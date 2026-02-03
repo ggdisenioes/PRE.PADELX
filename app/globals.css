@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --brand-primary: #010e35;
+  --brand-accent: #07fdbb;
+  --brand-accent-hover: #06e3a8;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand: var(--brand-accent);
+  --color-brand-primary: var(--brand-primary);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ================================ */
+/* Consistencia Desktop + Mobile    */
+/* (Evita texto claro sobre fondo)  */
+/* ================================ */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Form controls: no forzar colores; dejar que Tailwind mande.
+   Solo corregimos el bug de iOS donde el texto queda "gris". */
+input,
+textarea,
+select,
+button {
+  color: inherit;
+  -webkit-text-fill-color: currentColor;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af; /* gray-400 */
+  opacity: 1;
+}
+
+/* Botones oscuros (ej: login) deben tener texto claro para buen contraste */
+button[class*="bg-slate-9"],
+button[class*="bg-gray-9"],
+button[class*="bg-zinc-9"],
+button[class*="bg-neutral-9"],
+button.bg-black {
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+}
+
+/* iOS/Safari: asegura que el "text fill" respete el color real
+   (sin pisar utilidades Tailwind de branding) */
+@supports (-webkit-touch-callout: none) {
+  main,
+  main * {
+    -webkit-text-fill-color: currentColor !important;
+    opacity: 1;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    -webkit-text-fill-color: currentColor !important;
+    opacity: 1;
+  }
+
+  button[class*="bg-slate-9"],
+  button[class*="bg-gray-9"],
+  button[class*="bg-zinc-9"],
+  button[class*="bg-neutral-9"],
+  button.bg-black {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+  }
+}
