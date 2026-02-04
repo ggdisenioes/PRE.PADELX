@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Card from '../../components/Card';
 import { supabase } from '../../lib/supabase';
-import { supabase } from '../../lib/supabase';
+
 
 type Tournament = {
   id: number;
