@@ -138,7 +138,7 @@ export default function ScoreEntryPage() {
             return;
         }
 
-        // 6. VALIDACIÓN REGLAMENTO DE PADEL (CRÍTICO)
+        // 6. VALIDACIÓN REGLAMENTO DE PÁDEL (CRÍTICO)
         for (const [a, b] of scoreSets) {
             const numA = parseInt(a);
             const numB = parseInt(b);

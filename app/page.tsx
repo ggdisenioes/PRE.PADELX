@@ -918,7 +918,7 @@ export default function DashboardPage() {
                     }
 
                     const { blob, url } = result;
-                    const file = new File([blob], "resultado-demo.png", { type: "image/png" });
+                    const file = new File([blob], "resultado-twinco.png", { type: "image/png" });
 
                     if (navigator.share) {
                       try {
@@ -942,7 +942,7 @@ export default function DashboardPage() {
                     // Fallback: descargar
                     const a = document.createElement("a");
                     a.href = url;
-                    a.download = "resultado-demo.png";
+                    a.download = "resultado-twinco.png";
                     a.click();
                     toast.success("Imagen descargada");
                     URL.revokeObjectURL(url);
@@ -974,7 +974,7 @@ export default function DashboardPage() {
                     const { url } = result;
                     const a = document.createElement("a");
                     a.href = url;
-                    a.download = "resultado-demo.png";
+                    a.download = "resultado-twinco.png";
                     a.click();
                     toast.success("Imagen descargada");
                     URL.revokeObjectURL(url);

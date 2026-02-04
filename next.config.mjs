@@ -4,14 +4,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-
-  // Deploy estable en Vercel (evita que el build falle por warnings de lint)
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-
-  // Mejor compatibilidad en despliegues serverless
-  output: "standalone",
   
   // Mantenemos ignorar errores de TypeScript (esto sí suele permitirse)
   typescript: {

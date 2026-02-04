@@ -20,7 +20,7 @@ export default function NotFound() {
           borderRadius: 16,
           padding: 28,
           boxShadow: "0 20px 60px rgba(0,0,0,.35)",
-          borderTop: "4px solid #07fdbb",
+          borderTop: "4px solid #ccff00",
         }}
       >
         <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: "#111827" }}>

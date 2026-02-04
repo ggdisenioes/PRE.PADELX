@@ -103,9 +103,9 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
     { id: "dashboard", label: "Panel General", href: "/", emoji: "📊" },
     { id: "tournaments", label: "Torneos", href: "/tournaments", emoji: "🏆" },
     { id: "players", label: "Jugadores", href: "/players", emoji: "👥" },
-    { id: "courts", label: "Administrador de Pistas", href: "/courts", emoji: "🏟️" },
     { id: "matches", label: "Partidos en Vivo", href: "/matches", emoji: "🎾" },
     { id: "ranking", label: "Ranking", href: "/ranking", emoji: "⭐" },
+    { id: "courts", label: "Administrador de Pistas", href: "/courts", emoji: "🏟️" },
   ];
 
   const getInitials = (u: UserInfo | null): string => {
@@ -137,8 +137,8 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
         <h1 className="text-[26px] font-extrabold italic tracking-tight">
           DEMO
         </h1>
-        <p className="mt-1 text-[10px] font-bold tracking-[0.3em] text-[#07fdbb] uppercase">
-          Padel Manager
+        <p className="mt-1 text-[10px] font-bold tracking-[0.3em] text-[#ccff00] uppercase">
+          Pádel Manager
         </p>
       </div>
 
@@ -152,7 +152,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
           return (
             <div key={item.id} className="relative">
               {active && (
-                <div className="absolute left-0 top-0 h-full w-1 bg-[#07fdbb]" />
+                <div className="absolute left-0 top-0 h-full w-1 bg-[#ccff00]" />
               )}
 
               <Link
@@ -200,7 +200,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
             <Link
               href="/login"
               onClick={onLinkClick}
-              className="text-sm text-[#07fdbb] hover:underline"
+              className="text-sm text-[#ccff00] hover:underline"
             >
               Iniciar sesión &rarr;
             </Link>
@@ -213,7 +213,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
             href="https://ggdisenio.es"
             target="_blank"
             rel="noreferrer"
-            className="font-bold hover:text-[#07fdbb]"
+            className="font-bold hover:text-[#ccff00]"
           >
             GGDisenio.es
           </a>

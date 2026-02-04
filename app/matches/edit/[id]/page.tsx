@@ -18,11 +18,12 @@ export default function EditMatch() {
 
   const [loading, setLoading] = useState(true);
   const [tournaments, setTournaments] = useState<any[]>([]);
+  const FRIENDLY_VALUE = "__friendly__";
   const [players, setPlayers] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('details'); // Nuevo estado para pestañas
 
   const [formData, setFormData] = useState({
-    tournament_id: '',
+    tournament_id: FRIENDLY_VALUE,
     round_name: '',
     player_1_a: '', 
     player_2_a: '', 
@@ -68,7 +69,7 @@ export default function EditMatch() {
       if (matchData) {
           // Fill form data with existing match values (converting IDs to string for select inputs)
           setFormData({
-              tournament_id: String(matchData.tournament_id) || '',
+              tournament_id: matchData.tournament_id ? String(matchData.tournament_id) : FRIENDLY_VALUE,
               round_name: matchData.round_name || '',
               // Player IDs must be strings for the select input's value prop
               player_1_a: String(matchData.player_1_a) || '',
@@ -134,8 +135,12 @@ export default function EditMatch() {
     
     // Prepare data for UPDATE
     const updateData = {
-        tournament_id: Number(formData.tournament_id),
-        round_name: formData.round_name,
+        tournament_id:
+          formData.tournament_id === FRIENDLY_VALUE || !formData.tournament_id
+            ? null
+            : Number(formData.tournament_id),
+        round_name:
+          formData.tournament_id === FRIENDLY_VALUE ? null : (formData.round_name || null),
         place: formData.place,
         court: formData.court,
         start_time: formData.start_time ? new Date(formData.start_time).toISOString() : null,
@@ -237,11 +242,11 @@ export default function EditMatch() {
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-bold text-blue-800 mb-1">Torneo</label>
                                 <select 
-                                    required
                                     className="w-full p-3 border border-blue-300 rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                                     value={formData.tournament_id}
                                     onChange={(e) => setFormData({...formData, tournament_id: e.target.value})}
                                 >
+                                    <option value={FRIENDLY_VALUE}>Partido Amistoso</option>
                                     <option value="">-- Selecciona un torneo --</option>
                                     {tournaments.map(t => (
                                         <option key={t.id} value={t.id}>{t.name} - {t.category}</option>
@@ -252,7 +257,15 @@ export default function EditMatch() {
                             {/* Ronda i Hora */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Ronda / Fase</label>
-                                <input type="text" required placeholder="Ej: Vuitens de Final" className="w-full p-2 border border-gray-300 rounded" value={formData.round_name} onChange={(e) => setFormData({...formData, round_name: e.target.value})} />
+                                <input
+                                  type="text"
+                                  required={formData.tournament_id !== FRIENDLY_VALUE}
+                                  disabled={formData.tournament_id === FRIENDLY_VALUE}
+                                  placeholder={formData.tournament_id === FRIENDLY_VALUE ? "(Opcional en amistosos)" : "Ej: Octavos de Final"}
+                                  className="w-full p-2 border border-gray-300 rounded"
+                                  value={formData.round_name}
+                                  onChange={(e) => setFormData({...formData, round_name: e.target.value})}
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Fecha y hora</label>

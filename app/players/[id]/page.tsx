@@ -31,8 +31,9 @@ type MatchRow = {
 
 type HistoryItem = {
   id: number;
+  partner: string;
   opponent: string;
-  result: "Victoria" | "Derrota";
+  result: "Victoria" | "Derrota" | "Pendiente";
   score: string;
   ts: number; // timestamp para ordenar
   dateLabel: string; // para mostrar
@@ -128,13 +129,23 @@ export default function PlayerStatsPage() {
           team = "B";
         }
 
-        // ignorar si no pertenece o si no hay ganador final
-        const w = match.winner ?? "pending";
-        if (!team || w === "pending") continue;
+        if (!team) continue;
 
-        const isWin = team === w;
-        if (isWin) wins++;
-        else losses++;
+        const w = match.winner ?? "pending";
+        const isFinal = w !== "pending";
+        const isWin = isFinal ? team === w : false;
+        if (isFinal) {
+          if (isWin) wins++;
+          else losses++;
+        }
+
+        // compañero
+        const mate =
+          team === "A"
+            ? (match.player_1_a?.id === playerId ? match.player_2_a?.name : match.player_1_a?.name)
+            : (match.player_1_b?.id === playerId ? match.player_2_b?.name : match.player_1_b?.name);
+
+        const partner = mate || "(Sin compañero)";
 
         // oponentes (mejor: ambos nombres)
         const opp1 =
@@ -151,8 +162,9 @@ export default function PlayerStatsPage() {
 
         historyData.push({
           id: match.id,
+          partner,
           opponent,
-          result: isWin ? "Victoria" : "Derrota",
+          result: !isFinal ? "Pendiente" : (isWin ? "Victoria" : "Derrota"),
           score: match.score ?? "-",
           ts,
           dateLabel,
@@ -226,13 +238,18 @@ export default function PlayerStatsPage() {
           history.map((m) => (
             <Card key={m.id} className="p-4 flex justify-between gap-4">
               <div className="min-w-0">
-                <p className="font-semibold truncate">vs {m.opponent}</p>
+                <p className="font-semibold truncate">Con {m.partner}</p>
+                <p className="text-sm text-gray-700 truncate">vs {m.opponent}</p>
                 <p className="text-xs text-gray-500">{m.dateLabel}</p>
               </div>
               <div className="text-right shrink-0">
                 <p
                   className={`font-bold ${
-                    m.result === "Victoria" ? "text-green-700" : "text-red-700"
+                    m.result === "Victoria"
+                      ? "text-green-700"
+                      : m.result === "Derrota"
+                      ? "text-red-700"
+                      : "text-gray-500"
                   }`}
                 >
                   {m.result}
