@@ -7,9 +7,8 @@ import { supabase } from "../../../lib/supabase";
 import { useRole } from "../../../hooks/useRole";
 
 type Player = {
-  id: number; // id interno numérico (para UI)
+  id: number;
   name: string;
-  profile_id: string; // UUID real (lo que espera matches.player_*)
 };
 
 type Court = {
@@ -24,7 +23,7 @@ export default function CreateFriendlyMatchPage() {
   const { isAdmin, isManager, loading: roleLoading } = useRole();
 
   const [players, setPlayers] = useState<Player[]>([]);
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [courts, setCourts] = useState<Court[]>([]);
@@ -43,7 +42,7 @@ export default function CreateFriendlyMatchPage() {
 
       const { data: playersData, error: playersError } = await supabase
         .from("players")
-        .select("id, name, profile_id")
+        .select("id, name")
         .eq("is_approved", true)
         .order("name");
 
@@ -51,20 +50,7 @@ export default function CreateFriendlyMatchPage() {
         console.error(playersError);
         toast.error("No se pudieron cargar los jugadores");
       } else {
-        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        const normalized = (playersData || []).filter((p: any) => {
-          const ok = typeof p?.profile_id === "string" && UUID_RE.test(p.profile_id);
-          return ok;
-        });
-
-        if ((playersData || []).length !== normalized.length) {
-          console.warn(
-            "[friendly] Algunos jugadores no tienen profile_id UUID válido y fueron omitidos.",
-            { total: (playersData || []).length, ok: normalized.length }
-          );
-        }
-
-        setPlayers(normalized as Player[]);
+        setPlayers((playersData as Player[]) || []);
       }
 
       const { data: courtsData, error: courtsError } = await supabase
@@ -90,11 +76,9 @@ export default function CreateFriendlyMatchPage() {
   const canAccess = isAdmin || isManager;
   const isPageLoading = roleLoading || loadingCourts;
 
-  const togglePlayer = (profileId: string) => {
+  const togglePlayer = (id: number) => {
     setSelected((prev) =>
-      prev.includes(profileId)
-        ? prev.filter((p) => p !== profileId)
-        : [...prev, profileId]
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
     );
   };
 
@@ -183,14 +167,6 @@ export default function CreateFriendlyMatchPage() {
 
     setLoading(true);
 
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    const invalid = selected.find((v) => !UUID_RE.test(String(v)));
-    if (invalid) {
-      toast.error("Hay un jugador seleccionado sin UUID válido. Reintentá recargar la página.");
-      setLoading(false);
-      return;
-    }
-
     const shuffled = [...selected].sort(() => Math.random() - 0.5);
 
     const inserts: any[] = [];
@@ -208,29 +184,42 @@ export default function CreateFriendlyMatchPage() {
       const start = new Date(baseStart.getTime() + matchIndex * duration * 60_000);
 
       inserts.push({
-        tournament_id: null,
-        round_name: "Partido amistoso",
         start_time: start.toISOString(),
-        duration_minutes: duration,
-        court_id: Number(form.court_id),
-        court: selectedCourt?.name || null,
-        player_1_a: String(group[0]),
-        player_2_a: String(group[1]),
-        player_1_b: String(group[2]),
-        player_2_b: String(group[3]),
-        winner: "pending",
+        player_1_a_id: group[0],
+        player_2_a_id: group[1],
+        player_1_b_id: group[2],
+        player_2_b_id: group[3],
       });
 
       matchIndex += 1;
     }
 
-    const { error } = await supabase.from("matches").insert(inserts);
+    for (const m of inserts) {
+      const { error } = await supabase.rpc("create_friendly_match_by_player_ids", {
+        p_start_time: m.start_time,
+        p_player_1_a_id: m.player_1_a_id,
+        p_player_2_a_id: m.player_2_a_id,
+        p_player_1_b_id: m.player_1_b_id,
+        p_player_2_b_id: m.player_2_b_id,
+        p_location_name: null,
+        p_court_name: selectedCourt?.name || null,
+      });
 
-    if (error) {
-      console.error(error);
-      toast.error(`Error al crear los partidos amistosos: ${error.message}`);
-      setLoading(false);
-      return;
+      if (error) {
+        console.error(error);
+
+        const msg = String(error.message || "");
+        if (msg.toLowerCase().includes("does not exist") || msg.toLowerCase().includes("function")) {
+          toast.error(
+            "Falta configurar el RPC de creación de amistosos en Supabase. Pegá el SQL que te pasé (create_friendly_match_by_player_ids)."
+          );
+        } else {
+          toast.error(`Error al crear los partidos amistosos: ${error.message}`);
+        }
+
+        setLoading(false);
+        return;
+      }
     }
 
     toast.success("Partidos amistosos creados");
@@ -317,10 +306,10 @@ export default function CreateFriendlyMatchPage() {
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => togglePlayer(p.profile_id)}
+                    onClick={() => togglePlayer(p.id)}
                     className={`px-3 py-2 rounded-md border text-sm text-left transition
                       ${
-                        selected.includes(p.profile_id)
+                        selected.includes(p.id)
                           ? "bg-green-600 text-white border-green-600"
                           : "bg-white hover:bg-gray-50"
                       }`}
@@ -353,10 +342,10 @@ export default function CreateFriendlyMatchPage() {
                     return pairs.map((g, idx) => (
                       <li key={idx}>
                         <strong>Partido {idx + 1}:</strong>{" "}
-                        {players.find((p) => p.profile_id === g[0])?.name} &{" "}
-                        {players.find((p) => p.profile_id === g[1])?.name} vs{" "}
-                        {players.find((p) => p.profile_id === g[2])?.name} &{" "}
-                        {players.find((p) => p.profile_id === g[3])?.name}
+                        {players.find((p) => p.id === g[0])?.name} &{" "}
+                        {players.find((p) => p.id === g[1])?.name} vs{" "}
+                        {players.find((p) => p.id === g[2])?.name} &{" "}
+                        {players.find((p) => p.id === g[3])?.name}
                       </li>
                     ));
                   })()}
