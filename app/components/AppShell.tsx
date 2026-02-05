@@ -140,7 +140,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <header className="md:hidden relative flex items-center justify-center px-4 py-4 bg-[#05070b] border-b border-gray-800">
             <div className="text-center">
               <p className="text-[11px] font-extrabold tracking-[0.26em] text-white uppercase">
-                DEMO
+                TWINCO
               </p>
               <p className="text-[9px] font-semibold tracking-[0.32em] text-[#ccff00] uppercase mt-1">
                 Pádel Manager

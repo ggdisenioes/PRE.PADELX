@@ -175,6 +175,19 @@ export default function CreateFriendlyMatchPage() {
 
     const selectedCourt = courts.find((c) => c.id === Number(form.court_id));
 
+    const isRpcMissing = (err: any) => {
+      const msg = String(err?.message || "").toLowerCase();
+      const code = String((err as any)?.code || "").toLowerCase();
+      const details = String((err as any)?.details || "").toLowerCase();
+
+      if (code.includes("pgrst") && code.includes("202")) return true;
+      if (msg.includes("could not find the function")) return true;
+      if (msg.includes("function") && msg.includes("does not exist")) return true;
+      if (details.includes("could not find the function")) return true;
+
+      return false;
+    };
+
     let matchIndex = 0;
 
     for (let i = 0; i < shuffled.length; i += 4) {
@@ -195,7 +208,7 @@ export default function CreateFriendlyMatchPage() {
     }
 
     for (const m of inserts) {
-      const { error } = await supabase.rpc("create_friendly_match_by_player_ids", {
+      const rpc = await supabase.rpc("create_friendly_match_by_player_ids", {
         p_start_time: m.start_time,
         p_player_1_a_id: m.player_1_a_id,
         p_player_2_a_id: m.player_2_a_id,
@@ -205,18 +218,39 @@ export default function CreateFriendlyMatchPage() {
         p_court_name: selectedCourt?.name || null,
       });
 
-      if (error) {
-        console.error(error);
+      if (rpc.error) {
+        console.error("[friendly] RPC error", rpc.error);
 
-        const msg = String(error.message || "");
-        if (msg.toLowerCase().includes("does not exist") || msg.toLowerCase().includes("function")) {
-          toast.error(
-            "Falta configurar el RPC de creación de amistosos en Supabase. Pegá el SQL que te pasé (create_friendly_match_by_player_ids)."
-          );
-        } else {
-          toast.error(`Error al crear los partidos amistosos: ${error.message}`);
+        if (isRpcMissing(rpc.error)) {
+          // Fallback automático: insert directo (no depende de RPC ni cache)
+          const ins = await supabase.from("matches").insert({
+            start_time: m.start_time,
+            duration_minutes: duration,
+            is_friendly: true,
+            court_id: Number(form.court_id),
+            player_1_a_id: m.player_1_a_id,
+            player_2_a_id: m.player_2_a_id,
+            player_1_b_id: m.player_1_b_id,
+            player_2_b_id: m.player_2_b_id,
+            court_name: selectedCourt?.name || null,
+            location_name: null,
+          });
+
+          if (ins.error) {
+            console.error("[friendly] INSERT fallback error", ins.error);
+            const code = (ins.error as any)?.code ? ` [${(ins.error as any).code}]` : "";
+            const details = (ins.error as any)?.details ? ` · ${(ins.error as any).details}` : "";
+            toast.error(`Error al crear amistoso (fallback)${code}: ${ins.error.message}${details}`);
+            setLoading(false);
+            return;
+          }
+
+          continue;
         }
 
+        const code = (rpc.error as any)?.code ? ` [${(rpc.error as any).code}]` : "";
+        const details = (rpc.error as any)?.details ? ` · ${(rpc.error as any).details}` : "";
+        toast.error(`Error al crear amistoso${code}: ${rpc.error.message}${details}`);
         setLoading(false);
         return;
       }
