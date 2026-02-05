@@ -26,10 +26,18 @@ type UpcomingMatch = {
   round_name: string | null;
   place: string | null;
   court: string | null;
+  // Esquema anterior
   player_1_a: number | null;
   player_2_a: number | null;
   player_1_b: number | null;
   player_2_b: number | null;
+
+  // Nuevo esquema (amistosos)
+  player_1_a_id?: number | null;
+  player_2_a_id?: number | null;
+  player_1_b_id?: number | null;
+  player_2_b_id?: number | null;
+
   winner: string | null;
   score: string | null;
 };
@@ -69,19 +77,35 @@ type FinishedMatch = {
   start_time: string | null;
   score: string | null;
   winner: string | null;
+  // Esquema anterior
   player_1_a: number | null;
   player_2_a: number | null;
   player_1_b: number | null;
   player_2_b: number | null;
+
+  // Nuevo esquema (amistosos)
+  player_1_a_id?: number | null;
+  player_2_a_id?: number | null;
+  player_1_b_id?: number | null;
+  player_2_b_id?: number | null;
+
   created_at: string;
 };
 
 type RankingMatchRow = {
   winner: "A" | "B" | string | null;
+  // Esquema anterior
   player_1_a: number | null;
   player_2_a: number | null;
   player_1_b: number | null;
   player_2_b: number | null;
+
+  // Nuevo esquema (amistosos)
+  player_1_a_id?: number | null;
+  player_2_a_id?: number | null;
+  player_1_b_id?: number | null;
+  player_2_b_id?: number | null;
+
   score: string | null;
   tournament_id: number | null;
 };
@@ -109,6 +133,25 @@ export default function DashboardPage() {
 
   const [openResultMatch, setOpenResultMatch] = useState<FinishedMatch | null>(null);
   const shareCardRef = useRef<HTMLDivElement | null>(null);
+
+  const normalizePlayersFromIds = <T extends {
+    player_1_a: number | null;
+    player_2_a: number | null;
+    player_1_b: number | null;
+    player_2_b: number | null;
+    player_1_a_id?: number | null;
+    player_2_a_id?: number | null;
+    player_1_b_id?: number | null;
+    player_2_b_id?: number | null;
+  }>(m: T): T => {
+    return {
+      ...m,
+      player_1_a: m.player_1_a ?? (m.player_1_a_id ?? null),
+      player_2_a: m.player_2_a ?? (m.player_2_a_id ?? null),
+      player_1_b: m.player_1_b ?? (m.player_1_b_id ?? null),
+      player_2_b: m.player_2_b ?? (m.player_2_b_id ?? null),
+    };
+  };
 
 
   // Función para calcular alertas inteligentes (estable para hooks/realtime)
@@ -169,7 +212,8 @@ export default function DashboardPage() {
           .from("matches")
           .select("*", { count: "exact", head: true })
           .or(
-            `player_1_a.eq.${p.id},player_2_a.eq.${p.id},player_1_b.eq.${p.id},player_2_b.eq.${p.id}`
+            `player_1_a.eq.${p.id},player_2_a.eq.${p.id},player_1_b.eq.${p.id},player_2_b.eq.${p.id},` +
+            `player_1_a_id.eq.${p.id},player_2_a_id.eq.${p.id},player_1_b_id.eq.${p.id},player_2_b_id.eq.${p.id}`
           );
 
         if (!count || count === 0) {
@@ -237,13 +281,13 @@ export default function DashboardPage() {
       const { data: matches } = await supabase
         .from("matches")
         .select(
-          "id, start_time, tournament_id, round_name, place, court, player_1_a, player_2_a, player_1_b, player_2_b, winner, score"
+          "id, start_time, tournament_id, round_name, place, court, player_1_a, player_2_a, player_1_b, player_2_b, player_1_a_id, player_2_a_id, player_1_b_id, player_2_b_id, winner, score"
         )
         .eq("winner", "pending")
         .order("start_time", { ascending: true })
         .limit(5);
 
-      setUpcomingMatches(matches || []);
+      setUpcomingMatches((matches || []).map((m: any) => normalizePlayersFromIds(m)));
 
       // 4.25) Gráfico simple (últimos 7 días): partidos pendientes vs finalizados
       const start7d = new Date();
@@ -290,12 +334,12 @@ export default function DashboardPage() {
       // 4.5) Resultados recientes
       const { data: finishedMatches } = await supabase
         .from("matches")
-        .select("id, tournament_id, start_time, round_name, court, score, winner, player_1_a, player_2_a, player_1_b, player_2_b, created_at")
+        .select("id, tournament_id, start_time, round_name, court, score, winner, player_1_a, player_2_a, player_1_b, player_2_b, player_1_a_id, player_2_a_id, player_1_b_id, player_2_b_id, created_at")
         .neq("winner", "pending")
         .order("created_at", { ascending: false })
         .limit(5);
 
-      setRecentResults(finishedMatches || []);
+      setRecentResults((finishedMatches || []).map((m: any) => normalizePlayersFromIds(m)));
 
       // 5) Logs iniciales
       const { data: logs } = await supabase
@@ -309,7 +353,7 @@ export default function DashboardPage() {
       // 5.5) Ranking real (3 pts victoria, 1 pt derrota)
       const { data: rankingMatches } = await supabase
         .from("matches")
-        .select("winner, player_1_a, player_2_a, player_1_b, player_2_b, score, tournament_id")
+        .select("winner, player_1_a, player_2_a, player_1_b, player_2_b, player_1_a_id, player_2_a_id, player_1_b_id, player_2_b_id, score, tournament_id")
         .neq("winner", "pending");
 
       // Filter by tournament if selected
@@ -317,9 +361,11 @@ export default function DashboardPage() {
         ? (rankingMatches || []).filter((m) => m.tournament_id === selectedTournamentId)
         : rankingMatches || [];
 
+      const normalizedRankingMatches = filteredRankingMatches.map((m: any) => normalizePlayersFromIds(m));
+
       const rankingMap: Record<number, RankingItem> = {};
 
-      (filteredRankingMatches).forEach((m: RankingMatchRow) => {
+      (normalizedRankingMatches).forEach((m: RankingMatchRow) => {
         const teamA = [m.player_1_a, m.player_2_a].filter(Boolean) as number[];
         const teamB = [m.player_1_b, m.player_2_b].filter(Boolean) as number[];
 
