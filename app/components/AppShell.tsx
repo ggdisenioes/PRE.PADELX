@@ -137,8 +137,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* COLUMNA PRINCIPAL */}
         <div className="flex-1 flex flex-col">
           {/* HEADER MOBILE */}
-          <header className="md:hidden flex items-center justify-between px-4 py-4 bg-[#05070b] border-b border-gray-800">
-            <div className="text-center flex-1">
+          <header className="md:hidden relative flex items-center justify-center px-4 py-4 bg-[#05070b] border-b border-gray-800">
+            <div className="text-center">
               <p className="text-[11px] font-extrabold tracking-[0.26em] text-white uppercase">
                 DEMO
               </p>
@@ -150,18 +150,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
-              className="ml-3 inline-flex items-center justify-center rounded-md border border-gray-700 p-2 text-gray-200 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#05070b] focus:ring-[#ccff00]"
+              className="absolute right-4 inline-flex items-center gap-2 rounded-md border border-white/25 bg-white/10 px-3 py-2 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#05070b] focus:ring-[#ccff00]"
               onClick={() => setMobileOpen((o) => !o)}
             >
               {mobileOpen ? (
-                <svg className="h-5 w-5" viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth={1.8}>
+                <svg
+                  className="h-5 w-5 shrink-0"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  fill="none"
+                  strokeWidth={1.8}
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               ) : (
-                <svg className="h-5 w-5" viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth={1.8}>
+                <svg
+                  className="h-5 w-5 shrink-0"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  fill="none"
+                  strokeWidth={1.8}
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               )}
+              <span className="text-xs font-semibold">{mobileOpen ? "Cerrar" : "Menú"}</span>
             </button>
           </header>
 
