@@ -18,6 +18,7 @@ export default function CourtsPage() {
 
   const normalizedRole = (role || "").toLowerCase();
   const canWrite = normalizedRole === "admin" || normalizedRole === "manager" || isAdmin || isManager;
+  const canDelete = normalizedRole === "admin" || isAdmin;
 
   const [loading, setLoading] = useState(true);
   const [courts, setCourts] = useState<Court[]>([]);
@@ -30,6 +31,7 @@ export default function CourtsPage() {
   const [editName, setEditName] = useState("");
   const [editCovered, setEditCovered] = useState<boolean>(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const title = useMemo(() => {
     if (role === "user") return "Pistas disponibles";
@@ -147,6 +149,32 @@ export default function CourtsPage() {
     toast.success("Pista actualizada");
     setSavingEdit(false);
     cancelEdit();
+    fetchCourts();
+  };
+
+  const deleteCourt = async (c: Court) => {
+    if (!canDelete) {
+      toast.error("Solo un administrador puede eliminar pistas");
+      return;
+    }
+
+    const ok = window.confirm(`¿Eliminar la pista "${c.name}"? Esta acción no se puede deshacer.`);
+    if (!ok) return;
+
+    setDeletingId(c.id);
+    const { error } = await supabase.from("courts").delete().eq("id", c.id);
+
+    if (error) {
+      console.error("[courts] delete error", error);
+      toast.error(`No se pudo eliminar la pista: ${error.message}`);
+      setDeletingId(null);
+      return;
+    }
+
+    toast.success("Pista eliminada");
+    setDeletingId(null);
+    // Si estaba en edición, salimos
+    if (editingId === c.id) cancelEdit();
     fetchCourts();
   };
 
@@ -274,13 +302,26 @@ export default function CourtsPage() {
                               </button>
                             </div>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => startEdit(c)}
-                              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 transition"
-                            >
-                              Editar
-                            </button>
+                            <div className="inline-flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startEdit(c)}
+                                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 transition"
+                              >
+                                Editar
+                              </button>
+
+                              {canDelete && (
+                                <button
+                                  type="button"
+                                  disabled={deletingId === c.id}
+                                  onClick={() => deleteCourt(c)}
+                                  className="rounded-lg bg-red-600 text-white px-3 py-2 text-sm font-semibold hover:bg-red-700 transition disabled:opacity-60"
+                                >
+                                  {deletingId === c.id ? "Eliminando..." : "Eliminar"}
+                                </button>
+                              )}
+                            </div>
                           )}
                         </td>
                       )}
