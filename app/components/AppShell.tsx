@@ -150,7 +150,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
-              className="absolute right-4 inline-flex items-center gap-2 rounded-md border border-white/25 bg-white/10 px-3 py-2 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#05070b] focus:ring-[#ccff00]"
+              className="absolute right-4 inline-flex items-center gap-2 rounded-md border border-white/40 bg-black/30 px-3 py-2 shadow-sm hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#05070b] focus:ring-[#ccff00]"
+              style={{ color: "#ffffff" }}
               onClick={() => setMobileOpen((o) => !o)}
             >
               {mobileOpen ? (
