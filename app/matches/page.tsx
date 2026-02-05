@@ -22,6 +22,14 @@ type Match = {
   round_name: string | null;
   score: string | null;
   winner: string | null;
+
+  // Nuevo esquema (amistosos): ids numéricos
+  player_1_a_id?: number | null;
+  player_2_a_id?: number | null;
+  player_1_b_id?: number | null;
+  player_2_b_id?: number | null;
+
+  // Esquema anterior (joins): refs cargadas vía FK
   player_1_a: PlayerRef | null;
   player_2_a: PlayerRef | null;
   player_1_b: PlayerRef | null;
@@ -41,6 +49,7 @@ export default function MatchesPage() {
   const searchParams = useSearchParams();
 
   const [matches, setMatches] = useState<Match[]>([]);
+  const [playersMapObj, setPlayersMapObj] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("pending");
 
@@ -63,6 +72,24 @@ export default function MatchesPage() {
     const loadData = async () => {
       setLoading(true);
 
+      const { data: playersData, error: playersError } = await supabase
+        .from("players")
+        .select("id, name")
+        .order("name");
+
+      if (playersError) {
+        console.error(playersError);
+        toast.error("No se pudieron cargar los jugadores.");
+      }
+
+      const playersMap = new Map<number, string>(
+        (playersData ?? []).map((p: any) => [Number(p.id), String(p.name)])
+      );
+
+      const playersMapObj: Record<number, string> = {};
+      for (const [k, v] of playersMap.entries()) playersMapObj[k] = v;
+      setPlayersMapObj(playersMapObj);
+
       const { data: matchesData, error: matchError } = await supabase
         .from("matches")
         .select(`
@@ -72,6 +99,10 @@ export default function MatchesPage() {
           round_name,
           score,
           winner,
+          player_1_a_id,
+          player_2_a_id,
+          player_1_b_id,
+          player_2_b_id,
           player_1_a:players!matches_player_1_a_fkey ( id, name ),
           player_2_a:players!matches_player_2_a_fkey ( id, name ),
           player_1_b:players!matches_player_1_b_fkey ( id, name ),
@@ -95,7 +126,25 @@ export default function MatchesPage() {
 
       setTournaments(tournamentsData ?? []);
 
-      setMatches((matchesData ?? []) as Match[]);
+      const normalizedMatches = (matchesData ?? []).map((m: any) => {
+        const resolve = (id: any) => {
+          const n = Number(id);
+          if (!Number.isFinite(n)) return null;
+          const name = playersMap.get(n);
+          if (!name) return null;
+          return { id: n, name } as PlayerRef;
+        };
+
+        return {
+          ...m,
+          player_1_a: m.player_1_a ?? resolve(m.player_1_a_id),
+          player_2_a: m.player_2_a ?? resolve(m.player_2_a_id),
+          player_1_b: m.player_1_b ?? resolve(m.player_1_b_id),
+          player_2_b: m.player_2_b ?? resolve(m.player_2_b_id),
+        } as Match;
+      });
+
+      setMatches(normalizedMatches);
       setLoading(false);
     };
 
@@ -314,7 +363,7 @@ export default function MatchesPage() {
                 onClick={() => setOpenResultMatch(m)}
                 className="cursor-pointer"
               >
-                <MatchCard match={m} playersMap={{}} showActions={false} />
+                <MatchCard match={m} playersMap={playersMapObj} showActions={false} />
               </div>
 
               {/* Acciones */}
