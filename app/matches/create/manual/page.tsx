@@ -212,7 +212,7 @@ export default function CreateMatchManualPage() {
       court_id: Number(form.court_id),
       duration_minutes: Number(form.duration_minutes || 60),
       court: selectedCourt?.name || null,
-      start_time: form.start_time,
+      start_time: new Date(form.start_time).toISOString(),
       player_1_a: Number(player_1_a),
       player_2_a: Number(player_2_a),
       player_1_b: Number(player_1_b),
@@ -250,6 +250,7 @@ export default function CreateMatchManualPage() {
               type="datetime-local"
               name="start_time"
               required
+              value={form.start_time}
               className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
               onChange={handleChange}
             />
