@@ -103,6 +103,9 @@ export default function DashboardPage() {
   const [selectedTournamentId, setSelectedTournamentId] = useState<number | null>(null);
   const [recentResults, setRecentResults] = useState<FinishedMatch[]>([]);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
+  const [chart7d, setChart7d] = useState<
+    { key: string; label: string; pending: number; finished: number; total: number }[]
+  >([]);
 
   const [openResultMatch, setOpenResultMatch] = useState<FinishedMatch | null>(null);
   const shareCardRef = useRef<HTMLDivElement | null>(null);
@@ -241,6 +244,48 @@ export default function DashboardPage() {
         .limit(5);
 
       setUpcomingMatches(matches || []);
+
+      // 4.25) Gráfico simple (últimos 7 días): partidos pendientes vs finalizados
+      const start7d = new Date();
+      start7d.setDate(start7d.getDate() - 6);
+      start7d.setHours(0, 0, 0, 0);
+
+      const { data: matches7d, error: m7Err } = await supabase
+        .from("matches")
+        .select("start_time, winner")
+        .gte("start_time", start7d.toISOString());
+
+      const days: { key: string; date: Date; label: string }[] = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(start7d);
+        d.setDate(start7d.getDate() + i);
+        const key = d.toISOString().slice(0, 10);
+        const label = d.toLocaleDateString("es-ES", { weekday: "short" });
+        days.push({ key, date: d, label });
+      }
+
+      const byDay: Record<
+        string,
+        { key: string; label: string; pending: number; finished: number; total: number }
+      > = {};
+      days.forEach((d) => {
+        byDay[d.key] = { key: d.key, label: d.label, pending: 0, finished: 0, total: 0 };
+      });
+
+      if (!m7Err && matches7d) {
+        for (const row of matches7d as { start_time: string | null; winner: string | null }[]) {
+          if (!row.start_time) continue;
+          const k = new Date(row.start_time).toISOString().slice(0, 10);
+          if (!byDay[k]) continue;
+
+          const isPending = !row.winner || String(row.winner).toLowerCase() === "pending";
+          if (isPending) byDay[k].pending += 1;
+          else byDay[k].finished += 1;
+          byDay[k].total += 1;
+        }
+      }
+
+      setChart7d(days.map((d) => byDay[d.key]));
 
       // 4.5) Resultados recientes
       const { data: finishedMatches } = await supabase
@@ -609,6 +654,67 @@ export default function DashboardPage() {
                 )}
               </div>
             )}
+
+            {/* GRÁFICO (últimos 7 días) */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                  Actividad (7 días)
+                </h2>
+                <span className="text-xs text-gray-400">Pendientes vs finalizados</span>
+              </div>
+
+              {chart7d.length === 0 ? (
+                <div className="h-40 rounded-xl bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center text-sm text-gray-500">
+                  No hay datos para graficar.
+                </div>
+              ) : (
+                (() => {
+                  const max = Math.max(1, ...chart7d.map((d) => d.total));
+                  return (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-7 gap-2 items-end h-44">
+                        {chart7d.map((d) => {
+                          const hTotal = Math.round((d.total / max) * 100);
+                          const hPending = d.total ? Math.round((d.pending / max) * 100) : 0;
+                          const hFinished = d.total ? Math.round((d.finished / max) * 100) : 0;
+
+                          return (
+                            <div key={d.key} className="flex flex-col items-center gap-2">
+                              <div className="w-full flex items-end justify-center gap-1 h-36">
+                                <div
+                                  className="w-3 rounded-t bg-yellow-300"
+                                  style={{ height: `${Math.max(2, hPending)}%` }}
+                                  title={`${d.pending} pendientes`}
+                                />
+                                <div
+                                  className="w-3 rounded-t bg-green-400"
+                                  style={{ height: `${Math.max(2, hFinished)}%` }}
+                                  title={`${d.finished} finalizados`}
+                                />
+                              </div>
+                              <div className="text-[11px] text-gray-500 capitalize">{d.label}</div>
+                              <div className="text-[11px] font-semibold text-gray-700">{d.total}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block h-2 w-2 rounded bg-yellow-300" />
+                          Pendientes
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block h-2 w-2 rounded bg-green-400" />
+                          Finalizados
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              )}
+            </div>
 
             {/* ALERTAS */}
             {(isAdmin || isManager) && alerts.length > 0 && (
