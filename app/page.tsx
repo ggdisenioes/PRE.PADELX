@@ -504,19 +504,15 @@ export default function DashboardPage() {
   }
   return (
     <main className="w-full overflow-x-hidden px-4 py-6 md:px-8 lg:px-10 lg:py-8">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         {/* HEADER */}
-        <header className="mb-8 flex items-start justify-between">
+        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-3xl font-extrabold text-gray-900">
-              Panel General
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Resumen de tu club en tiempo real.
-            </p>
+            <h1 className="text-3xl font-extrabold text-gray-900">Panel General</h1>
+            <p className="text-sm text-gray-500 mt-1">Resumen de tu club en tiempo real.</p>
           </div>
 
-          <div className="hidden sm:flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm text-gray-500 shadow-sm">
+          <div className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm text-gray-500 shadow-sm w-fit">
             {new Date().toLocaleDateString("es-ES", {
               weekday: "long",
               day: "2-digit",
@@ -525,327 +521,448 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        {/* ACCIONES RÁPIDAS */}
-        {(isAdmin || isManager) && (
-          <section className="mb-8">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
-              Acciones rápidas
-            </h2>
-
-            <div className="flex flex-wrap gap-3">
-              {/* Crear partido */}
-              <Link
-                href="/matches/create"
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
-              >
-                ➕ Crear partido
-              </Link>
-
-              {/* Cargar resultados */}
-              <Link
-                href="/matches?status=pending"
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
-              >
-                🎯 Cargar resultados
-              </Link>
-
-              {/* Crear torneo (solo admin) */}
-              {isAdmin && (
-                <Link
-                  href="/tournaments/create"
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
-                >
-                  🏆 Crear torneo
-                </Link>
-              )}
-
-              {/* Gestión de usuarios (solo admin) */}
-              {isAdmin && (
-                <Link
-                  href="/admin/users/manage?crear=1"
-                  className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 shadow-sm hover:bg-indigo-100 transition"
-                >
-                  👤 Crear usuario
-                </Link>
-              )}
-
-              {/* Ver logs (solo admin) */}
-              {isAdmin && (
-                <Link
-                  href="/admin/logs"
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
-                >
-                  📜 Ver logs
-                </Link>
-              )}
-
-              {isAdmin && (
-                <Link
-                  href="/admin/users/manage"
-                  className="inline-flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 shadow-sm hover:bg-purple-100 transition"
-                >
-                  🛠️ Administrar usuarios
-                </Link>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* KPI CARDS */}
-        {(isAdmin || isManager) && (
-          loadingDashboard ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-28 bg-gray-100 animate-pulse rounded-xl" />
-              ))}
-            </div>
-          ) : (
-            <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
-              <div className="bg-white rounded-xl shadow-sm p-5 flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-gray-500">Torneos Activos</p>
-                  <p className="text-3xl font-bold">{countTournaments}</p>
-                  <p className="text-xs text-green-600 mt-1">+12% vs mes anterior</p>
+        {/* GRID PRINCIPAL (estilo dashboard con panel derecho) */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* COLUMNA IZQUIERDA */}
+          <div className="lg:col-span-8 space-y-6">
+            {/* KPIs */}
+            {(isAdmin || isManager) && (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                    Resumen
+                  </h2>
+                  <Link
+                    href="/matches"
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                  >
+                    Ver partidos →
+                  </Link>
                 </div>
-                <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center text-green-600 text-xl">🏆</div>
-              </div>
 
-              <div className="bg-white rounded-xl shadow-sm p-5 flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-gray-500">Partidos esta semana</p>
-                  <p className="text-3xl font-bold">{countPendingMatches}</p>
-                  <p className="text-xs text-green-600 mt-1">+25% vs mes anterior</p>
+                {loadingDashboard ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                    {[...Array(4)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-24 bg-gray-100 animate-pulse rounded-xl"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                    <div className="rounded-xl border border-gray-200 p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-500">Torneos</p>
+                        <p className="text-2xl font-extrabold text-gray-900">
+                          {countTournaments}
+                        </p>
+                        <p className="text-[11px] text-gray-500 mt-1">Activos / creados</p>
+                      </div>
+                      <div className="h-11 w-11 rounded-lg bg-green-100 flex items-center justify-center text-green-700 text-xl">
+                        🏆
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-gray-200 p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-500">Pendientes</p>
+                        <p className="text-2xl font-extrabold text-gray-900">
+                          {countPendingMatches}
+                        </p>
+                        <p className="text-[11px] text-gray-500 mt-1">Sin resultado</p>
+                      </div>
+                      <div className="h-11 w-11 rounded-lg bg-green-100 flex items-center justify-center text-green-700 text-xl">
+                        🎾
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-gray-200 p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-500">Jugadores</p>
+                        <p className="text-2xl font-extrabold text-gray-900">{countPlayers}</p>
+                        <p className="text-[11px] text-gray-500 mt-1">Aprobados</p>
+                      </div>
+                      <div className="h-11 w-11 rounded-lg bg-green-100 flex items-center justify-center text-green-700 text-xl">
+                        👥
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-gray-200 p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-500">Próximo</p>
+                        <p className="text-2xl font-extrabold text-gray-900">
+                          {upcomingMatches[0]?.start_time
+                            ? new Date(upcomingMatches[0].start_time).toLocaleTimeString("es-ES", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "—"}
+                        </p>
+                        <p className="text-[11px] text-gray-500 mt-1">Hora del partido</p>
+                      </div>
+                      <div className="h-11 w-11 rounded-lg bg-green-100 flex items-center justify-center text-green-700 text-xl">
+                        📅
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ALERTAS */}
+            {(isAdmin || isManager) && alerts.length > 0 && (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                    Alertas
+                  </h2>
+                  <span className="text-xs text-gray-400">Sugerencias inteligentes</span>
                 </div>
-                <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center text-green-600 text-xl">🎾</div>
-              </div>
 
-              <div className="bg-white rounded-xl shadow-sm p-5 flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-gray-500">Jugadores registrados</p>
-                  <p className="text-3xl font-bold">{countPlayers}</p>
-                  <p className="text-xs text-green-600 mt-1">+8% vs mes anterior</p>
-                </div>
-                <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center text-green-600 text-xl">👥</div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm p-5 flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-gray-500">Próximo partido</p>
-                  <p className="text-2xl font-bold">
-                    {upcomingMatches[0]?.start_time
-                      ? new Date(upcomingMatches[0].start_time).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
-                      : "—"}
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center text-green-600 text-xl">📅</div>
-              </div>
-            </section>
-          )
-        )}
-
-
-        {/* ALERTAS INTELIGENTES */}
-        {(isAdmin || isManager) && alerts.length > 0 && (
-          <section className="mb-10">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">
-              Alertas Inteligentes
-            </h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {alerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className={`rounded-xl border p-4 text-sm shadow-sm flex items-start justify-between gap-4 ${
-                    alert.type === "warning"
-                      ? "bg-yellow-50 border-yellow-300 text-yellow-900"
-                      : "bg-blue-50 border-blue-300 text-blue-900"
-                  }`}
-                >
-                  <p>{alert.message}</p>
-                  {alert.actionHref && alert.actionLabel && (
-                    <Link
-                      href={alert.actionHref}
-                      className="shrink-0 inline-flex items-center rounded-md bg-white/80 px-3 py-1.5 text-xs font-semibold text-gray-900 hover:bg-white transition"
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {alerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={`rounded-xl border p-4 text-sm shadow-sm flex items-start justify-between gap-4 ${
+                        alert.type === "warning"
+                          ? "bg-yellow-50 border-yellow-300 text-yellow-900"
+                          : "bg-blue-50 border-blue-300 text-blue-900"
+                      }`}
                     >
-                      {alert.actionLabel} →
+                      <p>{alert.message}</p>
+                      {alert.actionHref && alert.actionLabel && (
+                        <Link
+                          href={alert.actionHref}
+                          className="shrink-0 inline-flex items-center rounded-md bg-white/80 px-3 py-1.5 text-xs font-semibold text-gray-900 hover:bg-white transition"
+                        >
+                          {alert.actionLabel} →
+                        </Link>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* PRÓXIMOS PARTIDOS */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                  Próximos partidos
+                </h2>
+                <Link
+                  href="/matches"
+                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                >
+                  Ver todos →
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {upcomingMatches.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-gray-200 p-6 text-sm text-gray-500">
+                    No hay partidos pendientes para mostrar.
+                  </div>
+                ) : (
+                  upcomingMatches.map((m: UpcomingMatch) => {
+                    const matchWithName: any = {
+                      ...m,
+                      tournament_name: m.tournament_id
+                        ? tournamentMap[m.tournament_id]
+                        : undefined,
+                    };
+                    const clickable =
+                      !!m.score &&
+                      !!m.winner &&
+                      String(m.winner).toLowerCase() !== "pending";
+
+                    return (
+                      <div
+                        key={m.id}
+                        className={clickable ? "cursor-pointer" : ""}
+                        onClick={() => {
+                          if (clickable)
+                            setOpenResultMatch(matchWithName as any);
+                        }}
+                      >
+                        <MatchCard
+                          match={matchWithName}
+                          playersMap={playerMap}
+                          showActions={false}
+                        />
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* RESULTADOS + RANKING */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              {/* Resultados recientes */}
+              <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                    Resultados recientes
+                  </h2>
+                  <Link
+                    href="/matches?status=finished"
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                  >
+                    Ver historial →
+                  </Link>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {recentResults.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-gray-200 p-6 text-sm text-gray-500">
+                      Todavía no hay resultados cargados.
+                    </div>
+                  ) : (
+                    recentResults.map((m: FinishedMatch) => {
+                      const matchWithName: any = {
+                        ...m,
+                        tournament_name: m.tournament_id
+                          ? tournamentMap[m.tournament_id]
+                          : undefined,
+                      };
+                      return (
+                        <div
+                          key={m.id}
+                          className="cursor-pointer"
+                          onClick={() => setOpenResultMatch(matchWithName)}
+                        >
+                          <MatchCard
+                            match={matchWithName}
+                            playersMap={playerMap}
+                            showActions={false}
+                          />
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Ranking */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                    Ranking
+                  </h2>
+                  <span className="text-xs text-gray-400">3 pts victoria / 1 derrota</span>
+                </div>
+
+                <div className="mb-3">
+                  <label
+                    htmlFor="tournament-selector"
+                    className="block text-xs font-medium text-gray-500 mb-1"
+                  >
+                    Torneo
+                  </label>
+                  <select
+                    id="tournament-selector"
+                    value={selectedTournamentId ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedTournamentId(val === "" ? null : Number(val));
+                    }}
+                    className="w-full rounded-md border-gray-300 py-1.5 px-2 text-sm"
+                  >
+                    <option value="">Todos los torneos</option>
+                    {Object.entries(tournamentMap).map(([tid, tname]) => (
+                      <option key={tid} value={tid}>
+                        {tname}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="flex font-semibold text-[11px] text-gray-600 px-3 py-2 bg-gray-50 border-b border-gray-200">
+                    <div className="w-6 text-center">#</div>
+                    <div className="flex-1">Jugador</div>
+                    <div className="w-10 text-center">Pts</div>
+                  </div>
+
+                  {topRanking.length === 0 ? (
+                    <div className="p-4 text-sm text-gray-500">
+                      No hay datos de ranking para mostrar.
+                    </div>
+                  ) : (
+                    topRanking.slice(0, 8).map((r: RankingItem, idx: number) => {
+                      const medal =
+                        idx === 0
+                          ? "🥇"
+                          : idx === 1
+                          ? "🥈"
+                          : idx === 2
+                          ? "🥉"
+                          : null;
+
+                      return (
+                        <Link
+                          key={r.player_id}
+                          href={`/players/${r.player_id}`}
+                          className="flex items-center px-3 py-2 border-b last:border-b-0 border-gray-100 hover:bg-gray-50 transition"
+                        >
+                          <div className="w-6 text-center text-sm font-bold text-gray-500">
+                            {medal ?? idx + 1}
+                          </div>
+                          <div className="flex-1">
+                            <span className="font-semibold text-sm text-gray-900">
+                              {r.name}
+                            </span>
+                            <div className="text-[11px] text-gray-500">
+                              PJ {r.played} · PG {r.wins} · PP {r.losses}
+                            </div>
+                          </div>
+                          <div className="w-10 text-center font-extrabold text-green-700">
+                            {r.points}
+                          </div>
+                        </Link>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* COLUMNA DERECHA */}
+          <aside className="lg:col-span-4 space-y-6">
+            {/* ACCIONES RÁPIDAS */}
+            {(isAdmin || isManager) && (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                  Acciones rápidas
+                </h2>
+
+                <div className="grid grid-cols-1 gap-2">
+                  <Link
+                    href="/matches/create"
+                    className="inline-flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
+                  >
+                    <span>➕ Crear partido</span>
+                    <span className="text-gray-400">→</span>
+                  </Link>
+
+                  <Link
+                    href="/matches?status=pending"
+                    className="inline-flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
+                  >
+                    <span>🎯 Cargar resultados</span>
+                    <span className="text-gray-400">→</span>
+                  </Link>
+
+                  {isAdmin && (
+                    <Link
+                      href="/tournaments/create"
+                      className="inline-flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
+                    >
+                      <span>🏆 Crear torneo</span>
+                      <span className="text-gray-400">→</span>
+                    </Link>
+                  )}
+
+                  {isAdmin && (
+                    <Link
+                      href="/admin/users/manage?crear=1"
+                      className="inline-flex items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 shadow-sm hover:bg-indigo-100 transition"
+                    >
+                      <span>👤 Crear usuario</span>
+                      <span className="text-indigo-400">→</span>
+                    </Link>
+                  )}
+
+                  {isAdmin && (
+                    <Link
+                      href="/admin/users/manage"
+                      className="inline-flex items-center justify-between gap-2 rounded-lg border border-purple-200 bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 shadow-sm hover:bg-purple-100 transition"
+                    >
+                      <span>🛠️ Administrar usuarios</span>
+                      <span className="text-purple-400">→</span>
+                    </Link>
+                  )}
+
+                  {isAdmin && (
+                    <Link
+                      href="/admin/logs"
+                      className="inline-flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
+                    >
+                      <span>📜 Ver logs</span>
+                      <span className="text-gray-400">→</span>
                     </Link>
                   )}
                 </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* PRÓXIMOS PARTIDOS (CARDS) */}
-        <section className="mt-10">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900">
-              Próximos Partidos
-            </h2>
-            <Link
-              href="/matches"
-              className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
-            >
-              Ver todos →
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {upcomingMatches.map((m: UpcomingMatch) => {
-              const matchWithName: any = {
-                ...m,
-                tournament_name: m.tournament_id ? tournamentMap[m.tournament_id] : undefined,
-              };
-              const clickable = !!m.score && !!m.winner && String(m.winner).toLowerCase() !== "pending";
-              return (
-                <div
-                  key={m.id}
-                  className={clickable ? "cursor-pointer" : ""}
-                  onClick={() => {
-                    if (clickable) setOpenResultMatch(matchWithName as any);
-                  }}
-                >
-                  <MatchCard match={matchWithName} playersMap={playerMap} showActions={false} />
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* RANKING + RESULTADOS */}
-        <section className="mt-10 grid grid-cols-1 xl:grid-cols-3 gap-8">
-          {/* Resultados recientes */}
-          <div className="xl:col-span-2">
-            <h2 className="text-lg font-bold mb-4">Resultados Recientes</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {recentResults.map((m: FinishedMatch) => {
-                const matchWithName: any = {
-                  ...m,
-                  tournament_name: m.tournament_id ? tournamentMap[m.tournament_id] : undefined,
-                };
-                return (
-                  <div
-                    key={m.id}
-                    className="cursor-pointer"
-                    onClick={() => setOpenResultMatch(matchWithName)}
-                  >
-                    <MatchCard match={matchWithName} playersMap={playerMap} showActions={false} />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Ranking */}
-          <div>
-            <h2 className="text-lg font-bold mb-4">Top Ranking</h2>
-            {/* Tournament selector */}
-            <div className="mb-2">
-              <label htmlFor="tournament-selector" className="block text-xs font-medium text-gray-500 mb-1">
-                Torneo
-              </label>
-              <select
-                id="tournament-selector"
-                value={selectedTournamentId ?? ""}
-                onChange={e => {
-                  const val = e.target.value;
-                  setSelectedTournamentId(val === "" ? null : Number(val));
-                }}
-                className="rounded-md border-gray-300 py-1 px-2 text-sm"
-              >
-                <option value="">Todos los torneos</option>
-                {Object.entries(tournamentMap).map(([tid, tname]) => (
-                  <option key={tid} value={tid}>{tname}</option>
-                ))}
-              </select>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              {/* Table header */}
-              <div className="flex font-semibold text-xs text-gray-600 px-4 py-2 bg-gray-50 border-b border-gray-200">
-                <div className="w-6 text-center"></div>
-                <div className="flex-1">Jugador</div>
-                <div className="w-10 text-center">PJ</div>
-                <div className="w-10 text-center">PG</div>
-                <div className="w-10 text-center">PP</div>
-                <div className="w-10 text-center">GF</div>
-                <div className="w-10 text-center">GC</div>
-                <div className="w-12 text-center">Pts</div>
               </div>
-              {topRanking.map((r: RankingItem, idx: number) => {
-                const medal =
-                  idx === 0 ? "🥇" :
-                  idx === 1 ? "🥈" :
-                  idx === 2 ? "🥉" :
-                  null;
+            )}
 
-                return (
-                  <Link
-                    key={r.player_id}
-                    href={`/players/${r.player_id}`}
-                    className="flex items-center px-4 py-3 border-b last:border-b-0 border-gray-100 hover:bg-gray-50 transition"
-                  >
-                    <div className="w-6 text-center text-lg font-bold text-gray-500">
-                      {medal ?? idx + 1}
-                    </div>
-                    <div className="flex-1">
-                      <span className="font-semibold text-sm text-gray-900">{r.name}</span>
-                    </div>
-                    <div className="w-10 text-center">{r.played}</div>
-                    <div className="w-10 text-center">{r.wins}</div>
-                    <div className="w-10 text-center">{r.losses}</div>
-                    <div className="w-10 text-center">{r.games_for}</div>
-                    <div className="w-10 text-center">{r.games_against}</div>
-                    <div className="w-12 text-center font-bold text-green-600">{r.points}</div>
-                  </Link>
-                );
-              })}
+            {/* ACTIVIDAD RECIENTE */}
+            {isAdmin && (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+                <div className="p-5 border-b border-gray-200">
+                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                    Actividad reciente
+                  </h2>
+                </div>
+
+                <div className="divide-y">
+                  {recentLogs.length === 0 ? (
+                    <p className="p-4 text-sm text-gray-500">No hay actividad registrada.</p>
+                  ) : (
+                    recentLogs.map((log) => (
+                      <div key={log.id} className="p-4 flex items-start gap-3">
+                        <div className="mt-1.5 h-2 w-2 rounded-full bg-green-500" />
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-800">
+                            <span className="font-semibold">
+                              {log.user_email ?? "Sistema"}
+                            </span>{" "}
+                            realizó{" "}
+                            <span className="font-semibold">
+                              {log.action.replace(/_/g, " ").toLowerCase()}
+                            </span>
+                            {log.entity && (
+                              <>
+                                {" "}
+                                en <span className="font-semibold">{log.entity}</span>
+                              </>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {new Date(log.created_at).toLocaleString("es-ES")}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* AYUDA RÁPIDA */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                Atajos
+              </h2>
+              <div className="text-sm text-gray-600 space-y-2">
+                <Link href="/players" className="block hover:text-gray-900">
+                  Jugadores →
+                </Link>
+                <Link href="/tournaments" className="block hover:text-gray-900">
+                  Torneos →
+                </Link>
+                <Link href="/matches" className="block hover:text-gray-900">
+                  Partidos →
+                </Link>
+              </div>
             </div>
-          </div>
+          </aside>
         </section>
-
-        {/* ACTIVIDAD RECIENTE */}
-        {isAdmin && (
-          <section className="mt-10">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">
-              Actividad Reciente
-            </h2>
-
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y">
-              {recentLogs.length === 0 ? (
-                <p className="p-4 text-sm text-gray-500">
-                  No hay actividad registrada.
-                </p>
-              ) : (
-                recentLogs.map((log) => (
-                  <div key={log.id} className="p-4 flex items-start gap-3">
-                    <div className="mt-1 h-2 w-2 rounded-full bg-green-500" />
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-800">
-                        <span className="font-semibold">
-                          {log.user_email ?? "Sistema"}
-                        </span>{" "}
-                        realizó{" "}
-                        <span className="font-semibold">
-                          {log.action.replace(/_/g, " ").toLowerCase()}
-                        </span>
-                        {log.entity && (
-                          <>
-                            {" "}
-                            en <span className="font-semibold">{log.entity}</span>
-                          </>
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {new Date(log.created_at).toLocaleString("es-ES")}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-        )}
       </div>
+
       {/* Render oculto para generar imagen (Instagram 1:1) */}
       <div
         style={{
@@ -860,7 +977,13 @@ export default function DashboardPage() {
           <div ref={shareCardRef}>
             {(() => {
               const t = getWinnerLoserTeams(openResultMatch);
-              return <MatchShareCard winnerTeam={t.winnerTeam} loserTeam={t.loserTeam} score={t.score} />;
+              return (
+                <MatchShareCard
+                  winnerTeam={t.winnerTeam}
+                  loserTeam={t.loserTeam}
+                  score={t.score}
+                />
+              );
             })()}
           </div>
         )}
@@ -877,7 +1000,11 @@ export default function DashboardPage() {
             </button>
 
             <div className="flex flex-col items-center gap-1">
-              <img src="/logo.svg" alt="DEMO Padel Manager" className="h-8 w-auto object-contain" />
+              <img
+                src="/logo.svg"
+                alt="DEMO Padel Manager"
+                className="h-8 w-auto object-contain"
+              />
               <span className="text-xs tracking-widest text-green-400">PADEL MANAGER</span>
             </div>
 
@@ -886,8 +1013,14 @@ export default function DashboardPage() {
                 <>
                   <p className="text-lg font-semibold">
                     {openResultMatch.winner === "A"
-                      ? buildTeamNameFromIds(openResultMatch.player_1_a, openResultMatch.player_2_a)
-                      : buildTeamNameFromIds(openResultMatch.player_1_b, openResultMatch.player_2_b)}
+                      ? buildTeamNameFromIds(
+                          openResultMatch.player_1_a,
+                          openResultMatch.player_2_a
+                        )
+                      : buildTeamNameFromIds(
+                          openResultMatch.player_1_b,
+                          openResultMatch.player_2_b
+                        )}
                   </p>
 
                   <p className="text-5xl font-extrabold my-2">
@@ -896,8 +1029,14 @@ export default function DashboardPage() {
 
                   <p className="text-sm text-white/70">
                     {openResultMatch.winner === "A"
-                      ? buildTeamNameFromIds(openResultMatch.player_1_b, openResultMatch.player_2_b)
-                      : buildTeamNameFromIds(openResultMatch.player_1_a, openResultMatch.player_2_a)}
+                      ? buildTeamNameFromIds(
+                          openResultMatch.player_1_b,
+                          openResultMatch.player_2_b
+                        )
+                      : buildTeamNameFromIds(
+                          openResultMatch.player_1_a,
+                          openResultMatch.player_2_a
+                        )}
                   </p>
                 </>
               ) : (
@@ -918,7 +1057,9 @@ export default function DashboardPage() {
                     }
 
                     const { blob, url } = result;
-                    const file = new File([blob], "resultado-twinco.png", { type: "image/png" });
+                    const file = new File([blob], "resultado-twinco.png", {
+                      type: "image/png",
+                    });
 
                     if (navigator.share) {
                       try {
@@ -931,11 +1072,14 @@ export default function DashboardPage() {
                         URL.revokeObjectURL(url);
                         return;
                       } catch (err: any) {
-                        if (err?.name === "AbortError" || err?.message === "Share canceled") {
+                        if (
+                          err?.name === "AbortError" ||
+                          err?.message === "Share canceled"
+                        ) {
                           URL.revokeObjectURL(url);
                           return;
                         }
-                        // if share fails, fall back to download below
+                        // si share falla, caemos al download
                       }
                     }
 
@@ -992,7 +1136,9 @@ export default function DashboardPage() {
                 Descargar imagen
               </button>
 
-              <p className="text-center text-xs text-white/60">Ideal para WhatsApp e Instagram.</p>
+              <p className="text-center text-xs text-white/60">
+                Ideal para WhatsApp e Instagram.
+              </p>
             </div>
           </div>
         </div>
