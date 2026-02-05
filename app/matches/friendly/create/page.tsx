@@ -73,23 +73,8 @@ export default function CreateFriendlyMatchPage() {
     loadData();
   }, []);
 
-  if (roleLoading || loadingCourts) {
-    return (
-      <main className="max-w-3xl mx-auto p-6">
-        <p className="text-gray-500">Cargando permisos…</p>
-      </main>
-    );
-  }
-
-  if (!isAdmin && !isManager) {
-    return (
-      <main className="max-w-3xl mx-auto p-6">
-        <p className="text-red-600 font-semibold">
-          No tenés permisos para crear partidos amistosos.
-        </p>
-      </main>
-    );
-  }
+  const canAccess = isAdmin || isManager;
+  const isPageLoading = roleLoading || loadingCourts;
 
   const togglePlayer = (id: number) => {
     setSelected((prev) =>
@@ -230,140 +215,150 @@ export default function CreateFriendlyMatchPage() {
 
   return (
     <main className="max-w-3xl mx-auto p-6 space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold">Crear partido amistoso</h1>
-        <p className="text-sm text-gray-500">
-          Los partidos amistosos no pertenecen a ningún torneo.
+      {isPageLoading ? (
+        <p className="text-gray-500">Cargando permisos…</p>
+      ) : !canAccess ? (
+        <p className="text-red-600 font-semibold">
+          No tenés permisos para crear partidos amistosos.
         </p>
-      </header>
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
-        <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-          <h2 className="font-semibold">Programación</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <input
-              type="datetime-local"
-              name="start_time"
-              value={form.start_time}
-              onChange={handleFormChange}
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-
-            <select
-              name="duration_minutes"
-              value={form.duration_minutes}
-              onChange={handleFormChange}
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              <option value="30">Duración: 30 min</option>
-              <option value="60">Duración: 60 min</option>
-              <option value="90">Duración: 90 min</option>
-              <option value="120">Duración: 120 min</option>
-            </select>
-
-            <select
-              name="court_id"
-              value={form.court_id}
-              onChange={handleFormChange}
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              <option value="">Seleccionar pista</option>
-              {courts.map((c) => {
-                const occupied = occupiedCourtIds.has(c.id);
-                const labelBase = `${c.name} · ${c.is_covered ? "Cubierta" : "Descubierta"}`;
-                const label = occupied ? `${labelBase} · Ocupada` : labelBase;
-                return (
-                  <option key={c.id} value={c.id} disabled={occupied}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          {matchesCount > 1 && (
-            <p className="text-xs text-gray-600">
-              Se van a crear <strong>{matchesCount}</strong> partidos consecutivos en la misma pista,
-              sumando un total de <strong>{matchesCount * Number(form.duration_minutes || 60)}</strong> minutos.
+      ) : (
+        <>
+          <header>
+            <h1 className="text-2xl font-bold">Crear partido amistoso</h1>
+            <p className="text-sm text-gray-500">
+              Los partidos amistosos no pertenecen a ningún torneo.
             </p>
-          )}
-        </div>
+          </header>
 
-        <div>
-          <h2 className="font-semibold mb-2">
-            Seleccioná jugadores (mínimo 4, número par)
-          </h2>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+              <h2 className="font-semibold">Programación</h2>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {players.map((p) => (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input
+                  type="datetime-local"
+                  name="start_time"
+                  value={form.start_time}
+                  onChange={handleFormChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+
+                <select
+                  name="duration_minutes"
+                  value={form.duration_minutes}
+                  onChange={handleFormChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="30">Duración: 30 min</option>
+                  <option value="60">Duración: 60 min</option>
+                  <option value="90">Duración: 90 min</option>
+                  <option value="120">Duración: 120 min</option>
+                </select>
+
+                <select
+                  name="court_id"
+                  value={form.court_id}
+                  onChange={handleFormChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="">Seleccionar pista</option>
+                  {courts.map((c) => {
+                    const occupied = occupiedCourtIds.has(c.id);
+                    const labelBase = `${c.name} · ${c.is_covered ? "Cubierta" : "Descubierta"}`;
+                    const label = occupied ? `${labelBase} · Ocupada` : labelBase;
+                    return (
+                      <option key={c.id} value={c.id} disabled={occupied}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {matchesCount > 1 && (
+                <p className="text-xs text-gray-600">
+                  Se van a crear <strong>{matchesCount}</strong> partidos consecutivos en la misma pista,
+                  sumando un total de <strong>{matchesCount * Number(form.duration_minutes || 60)}</strong> minutos.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <h2 className="font-semibold mb-2">
+                Seleccioná jugadores (mínimo 4, número par)
+              </h2>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {players.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => togglePlayer(p.id)}
+                    className={`px-3 py-2 rounded-md border text-sm text-left transition
+                      ${
+                        selected.includes(p.id)
+                          ? "bg-green-600 text-white border-green-600"
+                          : "bg-white hover:bg-gray-50"
+                      }`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+
+              {isOdd && (
+                <p className="mt-3 text-sm text-orange-600 font-medium">
+                  Para 2vs2 necesitás un número PAR de jugadores (se arman parejas).
+                </p>
+              )}
+            </div>
+
+            {canCreate && (
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-semibold mb-2">Vista previa de parejas</h3>
+                <ul className="space-y-2 text-sm">
+                  {(() => {
+                    const shuffled = [...selected];
+                    const pairs = [];
+                    for (let i = 0; i < shuffled.length; i += 4) {
+                      const g = shuffled.slice(i, i + 4);
+                      if (g.length === 4) {
+                        pairs.push(g);
+                      }
+                    }
+                    return pairs.map((g, idx) => (
+                      <li key={idx}>
+                        <strong>Partido {idx + 1}:</strong>{" "}
+                        {players.find((p) => p.id === g[0])?.name} &{" "}
+                        {players.find((p) => p.id === g[1])?.name} vs{" "}
+                        {players.find((p) => p.id === g[2])?.name} &{" "}
+                        {players.find((p) => p.id === g[3])?.name}
+                      </li>
+                    ));
+                  })()}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
               <button
-                key={p.id}
-                type="button"
-                onClick={() => togglePlayer(p.id)}
-                className={`px-3 py-2 rounded-md border text-sm text-left transition
-                  ${
-                    selected.includes(p.id)
-                      ? "bg-green-600 text-white border-green-600"
-                      : "bg-white hover:bg-gray-50"
-                  }`}
+                onClick={() => router.back()}
+                className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-semibold hover:bg-gray-200 transition"
               >
-                {p.name}
+                Cancelar
               </button>
-            ))}
+
+              <button
+                onClick={handleCreate}
+                disabled={loading}
+                className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-green-700 transition disabled:opacity-50"
+              >
+                {loading ? "Creando…" : "Crear partidos amistosos"}
+              </button>
+            </div>
           </div>
-
-          {isOdd && (
-            <p className="mt-3 text-sm text-orange-600 font-medium">
-              Para 2vs2 necesitás un número PAR de jugadores (se arman parejas).
-            </p>
-          )}
-        </div>
-
-        {canCreate && (
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-semibold mb-2">Vista previa de parejas</h3>
-            <ul className="space-y-2 text-sm">
-              {(() => {
-                const shuffled = [...selected];
-                const pairs = [];
-                for (let i = 0; i < shuffled.length; i += 4) {
-                  const g = shuffled.slice(i, i + 4);
-                  if (g.length === 4) {
-                    pairs.push(g);
-                  }
-                }
-                return pairs.map((g, idx) => (
-                  <li key={idx}>
-                    <strong>Partido {idx + 1}:</strong>{" "}
-                    {players.find((p) => p.id === g[0])?.name} &{" "}
-                    {players.find((p) => p.id === g[1])?.name} vs{" "}
-                    {players.find((p) => p.id === g[2])?.name} &{" "}
-                    {players.find((p) => p.id === g[3])?.name}
-                  </li>
-                ));
-              })()}
-            </ul>
-          </div>
-        )}
-
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={() => router.back()}
-            className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-semibold hover:bg-gray-200 transition"
-          >
-            Cancelar
-          </button>
-
-          <button
-            onClick={handleCreate}
-            disabled={loading}
-            className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-green-700 transition disabled:opacity-50"
-          >
-            {loading ? "Creando…" : "Crear partidos amistosos"}
-          </button>
-        </div>
-      </div>
+        </>
+      )}
     </main>
   );
 }
