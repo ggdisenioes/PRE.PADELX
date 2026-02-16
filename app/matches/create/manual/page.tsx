@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 
 import { supabase } from "../../../lib/supabase";
 import { useRole } from "../../../hooks/useRole";
+import { notifyMatchCreated } from "../../../lib/notify";
 
 type Player = {
   id: number;
@@ -205,7 +206,7 @@ export default function CreateMatchManualPage() {
 
     const selectedCourt = courts.find((c) => c.id === Number(form.court_id));
 
-    const { error } = await supabase.from("matches").insert({
+    const { data: created, error } = await supabase.from("matches").insert({
       tournament_id: Number(tournamentId),
       round_name: form.round_name || "Partido",
       place: form.place || null,
@@ -218,7 +219,7 @@ export default function CreateMatchManualPage() {
       player_1_b: Number(player_1_b),
       player_2_b: Number(player_2_b),
       winner: "pending",
-    });
+    }).select("id");
 
     if (error) {
       console.error(error);
@@ -227,6 +228,7 @@ export default function CreateMatchManualPage() {
     }
 
     toast.success("Partido creado correctamente");
+    if (created) notifyMatchCreated(created.map((m: any) => m.id));
     router.push("/matches");
   };
 

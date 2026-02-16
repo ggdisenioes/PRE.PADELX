@@ -3,13 +3,43 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase'; // Ajusta la ruta a tu lib/supabase
 import Card from '../../components/Card';
 import toast from 'react-hot-toast';
 
 export default function PlayersApprovalPage() {
+    const router = useRouter();
     const [pendingPlayers, setPendingPlayers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [hasAccess, setHasAccess] = useState(false);
+
+    // Check role on mount
+    useEffect(() => {
+        const checkAuth = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                router.push("/login");
+                return;
+            }
+
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("role")
+                .eq("id", user.id)
+                .single();
+
+            if (!profile || (profile.role !== "admin" && profile.role !== "manager")) {
+                router.push("/");
+                return;
+            }
+
+            setHasAccess(true);
+            fetchPendingPlayers();
+        };
+
+        checkAuth();
+    }, [router]);
 
     const fetchPendingPlayers = async () => {
         const { data, error } = await supabase
@@ -25,10 +55,6 @@ export default function PlayersApprovalPage() {
         }
         setLoading(false);
     };
-
-    useEffect(() => {
-        fetchPendingPlayers();
-    }, []);
 
     const handleApprove = async (playerId: number, playerName: string) => {
         setLoading(true);

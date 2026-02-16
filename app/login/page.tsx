@@ -22,6 +22,8 @@ function getLoginMessage(errorCode: string | null) {
       return "No se pudo leer tu perfil. Probá cerrar sesión e ingresar nuevamente.";
     case "tenant_invalido":
       return "Tu club no es válido. Contactá al administrador.";
+    case "aprobacion_en_curso":
+      return "Tu solicitud de acceso está en revisión. Contactá al administrador del club.";
     default:
       return null;
   }
@@ -74,18 +76,22 @@ export default function LoginPage() {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("active")
+      .select("active, role")
       .eq("id", data.user.id)
       .single();
 
     if (profileError || !profile || profile.active === false) {
       await supabase.auth.signOut();
-      setErrorMsg("Usuario deshabilitado, contacte su administrador.");
+      setErrorMsg(
+        profile && profile.active === false
+          ? "Tu solicitud de acceso está en revisión. Contactá al administrador del club."
+          : "Usuario deshabilitado, contacte su administrador."
+      );
       setLoading(false);
       return;
     }
 
-    router.push("/");
+    router.push(profile?.role === "super_admin" ? "/super-admin" : "/");
     router.refresh();
   };
 
@@ -97,11 +103,11 @@ export default function LoginPage() {
 
       <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md z-10 border-t-4 border-[#ccff00]">
         <div className="text-center mb-6">
-          <h1 className="text-4xl font-extrabold text-gray-900 italic tracking-tight">DEMO</h1>
+          <h1 className="text-4xl font-extrabold text-gray-900 italic tracking-tight">PadelX</h1>
           <span className="inline-block bg-gray-900 text-[#ccff00] px-2 py-0.5 text-xs font-bold tracking-[0.2em] uppercase rounded-sm mt-1">
-            Pádel Manager
+            Dashboard
           </span>
-          <p className="text-gray-400 text-sm mt-4">Bienvenido al club</p>
+          <p className="text-gray-400 text-sm mt-4">Bienvenido</p>
         </div>
 
         {/* Banner PRO para tenant incorrecto */}
@@ -136,7 +142,7 @@ export default function LoginPage() {
               type="email"
               required
               className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ccff00] focus:border-transparent outline-none transition bg-gray-50"
-              placeholder="usuario@twinco.com"
+              placeholder="usuario@padelx.es"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -161,6 +167,16 @@ export default function LoginPage() {
           >
             {loading ? "Accediendo..." : "Iniciar Sesión"}
           </button>
+          <button
+            type="button"
+            onClick={() => router.push("/register")}
+            className="w-full bg-white text-gray-900 font-bold py-3.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-200 shadow-sm"
+          >
+            Registrarme
+          </button>
+          <p className="text-xs text-gray-500 text-center">
+            Si no ves tu club en el registro, contactá al administrador.
+          </p>
         </form>
 
         <div className="mt-8 pt-6 border-t border-gray-100 text-center">

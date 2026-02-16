@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createUserSchema } from "@/lib/validation";
+import { z } from "zod";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -16,6 +19,12 @@ function debugProfileFlags(profile: any) {
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const { success } = rateLimit(`create-user:${ip}`, { maxRequests: 5, windowMs: 60_000 });
+    if (!success) {
+      return NextResponse.json({ error: "Demasiados intentos. Intentá en un minuto." }, { status: 429 });
+    }
+
     if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
       return NextResponse.json(
         { error: "Servidor mal configurado (env faltante)" },
@@ -29,42 +38,34 @@ export async function POST(req: Request) {
     });
 
     const body = await req.json().catch(() => ({}));
-    const email = (body?.email as string | undefined)?.trim();
-    const password = body?.password as string | undefined;
-    const role = body?.role as "user" | "manager" | undefined;
 
-    if (!email || !password || !role) {
+    // ✅ FIXED: Use Zod validation schema
+    let validatedData;
+    try {
+      validatedData = createUserSchema.parse({
+        email: body?.email,
+        password: body?.password,
+        role: body?.role,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return NextResponse.json(
+          {
+            error: "Validación fallida",
+            ...(process.env.NODE_ENV === "development"
+              ? { details: error.errors }
+              : {}),
+          },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
-        {
-          error: "Datos incompletos",
-          ...(process.env.NODE_ENV !== "production"
-            ? {
-                debug: {
-                  hasEmail: Boolean(email),
-                  hasPassword: Boolean(password),
-                  role: role ?? null,
-                },
-              }
-            : {}),
-        },
+        { error: "Datos inválidos" },
         { status: 400 }
       );
     }
 
-    if (!email.includes("@")) {
-      return NextResponse.json({ error: "Email inválido" }, { status: 400 });
-    }
-
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: "La contraseña debe tener al menos 8 caracteres" },
-        { status: 400 }
-      );
-    }
-
-    if (!(["user", "manager"] as const).includes(role)) {
-      return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
-    }
+    const { email, password, role } = validatedData;
 
     // Authorization: Bearer <token>
     const authHeader = req.headers.get("authorization") || "";

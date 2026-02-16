@@ -61,7 +61,7 @@ export default function MatchShareCard({ winnerTeam, loserTeam, score }: Props) 
       </div>
 
       <div style={{ textAlign: "center", fontSize: 12, opacity: 0.7 }}>
-        twinco.padelx.es
+        {process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, "") || "padelx.es"}
       </div>
     </div>
   );

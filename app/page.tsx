@@ -10,6 +10,7 @@ import { useRole } from "@/hooks/useRole";
 import MatchCard from "@/components/matches/MatchCard";
 import toast from "react-hot-toast";
 import MatchShareCard from "./components/matches/MatchShareCard";
+import { formatTimeMadrid, formatDateTimeMadrid } from "@/lib/dates";
 
 type PlayerMap = {
   [key: number]: string;
@@ -683,12 +684,7 @@ export default function DashboardPage() {
                       <div>
                         <p className="text-xs text-gray-500">Próximo</p>
                         <p className="text-2xl font-extrabold text-gray-900">
-                          {upcomingMatches[0]?.start_time
-                            ? new Date(upcomingMatches[0].start_time).toLocaleTimeString("es-ES", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
-                            : "—"}
+                          {formatTimeMadrid(upcomingMatches[0]?.start_time)}
                         </p>
                         <p className="text-[11px] text-gray-500 mt-1">Hora del partido</p>
                       </div>
@@ -1020,7 +1016,7 @@ export default function DashboardPage() {
 
                   {isAdmin && (
                     <Link
-                      href="/admin/users/manage?crear=1"
+                      href="/admin/management"
                       className="inline-flex items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 shadow-sm hover:bg-indigo-100 transition"
                     >
                       <span>👤 Crear usuario</span>
@@ -1030,7 +1026,7 @@ export default function DashboardPage() {
 
                   {isAdmin && (
                     <Link
-                      href="/admin/users/manage"
+                      href="/admin/users"
                       className="inline-flex items-center justify-between gap-2 rounded-lg border border-purple-200 bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 shadow-sm hover:bg-purple-100 transition"
                     >
                       <span>🛠️ Administrar usuarios</span>
@@ -1084,7 +1080,7 @@ export default function DashboardPage() {
                             )}
                           </p>
                           <p className="text-xs text-gray-500 mt-1">
-                            {new Date(log.created_at).toLocaleString("es-ES")}
+                            {formatDateTimeMadrid(log.created_at)}
                           </p>
                         </div>
                       </div>
@@ -1209,7 +1205,7 @@ export default function DashboardPage() {
                     }
 
                     const { blob, url } = result;
-                    const file = new File([blob], "resultado-twinco.png", {
+                    const file = new File([blob], "resultado-padelx-qa.png", {
                       type: "image/png",
                     });
 
@@ -1218,7 +1214,7 @@ export default function DashboardPage() {
                         await navigator.share({
                           files: [file],
                           title: "Resultado del partido",
-                          text: "Resultado DEMO Padel Manager",
+                          text: "Resultado PadelX QA",
                         });
                         toast.success("¡Imagen compartida!");
                         URL.revokeObjectURL(url);
@@ -1238,7 +1234,7 @@ export default function DashboardPage() {
                     // Fallback: descargar
                     const a = document.createElement("a");
                     a.href = url;
-                    a.download = "resultado-twinco.png";
+                    a.download = "resultado-padelx-qa.png";
                     a.click();
                     toast.success("Imagen descargada");
                     URL.revokeObjectURL(url);
@@ -1270,7 +1266,7 @@ export default function DashboardPage() {
                     const { url } = result;
                     const a = document.createElement("a");
                     a.href = url;
-                    a.download = "resultado-twinco.png";
+                    a.download = "resultado-padelx-qa.png";
                     a.click();
                     toast.success("Imagen descargada");
                     URL.revokeObjectURL(url);

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '../../lib/supabase';
 import { useRole } from '../../hooks/useRole';
 import Card from '../../components/Card';
+import { formatDateTimeMadrid } from '@/lib/dates';
 
 type Match = {
   id: number;
@@ -92,7 +93,7 @@ export default function FriendlyMatchesPage() {
                 </p>
 
                 <p className="text-sm text-gray-500">
-                  {new Date(match.start_time).toLocaleString('es-ES')}
+                  {formatDateTimeMadrid(match.start_time)}
                   {match.place && ` · ${match.place}`}
                   {match.court && ` · Pista ${match.court}`}
                 </p>

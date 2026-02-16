@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 
 import Card from "../../components/Card";
 import { supabase } from "../../lib/supabase";
+import { formatDateMadrid } from "@/lib/dates";
 
 type Player = {
   id: number;
@@ -147,17 +148,21 @@ export default function PlayerStatsPage() {
 
         const partner = mate || "(Sin compañero)";
 
-        // oponentes (mejor: ambos nombres)
+        // oponentes (ambos nombres)
         const opp1 =
           team === "A" ? match.player_1_b?.name : match.player_1_a?.name;
         const opp2 =
           team === "A" ? match.player_2_b?.name : match.player_2_a?.name;
 
-        const opponent = [opp1, opp2].filter(Boolean).join(" / ") || "Oponente";
+        // Formato mejorado: "Miguel y Juan" en lugar de "Miguel / Juan"
+        const opponents = [opp1, opp2].filter(Boolean);
+        const opponent = opponents.length === 2
+          ? `${opponents[0]} y ${opponents[1]}`
+          : opponents[0] || "Oponente";
 
         const ts = match.start_time ? Date.parse(match.start_time) : 0;
         const dateLabel = match.start_time
-          ? new Date(match.start_time).toLocaleDateString()
+          ? formatDateMadrid(match.start_time)
           : "—";
 
         historyData.push({
@@ -196,76 +201,126 @@ export default function PlayerStatsPage() {
   }
 
   return (
-    <main className="max-w-5xl mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <img
-          src={player.avatar_url || "https://placehold.co/200x200?text=Jugador"}
-          alt={`Avatar de ${player.name}`}
-          className="w-20 h-20 rounded-full object-cover border"
-          loading="lazy"
-        />
-        <div>
-          <h1 className="text-2xl font-bold">{player.name}</h1>
-          <p className="text-sm text-gray-500">Nivel {player.level ?? "—"}</p>
+    <main className="max-w-6xl mx-auto p-6 md:p-10 space-y-8">
+      {/* Back link */}
+      <Link href="/players" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 transition">
+        ← Volver a jugadores
+      </Link>
+
+      {/* Profile header */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+        <div className="h-32 bg-gradient-to-r from-[#0b1220] via-[#1a2740] to-[#0e1626] rounded-t-2xl" />
+        <div className="px-6 pb-6 pt-3 flex flex-col sm:flex-row sm:items-center gap-4">
+          <img
+            src={player.avatar_url || "https://placehold.co/200x200?text=Jugador"}
+            alt={`Avatar de ${player.name}`}
+            className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-lg shrink-0 bg-white -mt-16"
+            loading="lazy"
+          />
+          <div className="flex-1">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{player.name}</h1>
+            <div className="flex items-center gap-3 mt-1.5">
+              <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-sm font-medium px-3 py-1 rounded-full">
+                Nivel {player.level ?? "—"}
+              </span>
+              {stats.total > 0 && (
+                <span className="text-sm text-gray-500">
+                  {stats.total} {stats.total === 1 ? "partido" : "partidos"} jugados
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="text-center p-4">
-          <p className="text-sm text-gray-500">Partidos</p>
-          <p className="text-2xl font-bold">{stats.total}</p>
-        </Card>
-        <Card className="text-center p-4">
-          <p className="text-sm text-gray-500">Victorias</p>
-          <p className="text-2xl font-bold text-green-600">{stats.wins}</p>
-        </Card>
-        <Card className="text-center p-4">
-          <p className="text-sm text-gray-500">Derrotas</p>
-          <p className="text-2xl font-bold text-red-600">{stats.losses}</p>
-        </Card>
-        <Card className="text-center p-4">
-          <p className="text-sm text-gray-500">% Victorias</p>
-          <p className="text-2xl font-bold">{winRate}%</p>
-        </Card>
+      {/* Stats grid */}
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-center">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mx-auto mb-2">
+            <span className="text-blue-600 text-lg">🎾</span>
+          </div>
+          <p className="text-xs text-gray-500 font-medium">Partidos</p>
+          <p className="text-3xl font-bold text-gray-900 mt-1">{stats.total}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-center">
+          <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center mx-auto mb-2">
+            <span className="text-green-600 text-lg">✓</span>
+          </div>
+          <p className="text-xs text-gray-500 font-medium">Victorias</p>
+          <p className="text-3xl font-bold text-green-600 mt-1">{stats.wins}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-center">
+          <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center mx-auto mb-2">
+            <span className="text-red-500 text-lg">✗</span>
+          </div>
+          <p className="text-xs text-gray-500 font-medium">Derrotas</p>
+          <p className="text-3xl font-bold text-red-600 mt-1">{stats.losses}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-center">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center mx-auto mb-2">
+            <span className="text-amber-600 text-lg">%</span>
+          </div>
+          <p className="text-xs text-gray-500 font-medium">% Victorias</p>
+          <p className="text-3xl font-bold text-gray-900 mt-1">{winRate}%</p>
+          {stats.total > 0 && (
+            <div className="w-full h-1.5 bg-gray-100 rounded-full mt-3 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all"
+                style={{ width: `${winRate}%` }}
+              />
+            </div>
+          )}
+        </div>
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Últimos partidos</h2>
+      {/* Match history */}
+      <section>
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Historial de partidos</h2>
 
         {history.length === 0 ? (
-          <Card className="p-4">Sin partidos registrados.</Card>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+            <p className="text-gray-400">Sin partidos registrados.</p>
+          </div>
         ) : (
-          history.map((m) => (
-            <Card key={m.id} className="p-4 flex justify-between gap-4">
-              <div className="min-w-0">
-                <p className="font-semibold truncate">Con {m.partner}</p>
-                <p className="text-sm text-gray-700 truncate">vs {m.opponent}</p>
-                <p className="text-xs text-gray-500">{m.dateLabel}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p
-                  className={`font-bold ${
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50 overflow-hidden">
+            {history.map((m) => (
+              <div key={m.id} className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-gray-50/50 transition">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className={`w-1 h-10 rounded-full shrink-0 ${
                     m.result === "Victoria"
-                      ? "text-green-700"
+                      ? "bg-green-500"
                       : m.result === "Derrota"
-                      ? "text-red-700"
-                      : "text-gray-500"
-                  }`}
-                >
-                  {m.result}
-                </p>
-                <p className="text-sm">{m.score}</p>
+                      ? "bg-red-500"
+                      : "bg-gray-300"
+                  }`} />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 truncate">
+                      Con {m.partner}
+                    </p>
+                    <p className="text-sm text-gray-500 truncate">vs {m.opponent}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-6 shrink-0">
+                  <div className="text-right">
+                    <p className={`text-sm font-bold ${
+                      m.result === "Victoria"
+                        ? "text-green-600"
+                        : m.result === "Derrota"
+                        ? "text-red-600"
+                        : "text-gray-400"
+                    }`}>
+                      {m.result}
+                    </p>
+                    <p className="text-sm font-mono text-gray-700">{m.score}</p>
+                  </div>
+                  <p className="text-xs text-gray-400 w-20 text-right">{m.dateLabel}</p>
+                </div>
               </div>
-            </Card>
-          ))
+            ))}
+          </div>
         )}
       </section>
-
-      <div className="pt-4">
-        <Link href="/players" className="text-sm text-gray-600 hover:underline">
-          ← Volver a jugadores
-        </Link>
-      </div>
     </main>
   );
 }

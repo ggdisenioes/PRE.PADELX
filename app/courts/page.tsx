@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Card from "../components/Card";
 import { supabase } from "../lib/supabase";
 import { useRole } from "../hooks/useRole";
@@ -14,6 +15,7 @@ type Court = {
 };
 
 export default function CourtsPage() {
+  const router = useRouter();
   const { role, isAdmin, isManager, loading: roleLoading } = useRole();
 
   const normalizedRole = (role || "").toLowerCase();
@@ -22,6 +24,14 @@ export default function CourtsPage() {
 
   const [loading, setLoading] = useState(true);
   const [courts, setCourts] = useState<Court[]>([]);
+
+  // Redirect non-admin/non-manager users away from this admin page
+  useEffect(() => {
+    if (roleLoading) return;
+    if (!isAdmin && !isManager) {
+      router.push("/");
+    }
+  }, [roleLoading, isAdmin, isManager, router]);
 
   const [name, setName] = useState("Pista 1");
   const [isCovered, setIsCovered] = useState<boolean>(false);

@@ -7,6 +7,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Card from '../../../components/Card';
 import toast from 'react-hot-toast';
 import { logAction } from '../../../lib/audit';
+import { formatDateMadrid, formatTimeMadrid } from '@/lib/dates';
 
 export default function ScoreEntryPage() {
     const { isAdmin, isManager, loading: roleLoading } = useRole();
@@ -277,8 +278,8 @@ export default function ScoreEntryPage() {
               </div>
 
               <div className="mt-4 flex flex-wrap items-center justify-center gap-6 text-sm text-gray-600">
-                <div>📅 {new Date(matchData.start_time).toLocaleDateString('es-ES')}</div>
-                <div>⏰ {new Date(matchData.start_time).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</div>
+                <div>📅 {formatDateMadrid(matchData.start_time)}</div>
+                <div>⏰ {formatTimeMadrid(matchData.start_time)}</div>
               </div>
             </div>
 

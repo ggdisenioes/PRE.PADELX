@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toPng } from "html-to-image";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -9,6 +10,7 @@ import toast from "react-hot-toast";
 import { supabase } from "../lib/supabase";
 import { useRole } from "../hooks/useRole";
 import MatchCard from "../components/matches/MatchCard";
+import { formatDateMadrid, formatTimeMadrid } from "@/lib/dates";
 
 type PlayerRef = {
   id: number;
@@ -22,6 +24,8 @@ type Match = {
   round_name: string | null;
   score: string | null;
   winner: string | null;
+  court: string | null;
+  place: string | null;
 
   // Nuevo esquema (amistosos): ids numéricos
   player_1_a_id?: number | null;
@@ -59,6 +63,7 @@ export default function MatchesPage() {
   const [filterCategory, setFilterCategory] = useState<string>("all");
 
   const [openResultMatch, setOpenResultMatch] = useState<Match | null>(null);
+  const shareCardRef = useRef<HTMLDivElement>(null);
 
   // Si entran con /matches?status=pending, forzamos la vista pendientes
   useEffect(() => {
@@ -99,6 +104,8 @@ export default function MatchesPage() {
           round_name,
           score,
           winner,
+          court,
+          place,
           player_1_a_id,
           player_2_a_id,
           player_1_b_id,
@@ -171,6 +178,16 @@ export default function MatchesPage() {
     if (!raw) return "";
     // Accept formats like "6-4 4-6" or "6 4" and normalize spacing
     return raw.replace(/\s+/g, " ").trim();
+  };
+
+  const formatLocalDate = (iso: string | null) => {
+    if (!iso) return undefined;
+    return formatDateMadrid(iso);
+  };
+
+  const formatLocalTime = (iso: string | null) => {
+    if (!iso) return undefined;
+    return formatTimeMadrid(iso);
   };
 
   // 1️⃣ AGREGAR FUNCIÓN handleDeleteMatch
@@ -363,7 +380,13 @@ export default function MatchesPage() {
                 onClick={() => setOpenResultMatch(m)}
                 className="cursor-pointer"
               >
-                <MatchCard match={m} playersMap={playersMapObj} showActions={false} />
+                <MatchCard
+                  match={m}
+                  playersMap={playersMapObj}
+                  showActions={false}
+                  date={formatLocalDate(m.start_time)}
+                  time={formatLocalTime(m.start_time)}
+                />
               </div>
 
               {/* Acciones */}
@@ -404,93 +427,150 @@ export default function MatchesPage() {
         </div>
       )}
 
-      {openResultMatch && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-[#0F172A] w-[92vw] max-w-sm rounded-3xl shadow-2xl p-6 sm:p-7 space-y-5 relative text-white overflow-hidden">
-            <button
-              onClick={() => setOpenResultMatch(null)}
-              className="absolute top-3 right-3 text-white/60 hover:text-white"
-            >
-              ✕
-            </button>
+      {openResultMatch && isPlayed(openResultMatch) && (() => {
+        const m = openResultMatch;
+        const winnerTeam = m.winner === "A"
+          ? `${m.player_1_a?.name || ""}${m.player_2_a ? " y " + m.player_2_a.name : ""}`.trim()
+          : `${m.player_1_b?.name || ""}${m.player_2_b ? " y " + m.player_2_b.name : ""}`.trim();
+        const loserTeam = m.winner === "A"
+          ? `${m.player_1_b?.name || ""}${m.player_2_b ? " y " + m.player_2_b.name : ""}`.trim()
+          : `${m.player_1_a?.name || ""}${m.player_2_a ? " y " + m.player_2_a.name : ""}`.trim();
+        const score = formatScoreForDisplay(m.score);
+        const matchType = m.tournament_id
+          ? (tournaments.find(t => t.id === m.tournament_id)?.name || "Torneo")
+          : "Partido Amistoso";
+        const dateStr = m.start_time ? formatDateMadrid(m.start_time) : "";
+        const timeStr = m.start_time ? formatTimeMadrid(m.start_time) : "";
+        const courtPlace = [m.court, m.place].filter(Boolean).join(" · ");
 
-            {/* LOGO */}
-            <div className="flex flex-col items-center gap-1">
-              <img
-                src="/logo.svg"
-                alt="DEMO Padel Manager"
-                className="h-8 w-auto object-contain"
-              />
-              <span className="text-xs tracking-widest text-green-400">
-                PADEL MANAGER
-              </span>
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 relative shadow-2xl">
+              <button
+                onClick={() => setOpenResultMatch(null)}
+                className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl"
+              >
+                ✕
+              </button>
+
+              {/* Share card (rendered for screenshot) — scaled to fit modal */}
+              <div style={{ overflow: "hidden", borderRadius: 16 }}>
+                <div ref={shareCardRef} style={{
+                  width: 480, height: 520, backgroundColor: "#0b1220",
+                  borderRadius: 0, padding: "28px 32px", color: "#fff",
+                  fontFamily: "system-ui, -apple-system, sans-serif",
+                  display: "flex", flexDirection: "column", justifyContent: "space-between",
+                  transform: "scale(0.82)", transformOrigin: "top left",
+                  marginBottom: -90,
+                }}>
+                  {/* Header with logo */}
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: 3, fontStyle: "italic", color: "#ffffff" }}>
+                      PadelX QA
+                    </div>
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 5, color: "#ccff00", marginTop: 3 }}>
+                      PÁDEL MANAGER
+                    </div>
+                  </div>
+
+                  {/* Match type badge */}
+                  <div style={{ textAlign: "center", marginTop: 14 }}>
+                    <span style={{
+                      display: "inline-block",
+                      backgroundColor: m.tournament_id ? "#1a3a2a" : "#1a2a3a",
+                      color: m.tournament_id ? "#4ade80" : "#60a5fa",
+                      fontSize: 11, fontWeight: 700, padding: "5px 16px", borderRadius: 20,
+                      letterSpacing: 1, textTransform: "uppercase" as const,
+                    }}>
+                      {matchType}
+                    </span>
+                  </div>
+
+                  {/* Main content */}
+                  <div style={{ textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 6 }}>
+                    {/* Winners */}
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#4ade80", letterSpacing: 3, marginBottom: 6 }}>
+                        GANADORES
+                      </div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: "#ffffff" }}>
+                        {winnerTeam}
+                      </div>
+                    </div>
+
+                    {/* Score */}
+                    <div style={{ fontSize: 56, fontWeight: 900, letterSpacing: 4, color: "#ccff00", margin: "8px 0" }}>
+                      {score}
+                    </div>
+
+                    {/* Losers */}
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#666", letterSpacing: 3, marginBottom: 6 }}>
+                        PERDEDORES
+                      </div>
+                      <div style={{ fontSize: 16, color: "#999" }}>
+                        {loserTeam}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div>
+                    <div style={{ height: 1, backgroundColor: "#1e293b", marginBottom: 12 }} />
+                    <div style={{ display: "flex", justifyContent: "center", gap: 16, fontSize: 11, color: "#64748b" }}>
+                      {dateStr && <span>{dateStr}</span>}
+                      {timeStr && <span>{timeStr}h</span>}
+                      {courtPlace && <span>{courtPlace}</span>}
+                    </div>
+                    <div style={{ textAlign: "center", marginTop: 10, fontSize: 10, color: "#334155" }}>
+                      {process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, "") || "padelx.es"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    const el = shareCardRef.current;
+                    if (!el) return;
+                    // Temporarily reset scale for full-resolution capture
+                    const origTransform = el.style.transform;
+                    const origMargin = el.style.marginBottom;
+                    el.style.transform = "none";
+                    el.style.marginBottom = "0";
+                    try {
+                      const dataUrl = await toPng(el, { cacheBust: true, pixelRatio: 2, width: 480, height: 520 });
+                      const link = document.createElement("a");
+                      link.download = `PadelXQA_Partido_${m.id}.png`;
+                      link.href = dataUrl;
+                      link.click();
+                      toast.success("Imagen descargada");
+                    } catch (err) {
+                      console.error("toPng error:", err);
+                      toast.error("Error al generar imagen");
+                    } finally {
+                      el.style.transform = origTransform;
+                      el.style.marginBottom = origMargin;
+                    }
+                  }}
+                  className="flex-1 bg-gray-900 text-white py-2.5 rounded-xl font-semibold hover:bg-black transition text-sm"
+                >
+                  Descargar imagen
+                </button>
+              </div>
+
+              <button
+                onClick={() => setOpenResultMatch(null)}
+                className="w-full border border-gray-200 py-2 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition"
+              >
+                Cerrar
+              </button>
             </div>
-
-            {/* RESULT */}
-            <div className="text-center space-y-3 mt-2">
-              {isPlayed(openResultMatch) ? (
-                <>
-                  {/* WINNERS */}
-                  <p className="text-lg font-semibold">
-                    {openResultMatch.winner === "A"
-                      ? `${openResultMatch.player_1_a?.name}${openResultMatch.player_2_a ? " / " + openResultMatch.player_2_a.name : ""}`
-                      : `${openResultMatch.player_1_b?.name}${openResultMatch.player_2_b ? " / " + openResultMatch.player_2_b.name : ""}`}
-                  </p>
-
-                  {/* SCORE */}
-                  <p className="text-5xl font-extrabold my-2">
-                    {formatScoreForDisplay(openResultMatch.score)}
-                  </p>
-
-                  {/* LOSERS */}
-                  <p className="text-sm text-white/70">
-                    {openResultMatch.winner === "A"
-                      ? `${openResultMatch.player_1_b?.name}${openResultMatch.player_2_b ? " / " + openResultMatch.player_2_b.name : ""}`
-                      : `${openResultMatch.player_1_a?.name}${openResultMatch.player_2_a ? " / " + openResultMatch.player_2_a.name : ""}`}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-white/60">
-                  Resultado todavía no cargado
-                </p>
-              )}
-            </div>
-
-            {/* SHARE */}
-            <button
-              disabled={!isPlayed(openResultMatch)}
-              onClick={async () => {
-                if (!isPlayed(openResultMatch)) return;
-
-                const teamA = `${openResultMatch.player_1_a?.name || ""}${openResultMatch.player_2_a ? " / " + openResultMatch.player_2_a.name : ""}`.trim();
-                const teamB = `${openResultMatch.player_1_b?.name || ""}${openResultMatch.player_2_b ? " / " + openResultMatch.player_2_b.name : ""}`.trim();
-                const score = formatScoreForDisplay(openResultMatch.score);
-
-                const text = `DEMO PADEL MANAGER\n\n${teamA}\n${score}\n${teamB}`;
-
-                try {
-                  if (navigator.share) {
-                    await navigator.share({ text });
-                    return;
-                  }
-                  await navigator.clipboard.writeText(text);
-                  toast.success("Resultado copiado");
-                } catch (err: any) {
-                  if (err?.name === "AbortError") return;
-                  toast.error("No se pudo compartir");
-                }
-              }}
-              className={`w-full mt-4 py-3 rounded-xl font-semibold transition ${
-                isPlayed(openResultMatch)
-                  ? "bg-green-600 hover:bg-green-700"
-                  : "bg-white/10 text-white/40 cursor-not-allowed"
-              }`}
-            >
-              Compartir resultado
-            </button>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </main>
   );
 }

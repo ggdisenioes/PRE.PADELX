@@ -60,6 +60,15 @@ export default function MatchCard(props: MatchCardProps) {
     return playersMap[v] || `Jugador ${v}`;
   };
 
+  const toDateFromSupabase = (iso?: string | null) => {
+    if (!iso) return null;
+    // Si no trae zona (Z o +HH:MM/-HH:MM), lo tratamos como UTC.
+    const hasTz = /([zZ])|([+-]\d{2}:\d{2})$/.test(iso);
+    const normalized = hasTz ? iso : `${iso}Z`;
+    const d = new Date(normalized);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
   const winnerSide = match?.winner ?? null;
   const isWinnerAFromMatch = winnerSide === "A";
   const isWinnerBFromMatch = winnerSide === "B";
@@ -92,23 +101,23 @@ export default function MatchCard(props: MatchCardProps) {
     match?.tournament_name ||
     (match?.tournament_id ? `Torneo #${match.tournament_id}` : "Sin torneo");
 
-  const displayDate =
-    date ||
-    (match?.start_time
-      ? new Date(match.start_time).toLocaleDateString("es-ES")
-      : undefined);
+  const startDate = toDateFromSupabase(match?.start_time);
 
-  const displayTime =
-    time ||
-    (match?.start_time
-      ? new Date(match.start_time).toLocaleTimeString("es-ES", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : undefined);
+  const displayDate = startDate
+    ? startDate.toLocaleDateString("es-ES", { timeZone: "Europe/Madrid" })
+    : date || undefined;
+
+  const displayTime = startDate
+    ? startDate.toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Europe/Madrid",
+      })
+    : time || undefined;
 
   const displayCourt = court || match?.court || undefined;
   const displayScore = match?.score || null;
+
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-4">

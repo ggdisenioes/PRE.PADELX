@@ -6,10 +6,12 @@ import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import Card from '../../components/Card';
-import toast from 'react-hot-toast'; // Importamos toast
+import toast from 'react-hot-toast';
+import { useTenantPlan } from '../../hooks/useTenantPlan';
 
 export default function CreatePlayer() {
   const router = useRouter();
+  const { loading: planLoading, plan, canCreatePlayer, usage } = useTenantPlan();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   
@@ -59,9 +61,13 @@ export default function CreatePlayer() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
 
-    // 🔑 CLAVE: Inserción del jugador con is_approved en FALSE
+    if (!canCreatePlayer) {
+      toast.error(`Limite de jugadores alcanzado (${usage.playerCount}/${plan?.max_players}). Actualiza tu plan.`);
+      return;
+    }
+
+    setLoading(true);
     const { error } = await supabase
       .from('players')
       .insert([{
@@ -70,7 +76,10 @@ export default function CreatePlayer() {
       }]);
 
     if (error) {
-      toast.error('Error al guardar el jugador: ' + error.message);
+      const msg = error.message?.includes('PLAN_LIMIT')
+        ? error.message.replace('PLAN_LIMIT: ', '')
+        : 'Error al guardar el jugador: ' + error.message;
+      toast.error(msg);
       setLoading(false);
     } else {
       // Mensaje de éxito específico para la aprobación pendiente
@@ -84,6 +93,12 @@ export default function CreatePlayer() {
   return (
     <main className="flex-1 overflow-y-auto p-8">
         <h2 className="text-3xl font-bold text-gray-800 mb-6">Nuevo Jugador (Aprobación Pendiente)</h2>
+
+        {!planLoading && !canCreatePlayer && (
+          <div className="max-w-xl mx-auto mb-4 p-4 bg-yellow-50 border border-yellow-300 rounded-lg text-yellow-800 text-sm">
+            <strong>Limite alcanzado:</strong> Tu plan {plan?.name} permite hasta {plan?.max_players} jugadores y ya tienes {usage.playerCount}. Contacta al administrador para actualizar tu plan.
+          </div>
+        )}
 
         <Card className="max-w-xl mx-auto">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -164,7 +179,7 @@ export default function CreatePlayer() {
                 Cancelar
               </button>
               <button 
-                type="submit" disabled={loading || uploading || !formData.name}
+                type="submit" disabled={loading || uploading || !formData.name || !canCreatePlayer}
                 className="px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
               >
                 {loading ? 'Guardando...' : 'Guardar Jugador'}

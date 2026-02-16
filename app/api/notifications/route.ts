@@ -1,0 +1,135 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { sendMatchNotification } from "@/lib/email";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+export async function POST(req: Request) {
+  try {
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+    }
+
+    // Authenticate the caller
+    const supabaseClient = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: req.headers.get("authorization") || "" } },
+    });
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { type, match_id, match_ids } = body;
+
+    if (type !== "match_created") {
+      return NextResponse.json({ error: "Invalid type" }, { status: 400 });
+    }
+
+    // Support single or multiple match IDs
+    const ids: number[] = match_ids
+      ? (match_ids as number[])
+      : match_id
+      ? [match_id]
+      : [];
+
+    if (ids.length === 0) {
+      return NextResponse.json({ error: "No match IDs" }, { status: 400 });
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false },
+    });
+
+    // Fetch all matches
+    const { data: matches, error: matchError } = await supabaseAdmin
+      .from("matches")
+      .select("id, player_1_a, player_2_a, player_1_b, player_2_b, start_time, court, place, tenant_id")
+      .in("id", ids);
+
+    if (matchError || !matches || matches.length === 0) {
+      return NextResponse.json({ ok: true, sent: 0 });
+    }
+
+    // Collect all unique player IDs
+    const allPlayerIds = new Set<number>();
+    for (const m of matches) {
+      [m.player_1_a, m.player_2_a, m.player_1_b, m.player_2_b]
+        .filter((id): id is number => id != null)
+        .forEach((id) => allPlayerIds.add(id));
+    }
+
+    if (allPlayerIds.size === 0) {
+      return NextResponse.json({ ok: true, sent: 0 });
+    }
+
+    // Fetch all players at once
+    const { data: players } = await supabaseAdmin
+      .from("players")
+      .select("id, name, email, notify_email")
+      .in("id", Array.from(allPlayerIds));
+
+    if (!players || players.length === 0) {
+      return NextResponse.json({ ok: true, sent: 0 });
+    }
+
+    // Get tenant name (from first match)
+    const { data: tenant } = await supabaseAdmin
+      .from("tenants")
+      .select("name")
+      .eq("id", matches[0].tenant_id)
+      .single();
+
+    let totalSent = 0;
+
+    // Send notifications for each match
+    for (const match of matches) {
+      const getName = (id: number | null) => players.find((p: any) => p.id === id)?.name || "—";
+
+      const teamA = `${getName(match.player_1_a)} y ${getName(match.player_2_a)}`;
+      const teamB = `${getName(match.player_1_b)} y ${getName(match.player_2_b)}`;
+
+      let matchDate = "Fecha por confirmar";
+      if (match.start_time) {
+        matchDate = new Intl.DateTimeFormat("es-ES", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Europe/Madrid",
+        }).format(new Date(match.start_time));
+      }
+
+      const courtText = [match.court, match.place].filter(Boolean).join(" · ") || undefined;
+
+      // Players in THIS match
+      const matchPlayerIds = [match.player_1_a, match.player_2_a, match.player_1_b, match.player_2_b]
+        .filter((id): id is number => id != null);
+
+      const playerEmails = players
+        .filter((p: any) => matchPlayerIds.includes(p.id) && p.notify_email !== false && p.email)
+        .map((p: any) => ({ name: p.name, email: p.email }));
+
+      if (playerEmails.length > 0) {
+        await sendMatchNotification({
+          playerEmails,
+          teamA,
+          teamB,
+          matchDate,
+          court: courtText,
+          clubName: tenant?.name || "PadelX QA",
+        });
+        totalSent += playerEmails.length;
+      }
+    }
+
+    return NextResponse.json({ ok: true, sent: totalSent });
+  } catch (error) {
+    console.error("Notification error:", error);
+    return NextResponse.json({ error: "Error sending notifications" }, { status: 500 });
+  }
+}

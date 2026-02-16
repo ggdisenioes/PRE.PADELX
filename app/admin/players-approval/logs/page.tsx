@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 import { supabase } from "../../../lib/supabase";
@@ -18,6 +19,7 @@ type LogRow = {
 };
 
 export default function AdminLogsPage() {
+  const router = useRouter();
   const { isAdmin, loading: roleLoading } = useRole();
 
   const [logs, setLogs] = useState<LogRow[]>([]);
@@ -45,9 +47,13 @@ export default function AdminLogsPage() {
 
   // Cargar logs SOLO si es admin
   useEffect(() => {
-    if (!isAdmin) return;
+    if (roleLoading) return;
+    if (!isAdmin) {
+      router.push("/");
+      return;
+    }
     fetchLogs();
-  }, [isAdmin]);
+  }, [isAdmin, roleLoading, router]);
 
   // Realtime (solo admin)
   useEffect(() => {

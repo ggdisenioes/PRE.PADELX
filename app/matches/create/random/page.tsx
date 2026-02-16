@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import { useRole } from "../../../hooks/useRole";
+import { notifyMatchCreated } from "../../../lib/notify";
 import toast from "react-hot-toast";
 
 type Player = {
@@ -115,7 +116,7 @@ export default function CreateRandomMatchesPage() {
       });
     }
 
-    const { error } = await supabase.from("matches").insert(matches);
+    const { data: created, error } = await supabase.from("matches").insert(matches).select("id");
 
     setCreating(false);
 
@@ -124,6 +125,7 @@ export default function CreateRandomMatchesPage() {
       toast.error("Error al crear partidos");
     } else {
       toast.success("Partidos creados");
+      if (created) notifyMatchCreated(created.map((m: any) => m.id));
       router.push(`/tournaments/edit/${tournamentId}`);
     }
   };

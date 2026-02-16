@@ -20,6 +20,7 @@ export default function EditMatch() {
   const [tournaments, setTournaments] = useState<any[]>([]);
   const FRIENDLY_VALUE = "__friendly__";
   const [players, setPlayers] = useState<any[]>([]);
+  const [courts, setCourts] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('details'); // Nuevo estado para pestañas
 
   const [formData, setFormData] = useState({
@@ -30,6 +31,7 @@ export default function EditMatch() {
     player_1_b: '', 
     player_2_b: '',
     place: '',
+    court_id: '',
     court: '',
     start_time: '',
     winner: 'pending',
@@ -47,10 +49,20 @@ export default function EditMatch() {
     const loadData = async () => {
       // 1. Carregar Tornejos i Jugadors
       const { data: tourns } = await supabase.from('tournaments').select('id, name, category').order('created_at', { ascending: false });
-      const { data: plyrs } = await supabase.from('players').select('id, name, level').eq('is_approved', true).order('name');
-      
+      const { data: plyrs } = await supabase
+        .from('players')
+        .select('id, name, level, is_approved')
+        .order('name');
+
+      const { data: cts } = await supabase
+        .from('courts')
+        .select('id, name, is_covered, sort_order')
+        .order('sort_order', { ascending: true })
+        .order('id', { ascending: true });
+
       if (tourns) setTournaments(tourns);
       if (plyrs) setPlayers(plyrs);
+      if (cts) setCourts(cts);
 
       // 2. Carregar Dades del Partit existent
       const { data: matchData, error: matchError } = await supabase
@@ -67,19 +79,33 @@ export default function EditMatch() {
       }
       
       if (matchData) {
-          // Fill form data with existing match values (converting IDs to string for select inputs)
+          const asStr = (v: any) => (v === null || v === undefined ? '' : String(v));
+          const courtIdFromName = (name?: string | null) => {
+            if (!name) return '';
+            const list = (cts || []) as any[];
+            const target = String(name).trim().toLowerCase();
+            // match exacto por nombre
+            const exact = list.find((c) => String(c.name).trim().toLowerCase() === target);
+            if (exact) return String(exact.id);
+            // fallback: si el texto contiene el nombre de la pista o viceversa
+            const fuzzy = list.find((c) => {
+              const n = String(c.name).trim().toLowerCase();
+              return n.includes(target) || target.includes(n);
+            });
+            return fuzzy ? String(fuzzy.id) : '';
+          };
           setFormData({
-              tournament_id: matchData.tournament_id ? String(matchData.tournament_id) : FRIENDLY_VALUE,
+              tournament_id: matchData.tournament_id ? asStr(matchData.tournament_id) : FRIENDLY_VALUE,
               round_name: matchData.round_name || '',
-              // Player IDs must be strings for the select input's value prop
-              player_1_a: String(matchData.player_1_a) || '',
-              player_2_a: String(matchData.player_2_a) || '',
-              player_1_b: String(matchData.player_1_b) || '',
-              player_2_b: String(matchData.player_2_b) || '',
+              player_1_a: asStr(matchData.player_1_a),
+              player_2_a: asStr(matchData.player_2_a),
+              player_1_b: asStr(matchData.player_1_b),
+              player_2_b: asStr(matchData.player_2_b),
               place: matchData.place || '',
-              court: matchData.court || '',
-              // Format date/time string correctly for datetime-local input (removes timezone info)
-              start_time: matchData.start_time ? matchData.start_time.substring(0, 16) : '', 
+              // si no viene court_id pero viene court (texto), intentamos mapearlo a un court_id real
+              court_id: matchData.court_id ? asStr(matchData.court_id) : courtIdFromName(matchData.court),
+              court: matchData.court ? String(matchData.court) : '',
+              start_time: matchData.start_time ? String(matchData.start_time).substring(0, 16) : '',
               winner: matchData.winner || 'pending',
               score: matchData.score || '',
           });
@@ -141,8 +167,11 @@ export default function EditMatch() {
             : Number(formData.tournament_id),
         round_name:
           formData.tournament_id === FRIENDLY_VALUE ? null : (formData.round_name || null),
-        place: formData.place,
-        court: formData.court,
+        place: formData.place || null,
+        court_id: formData.court_id ? Number(formData.court_id) : null,
+        court: formData.court_id
+          ? (courts.find((c: any) => String(c.id) === String(formData.court_id))?.name || formData.court || null)
+          : (formData.court || null),
         start_time: formData.start_time ? new Date(formData.start_time).toISOString() : null,
         winner: formData.winner, 
         score: formData.score || null,
@@ -175,19 +204,26 @@ export default function EditMatch() {
     <div>
       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">{label}</label>
       <select 
-        required
         className="w-full p-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
         <option value="">Seleccionar...</option>
         {players.map(p => (
-            // El valor ha de ser l'ID numèric
-            <option key={p.id} value={p.id}>{p.name} (Niv {p.level})</option>
+          <option key={p.id} value={String(p.id)}>
+            {p.name} (Niv {p.level}){p.is_approved === false ? " · Pendiente" : ""}
+          </option>
         ))}
       </select>
     </div>
   );
+
+  useEffect(() => {
+    if (!formData.court_id) return;
+    const name = courts.find((c: any) => String(c.id) === String(formData.court_id))?.name;
+    if (!name) return;
+    setFormData((prev) => (prev.court === name ? prev : { ...prev, court: name }));
+  }, [formData.court_id, courts]);
 
   if (loading) {
     return (
@@ -249,7 +285,7 @@ export default function EditMatch() {
                                     <option value={FRIENDLY_VALUE}>Partido Amistoso</option>
                                     <option value="">-- Selecciona un torneo --</option>
                                     {tournaments.map(t => (
-                                        <option key={t.id} value={t.id}>{t.name} - {t.category}</option>
+                                        <option key={t.id} value={String(t.id)}>{t.name} - {t.category}</option>
                                     ))}
                                 </select>
                             </div>
@@ -288,9 +324,41 @@ export default function EditMatch() {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Lugar</label>
                                 <input type="text" placeholder="Ej: Club Padel Central" className="w-full p-2 border border-gray-300 rounded" value={formData.place} onChange={(e) => setFormData({...formData, place: e.target.value})} />
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Número de pista</label>
-                                <input type="text" placeholder="Ej: Pista 4" className="w-full p-2 border border-gray-300 rounded" value={formData.court} onChange={(e) => setFormData({...formData, court: e.target.value})} />
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Pista</label>
+
+                              {courts.length > 0 && (
+                                <select
+                                  className="w-full p-2 border border-gray-300 rounded"
+                                  value={formData.court_id}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    setFormData({ ...formData, court_id: v });
+                                  }}
+                                >
+                                  <option value="">-- (Opcional) Selecciona una pista del club --</option>
+                                  {courts.map((c: any) => (
+                                    <option key={c.id} value={String(c.id)}>
+                                      {c.name}{c.is_covered ? " · Cubierta" : " · Descubierta"}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+
+                              {/* Si el partido no tiene court_id (partidos viejos o creados manual), mostramos el texto y lo mantenemos */}
+                              {(!formData.court_id || courts.length === 0) && (
+                                <input
+                                  type="text"
+                                  placeholder="Ej: Pista 4"
+                                  className="w-full p-2 border border-gray-300 rounded"
+                                  value={formData.court}
+                                  onChange={(e) => setFormData({ ...formData, court: e.target.value })}
+                                />
+                              )}
+
+                              <p className="text-xs text-gray-500">
+                                Tip: si el partido se creó con texto (sin pista del club), podés dejarlo así o elegir una pista del listado.
+                              </p>
                             </div>
                         </div>
 

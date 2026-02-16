@@ -151,7 +151,13 @@ export default function TournamentsPage() {
         ) : tournaments.length === 0 ? (
           <p className="text-gray-500">No hay torneos creados.</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className={`grid gap-6 ${
+            tournaments.length === 1
+              ? "grid-cols-1"
+              : tournaments.length === 2
+              ? "grid-cols-1 lg:grid-cols-2"
+              : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
+          }`}>
             {tournaments.map((t) => {
               const progress =
                 t.total_matches > 0
@@ -159,23 +165,33 @@ export default function TournamentsPage() {
                       (t.played_matches / t.total_matches) * 100
                     )
                   : 0;
+              const isWide = tournaments.length <= 2;
 
               return (
                 <div
                   key={t.id}
-                  className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-5 flex flex-col gap-4"
+                  className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 p-6 flex flex-col gap-4"
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-600 text-lg">🏆</span>
-                      <h3 className="font-semibold text-gray-900">
-                        {t.name}
-                      </h3>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-2xl shadow-md">
+                        🏆
+                      </div>
+                      <div>
+                        <h3 className={`font-bold text-gray-900 ${isWide ? "text-xl" : "text-base"}`}>
+                          {t.name}
+                        </h3>
+                        {t.category && (
+                          <span className="inline-block rounded-full bg-gray-100 px-3 py-0.5 text-xs font-medium text-gray-600 mt-1">
+                            {t.category}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <span
-                      className={`text-xs px-2 py-1 rounded-full font-medium shadow-sm ${
+                      className={`text-xs px-3 py-1.5 rounded-full font-semibold shadow-sm ${
                         STATUS_MAP[t.status]?.className
                       }`}
                     >
@@ -183,77 +199,75 @@ export default function TournamentsPage() {
                     </span>
                   </div>
 
-                  {/* Category */}
-                  {t.category && (
-                    <span className="inline-block w-fit rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                      {t.category}
-                    </span>
-                  )}
-
-                  {/* Dates */}
-                  <p className="text-sm text-gray-600">
-                    📅{" "}
-                    {t.start_date
-                      ? new Date(t.start_date).toLocaleDateString("es-ES")
-                      : "—"}{" "}
-                    –{" "}
-                    {t.end_date
-                      ? new Date(t.end_date).toLocaleDateString("es-ES")
-                      : "—"}
-                  </p>
-
-                  {/* Meta */}
-                  <div className="text-sm text-gray-600">
-                    👥 {t.teams_count} equipos
-                  </div>
-
-                  <div className="text-sm text-gray-600">
-                    {t.played_matches} / {t.total_matches} partidos
+                  {/* Stats row */}
+                  <div className={`grid gap-3 ${isWide ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2"} mt-2`}>
+                    <div className="bg-gray-50 rounded-xl p-3 text-center">
+                      <p className="text-xs text-gray-500">Equipos</p>
+                      <p className="text-lg font-bold text-gray-900">{t.teams_count}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-3 text-center">
+                      <p className="text-xs text-gray-500">Partidos</p>
+                      <p className="text-lg font-bold text-gray-900">{t.played_matches}/{t.total_matches}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-3 text-center">
+                      <p className="text-xs text-gray-500">Inicio</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {t.start_date ? new Date(t.start_date).toLocaleDateString("es-ES") : "—"}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-3 text-center">
+                      <p className="text-xs text-gray-500">Fin</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {t.end_date ? new Date(t.end_date).toLocaleDateString("es-ES") : "—"}
+                      </p>
+                    </div>
                   </div>
 
                   {/* Progress */}
-                  <div>
-                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="mt-1">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-xs font-medium text-gray-600">Progreso del torneo</p>
+                      <p className="text-xs font-bold text-gray-900">{progress}%</p>
+                    </div>
+                    <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-300"
+                        className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-300"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Progreso del torneo · {progress}%
-                    </p>
                   </div>
 
-                  {/* Footer */}
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                    <p className="text-sm text-gray-700">
-                      {t.prize && <>🏅 {t.prize}</>}
-                    </p>
+                  {/* Prize */}
+                  {t.prize && (
+                    <p className="text-sm text-gray-700 font-medium">🏅 {t.prize}</p>
+                  )}
 
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
                     <Link
                       href={`/tournaments/edit/${t.id}`}
-                      className="text-sm font-semibold text-green-600 hover:text-green-700 transition flex items-center gap-1"
+                      className="inline-flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 transition"
                     >
                       Ver detalles →
                     </Link>
-                  </div>
 
-                  {isAdmin && (
-                    <div className="flex justify-end gap-3 text-xs pt-2">
-                      <Link
-                        href={`/tournaments/edit/${t.id}`}
-                        className="text-gray-600 hover:text-gray-900"
-                      >
-                        Editar
-                      </Link>
-                      <button
-                        onClick={() => handleDeleteTournament(t.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  )}
+                    {isAdmin && (
+                      <div className="flex gap-3 text-sm">
+                        <Link
+                          href={`/tournaments/edit/${t.id}`}
+                          className="text-gray-500 hover:text-gray-900 transition"
+                        >
+                          Editar
+                        </Link>
+                        <button
+                          onClick={() => handleDeleteTournament(t.id)}
+                          className="text-red-500 hover:text-red-700 transition"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}

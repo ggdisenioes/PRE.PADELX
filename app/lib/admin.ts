@@ -30,7 +30,9 @@ function getRole(user: User | null | undefined): string | null {
  * Reglas (en orden):
  * 1) role === 'admin' en metadata
  * 2) email incluido en NEXT_PUBLIC_ADMIN_EMAILS
- * 3) compatibilidad: email === 'admin@padel.com'
+ *
+ * ✅ FIXED: Removed hardcoded "admin@padel.com" fallback
+ * All admin detection must be explicit via metadata or env variables
  */
 export function isAdminSession(session: Session | null | undefined): boolean {
   const user = session?.user;
@@ -41,6 +43,6 @@ export function isAdminSession(session: Session | null | undefined): boolean {
   const email = (user?.email || "").toLowerCase();
   if (email && adminEmails.has(email)) return true;
 
-  // Backward compatible default
-  return email === "admin@padel.com";
+  // ✅ FIXED: No fallback to hardcoded email
+  return false;
 }

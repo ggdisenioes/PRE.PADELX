@@ -81,3 +81,17 @@ button.bg-black {
     -webkit-text-fill-color: #ffffff !important;
   }
 }
+
+/* Sidebar slide-in animation (mobile) */
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.3s ease-out forwards;
+}

@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import Card from "../../components/Card";
 import { supabase } from "../../lib/supabase";
 import { logAction } from "../../lib/audit";
+import { useTenantPlan } from "../../hooks/useTenantPlan";
 
 type TournamentInsert = {
   name: string;
@@ -17,6 +18,7 @@ type TournamentInsert = {
 
 export default function CreateTournament() {
   const router = useRouter();
+  const { loading: planLoading, plan, canCreateTournament, usage } = useTenantPlan();
 
   const [name, setName] = useState("");
   const [category, setCategory] = useState("Mixto A");
@@ -29,6 +31,11 @@ export default function CreateTournament() {
   const handleCreate = async () => {
     if (!name.trim()) {
       toast.error("Ingresá un nombre para el torneo");
+      return;
+    }
+
+    if (!canCreateTournament) {
+      toast.error(`Limite de torneos activos alcanzado (${usage.activeTournamentCount}/${plan?.max_concurrent_tournaments}). Finaliza un torneo o actualiza tu plan.`);
       return;
     }
 
@@ -59,7 +66,10 @@ export default function CreateTournament() {
 
     if (error) {
       console.error(error);
-      toast.error("Error al crear el torneo");
+      const msg = error.message?.includes('PLAN_LIMIT')
+        ? error.message.replace('PLAN_LIMIT: ', '')
+        : "Error al crear el torneo";
+      toast.error(msg);
       setLoading(false);
       return;
     }
@@ -87,6 +97,12 @@ export default function CreateTournament() {
   return (
     <main className="flex-1 overflow-y-auto p-8">
       <h2 className="text-3xl font-bold text-gray-800 mb-6">Crear Torneo</h2>
+
+      {!planLoading && !canCreateTournament && (
+        <div className="max-w-3xl mb-4 p-4 bg-yellow-50 border border-yellow-300 rounded-lg text-yellow-800 text-sm">
+          <strong>Limite alcanzado:</strong> Tu plan {plan?.name} permite hasta {plan?.max_concurrent_tournaments} torneo(s) activo(s) y ya tienes {usage.activeTournamentCount}. Finaliza un torneo o contacta al administrador para actualizar tu plan.
+        </div>
+      )}
 
       <Card className="max-w-3xl">
         <div className="space-y-4">
@@ -176,8 +192,8 @@ export default function CreateTournament() {
             <button
               type="button"
               onClick={handleCreate}
-              className="px-5 py-2 rounded bg-green-600 text-white font-semibold hover:bg-green-700"
-              disabled={loading}
+              className="px-5 py-2 rounded bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50"
+              disabled={loading || !canCreateTournament}
             >
               {loading ? "Creando..." : "Crear torneo"}
             </button>
