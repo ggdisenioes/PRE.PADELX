@@ -74,7 +74,7 @@ export default function SuperAdminLayout({
             {isSidebarOpen ? (
               <>
                 <span>🚀</span>
-                <span>PadelX SA</span>
+                <span>PadelX QA SA</span>
               </>
             ) : (
               <span>🚀</span>

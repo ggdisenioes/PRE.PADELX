@@ -247,7 +247,7 @@ export default function RankingPage() {
                       index === 0 ? "md:scale-105" : ""
                     }`}
                   >
-                    <div className="text-sm font-bold text-[#ccff00] mb-1">
+                    <div className="text-sm font-bold text-[#00b4ff] mb-1">
                       {index + 1}º
                     </div>
                     <div className="text-2xl mb-1">
@@ -258,7 +258,7 @@ export default function RankingPage() {
                       <img
                         src={player.avatar_url}
                         alt={player.name}
-                        className="w-12 h-12 rounded-full object-cover border-2 border-[#ccff00]"
+                        className="w-12 h-12 rounded-full object-cover border-2 border-[#00b4ff]"
                         onError={(e: any) => {
                           e.currentTarget.onerror = null;
                           e.currentTarget.src = `https://placehold.co/80x80/111827/ccff00?text=${player.name
@@ -267,7 +267,7 @@ export default function RankingPage() {
                         }}
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-full bg-[#ccff00] text-gray-900 flex items-center justify-center font-bold">
+                      <div className="w-12 h-12 rounded-full bg-[#00b4ff] text-gray-900 flex items-center justify-center font-bold">
                         {player.name.slice(0, 1).toUpperCase()}
                       </div>
                     )}
@@ -347,7 +347,7 @@ export default function RankingPage() {
                                   }}
                                 />
                               ) : (
-                                <div className="w-7 h-7 rounded-full bg-[#ccff00] text-gray-900 flex items-center justify-center text-xs font-bold">
+                                <div className="w-7 h-7 rounded-full bg-[#00b4ff] text-gray-900 flex items-center justify-center text-xs font-bold">
                                   {player.name.slice(0, 1).toUpperCase()}
                                 </div>
                               )}

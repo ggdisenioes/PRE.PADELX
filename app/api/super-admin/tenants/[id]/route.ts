@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from 'next/server';
 import { TenantService, SubscriptionService } from '@/lib/services/saas.service';
 import { UpdateTenantSchema, ChangeTenantPlanSchema, ChangeTenantStatusSchema, AddTenantAddonsSchema, RemoveTenantAddonSchema } from '@/lib/validation/saas.schema';

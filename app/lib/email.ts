@@ -30,7 +30,7 @@ function baseLayout(title: string, bodyHtml: string) {
     .card { max-width:640px; margin:0 auto; background:#ffffff; border:1px solid #e6e8ef; border-radius:16px; overflow:hidden; box-shadow:0 10px 30px rgba(15,23,42,.08); }
     .header { background:#05070b; padding:18px 20px; }
     .brand { color:#fff; font-weight:900; letter-spacing:.26em; font-size:14px; font-style:italic; }
-    .sub { color:#ccff00; font-weight:700; letter-spacing:.32em; font-size:10px; margin-top:4px; }
+    .sub { color:#00b4ff; font-weight:700; letter-spacing:.32em; font-size:10px; margin-top:4px; }
     .content { padding:24px; color:#0f172a; }
     h2 { font-size:20px; font-weight:800; margin:0 0 12px; }
     p { font-size:14px; line-height:1.6; margin:0 0 12px; color:#334155; }

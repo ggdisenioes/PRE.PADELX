@@ -52,13 +52,13 @@ export default function ShareModal({ match, onClose }: ShareModalProps) {
                 style={{ fontFamily: 'sans-serif' }}
             >
                 {/* Fondo Decorativo */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-[#ccff00] opacity-10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-[#00b4ff] opacity-10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
                 <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-600 opacity-10 rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2"></div>
 
                 {/* Header */}
                 <div className="p-6 text-center border-b border-gray-800 z-10">
                     <h1 className="text-3xl font-black italic tracking-tighter mb-1">DEMO</h1>
-                    <p className="text-[#ccff00] text-[10px] font-bold tracking-[0.3em] uppercase">PÁDEL MANAGER</p>
+                    <p className="text-[#00b4ff] text-[10px] font-bold tracking-[0.3em] uppercase">PÁDEL MANAGER</p>
                 </div>
 
                 {/* Torneo */}
@@ -73,10 +73,10 @@ export default function ShareModal({ match, onClose }: ShareModalProps) {
                 <div className="flex-1 flex flex-col justify-center items-center z-10 gap-6">
                     {/* Pareja A */}
                     <div className={`text-center ${match.winner === 'A' ? 'scale-110 transition-transform' : 'opacity-60'}`}>
-                        <p className={`text-xl font-bold ${match.winner === 'A' ? 'text-[#ccff00]' : 'text-white'}`}>
+                        <p className={`text-xl font-bold ${match.winner === 'A' ? 'text-[#00b4ff]' : 'text-white'}`}>
                             {match.player_1_a} / {match.player_1_b}
                         </p>
-                        {match.winner === 'A' && <span className="text-[10px] bg-[#ccff00] text-black px-2 py-0.5 rounded font-bold uppercase">Ganadores</span>}
+                        {match.winner === 'A' && <span className="text-[10px] bg-[#00b4ff] text-black px-2 py-0.5 rounded font-bold uppercase">Ganadores</span>}
                     </div>
 
                     {/* Resultado Grande */}
@@ -86,16 +86,16 @@ export default function ShareModal({ match, onClose }: ShareModalProps) {
 
                     {/* Pareja B */}
                     <div className={`text-center ${match.winner === 'B' ? 'scale-110 transition-transform' : 'opacity-60'}`}>
-                        <p className={`text-xl font-bold ${match.winner === 'B' ? 'text-[#ccff00]' : 'text-white'}`}>
+                        <p className={`text-xl font-bold ${match.winner === 'B' ? 'text-[#00b4ff]' : 'text-white'}`}>
                             {match.player_2_a} / {match.player_2_b}
                         </p>
-                        {match.winner === 'B' && <span className="text-[10px] bg-[#ccff00] text-black px-2 py-0.5 rounded font-bold uppercase">Ganadores</span>}
+                        {match.winner === 'B' && <span className="text-[10px] bg-[#00b4ff] text-black px-2 py-0.5 rounded font-bold uppercase">Ganadores</span>}
                     </div>
                 </div>
 
                 {/* Footer */}
                 <div className="p-4 text-center border-t border-gray-800 z-10">
-                    <p className="text-gray-600 text-[10px]">Resultado oficial gestionado por PadelX Demo</p>
+                    <p className="text-gray-600 text-[10px]">Resultado oficial gestionado por PadelX QA</p>
                 </div>
             </div>
         </div>
@@ -111,7 +111,7 @@ export default function ShareModal({ match, onClose }: ShareModalProps) {
             <button 
                 onClick={handleDownload}
                 disabled={loading}
-                className="flex-1 py-3 bg-[#ccff00] text-black font-bold rounded-lg hover:bg-[#b3e600] transition shadow-lg flex justify-center items-center gap-2"
+                className="flex-1 py-3 bg-[#00b4ff] text-black font-bold rounded-lg hover:bg-[#b3e600] transition shadow-lg flex justify-center items-center gap-2"
             >
                 {loading ? 'Generando...' : (
                     <>

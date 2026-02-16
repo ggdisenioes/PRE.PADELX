@@ -35,7 +35,7 @@ export default function SuperAdminDashboard() {
     <div className="space-y-8">
       <div>
         <h1 className="text-4xl font-bold text-gray-900">Dashboard Super Admin</h1>
-        <p className="text-gray-600 mt-2">Bienvenido a PadelX - Control total de tu SaaS</p>
+        <p className="text-gray-600 mt-2">Bienvenido a PadelX QA - Control total de tu SaaS</p>
       </div>
 
       {/* Top metrics */}

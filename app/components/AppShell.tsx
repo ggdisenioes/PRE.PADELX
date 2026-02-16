@@ -169,7 +169,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <p className="text-[11px] font-extrabold tracking-[0.26em] text-white uppercase">
                 PadelX QA
               </p>
-              <p className="text-[9px] font-semibold tracking-[0.32em] text-[#ccff00] uppercase mt-1">
+              <p className="text-[9px] font-semibold tracking-[0.32em] text-[#00b4ff] uppercase mt-1">
                 Pádel Manager
               </p>
             </div>
@@ -177,7 +177,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
-              className="absolute right-4 inline-flex items-center gap-2 rounded-md border border-white/40 bg-black/30 px-3 py-2 shadow-sm hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#05070b] focus:ring-[#ccff00]"
+              className="absolute right-4 inline-flex items-center gap-2 rounded-md border border-white/40 bg-black/30 px-3 py-2 shadow-sm hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#05070b] focus:ring-[#00b4ff]"
               style={{ color: "#ffffff" }}
               onClick={() => setMobileOpen((o) => !o)}
             >

@@ -468,7 +468,7 @@ export default function MatchesPage() {
                     <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: 3, fontStyle: "italic", color: "#ffffff" }}>
                       PadelX QA
                     </div>
-                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 5, color: "#ccff00", marginTop: 3 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 5, color: "#00b4ff", marginTop: 3 }}>
                       PÁDEL MANAGER
                     </div>
                   </div>
@@ -499,7 +499,7 @@ export default function MatchesPage() {
                     </div>
 
                     {/* Score */}
-                    <div style={{ fontSize: 56, fontWeight: 900, letterSpacing: 4, color: "#ccff00", margin: "8px 0" }}>
+                    <div style={{ fontSize: 56, fontWeight: 900, letterSpacing: 4, color: "#00b4ff", margin: "8px 0" }}>
                       {score}
                     </div>
 
