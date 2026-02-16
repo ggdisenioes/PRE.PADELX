@@ -1,6 +1,12 @@
+"use client";
+
 // app/not-found.tsx
 
+import { useTranslation } from "./i18n";
+
 export default function NotFound() {
+  const { t } = useTranslation();
+
   return (
     <main
       style={{
@@ -24,10 +30,10 @@ export default function NotFound() {
         }}
       >
         <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: "#111827" }}>
-          Página no encontrada
+          {t("notFound.title")}
         </h1>
         <p style={{ marginTop: 10, marginBottom: 18, color: "#4b5563", lineHeight: 1.45 }}>
-          La URL que intentaste abrir no existe o fue movida.
+          {t("notFound.body")}
         </p>
         <a
           href="/"
@@ -43,7 +49,7 @@ export default function NotFound() {
             textDecoration: "none",
           }}
         >
-          Volver al inicio
+          {t("notFound.backToHome")}
         </a>
       </div>
     </main>

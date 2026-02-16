@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { supabase } from "../../lib/supabase";
+import { useTranslation } from "../../i18n";
 
 type ApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -40,6 +41,7 @@ function statusFromRow(u: ProfileRow): "pending" | "approved" | "rejected" | "de
 }
 
 export default function AdminUsersPage() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [canAccess, setCanAccess] = useState(false);
   const [meId, setMeId] = useState<string | null>(null);
@@ -80,7 +82,7 @@ export default function AdminUsersPage() {
     if (userErr || !user) {
       setLoading(false);
       setCanAccess(false);
-      toast.error("No se pudo leer tu sesión.");
+      toast.error(t("admin.users.errorLoadingUsers"));
       return;
     }
 
@@ -96,9 +98,7 @@ export default function AdminUsersPage() {
       console.warn("[admin/users] could not read my profile", { meErr, userId: user.id });
       setLoading(false);
       setCanAccess(false);
-      toast.error(
-        "No se pudo determinar tu club (tenant). Verificá que exista tu fila en public.profiles y que tenga tenant_id asignado."
-      );
+      toast.error(t("admin.users.errorLoadingUsers"));
       return;
     }
 
@@ -117,7 +117,7 @@ export default function AdminUsersPage() {
     if (!me.tenant_id) {
       setRows([]);
       setLoading(false);
-      toast.error("Tu perfil no tiene tenant_id asignado.");
+      toast.error(t("admin.users.errorLoadingUsers"));
       return;
     }
 
@@ -137,7 +137,7 @@ export default function AdminUsersPage() {
 
     if (usersRes.error) {
       console.error(usersRes.error);
-      toast.error("No se pudieron cargar los usuarios.");
+      toast.error(t("admin.users.errorLoadingUsers"));
       setRows([]);
       setLoading(false);
       return;
@@ -152,10 +152,10 @@ export default function AdminUsersPage() {
     const { error } = await supabase.rpc("approve_user", { p_user_id: userId });
     if (error) {
       console.error(error);
-      toast.error("No se pudo aprobar el usuario.");
+      toast.error(t("admin.users.errorUpdatingStatus"));
       return;
     }
-    toast.success("Usuario aprobado.");
+    toast.success(t("admin.users.userActivated"));
     void load();
   };
 
@@ -163,10 +163,10 @@ export default function AdminUsersPage() {
     const { error } = await supabase.rpc("reject_user", { p_user_id: userId });
     if (error) {
       console.error(error);
-      toast.error("No se pudo rechazar el usuario.");
+      toast.error(t("admin.users.errorUpdatingStatus"));
       return;
     }
-    toast.success("Usuario rechazado.");
+    toast.success(t("admin.users.userDeactivated"));
     void load();
   };
 
@@ -178,11 +178,11 @@ export default function AdminUsersPage() {
 
     if (error) {
       console.error("[admin/users] softDelete error", error);
-      toast.error(`No se pudo eliminar (deshabilitar) el usuario. ${error.message ?? ""}`.trim());
+      toast.error(t("admin.users.errorDeleting"));
       return;
     }
 
-    toast.success("Usuario eliminado (deshabilitado).");
+    toast.success(t("admin.users.userDeleted"));
     void load();
   };
 
@@ -195,11 +195,11 @@ export default function AdminUsersPage() {
 
     if (error) {
       console.error("[admin/users] setActive error", error);
-      toast.error(active ? "No se pudo habilitar el usuario." : "No se pudo deshabilitar el usuario.");
+      toast.error(t("admin.users.errorUpdatingStatus"));
       return;
     }
 
-    toast.success(active ? "Usuario habilitado." : "Usuario deshabilitado.");
+    toast.success(active ? t("admin.users.userActivated") : t("admin.users.userDeactivated"));
     void load();
   };
 
@@ -207,10 +207,10 @@ export default function AdminUsersPage() {
     const { error } = await supabase.from("profiles").update({ role: newRole }).eq("id", userId);
     if (error) {
       console.error(error);
-      toast.error("No se pudo actualizar el rol.");
+      toast.error(t("admin.users.errorUpdatingRole"));
       return;
     }
-    toast.success("Rol actualizado.");
+    toast.success(t("admin.users.roleUpdated"));
     void load();
   };
 
@@ -223,7 +223,7 @@ export default function AdminUsersPage() {
 
     if (unlinkErr) {
       console.error("[admin/users] unlink error", unlinkErr);
-      toast.error("Error al desvincular el jugador anterior.");
+      toast.error(t("admin.users.errorSavingChanges"));
       return;
     }
 
@@ -236,12 +236,12 @@ export default function AdminUsersPage() {
 
       if (linkErr) {
         console.error("[admin/users] link error", linkErr);
-        toast.error("Error al vincular el jugador.");
+        toast.error(t("admin.users.errorSavingChanges"));
         return;
       }
-      toast.success("Jugador vinculado correctamente.");
+      toast.success(t("admin.users.changesSaved"));
     } else {
-      toast.success("Jugador desvinculado.");
+      toast.success(t("admin.users.changesSaved"));
     }
 
     void load();
@@ -253,13 +253,13 @@ export default function AdminUsersPage() {
   }, []);
 
   if (loading) {
-    return <p className="p-6 text-gray-500">Cargando…</p>;
+    return <p className="p-6 text-gray-500">{t("admin.users.loading")}</p>;
   }
 
   if (!canAccess) {
     return (
       <p className="p-6 text-red-600 font-semibold">
-        No tenés permisos para gestionar usuarios.
+        {t("admin.users.noPermission")}
       </p>
     );
   }
@@ -268,26 +268,26 @@ export default function AdminUsersPage() {
     <main className="max-w-6xl mx-auto p-6 space-y-6">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Gestión de usuarios</h1>
+          <h1 className="text-2xl font-bold">{t("admin.users.title")}</h1>
           <p className="text-sm text-gray-600">
-            Administrá usuarios del club (aprobar/rechazar, habilitar/deshabilitar, rol, vincular jugador).
+            {t("admin.users.title")}
           </p>
         </div>
         <button
           onClick={() => void load()}
           className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-semibold hover:bg-gray-200 transition"
         >
-          Actualizar
+          {t("common.save")}
         </button>
       </header>
 
       <div className="flex flex-wrap gap-2">
         {([
-          ["pending", "Pendientes"],
-          ["approved", "Aprobados"],
-          ["rejected", "Rechazados"],
-          ["deleted", "Eliminados"],
-          ["all", "Todos"],
+          ["pending", t("admin.management.tabs.pending")],
+          ["approved", t("admin.management.tabs.approved")],
+          ["rejected", t("admin.management.tabs.rejected")],
+          ["deleted", t("admin.management.tabs.deleted")],
+          ["all", t("admin.management.tabs.all")],
         ] as const).map(([k, label]) => (
           <button
             key={k}
@@ -305,16 +305,16 @@ export default function AdminUsersPage() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="grid grid-cols-12 px-4 py-3 text-xs font-bold text-gray-500 uppercase bg-gray-50 border-b border-gray-100">
-          <div className="col-span-3">Usuario</div>
-          <div className="col-span-2">Email</div>
-          <div className="col-span-1">Rol</div>
-          <div className="col-span-1">Estado</div>
-          <div className="col-span-3">Jugador vinculado</div>
-          <div className="col-span-2 text-right">Acciones</div>
+          <div className="col-span-3">{t("admin.users.colUser")}</div>
+          <div className="col-span-2">{t("common.email")}</div>
+          <div className="col-span-1">{t("admin.users.colRole")}</div>
+          <div className="col-span-1">{t("admin.users.colStatus")}</div>
+          <div className="col-span-3">{t("admin.users.linkPlayer")}</div>
+          <div className="col-span-2 text-right">{t("admin.users.colActions")}</div>
         </div>
 
         {filtered.length === 0 ? (
-          <div className="p-6 text-gray-500">No hay usuarios en esta sección.</div>
+          <div className="p-6 text-gray-500">{t("common.noResults")}</div>
         ) : (
           filtered.map((u) => {
             const status = statusFromRow(u);
@@ -347,7 +347,7 @@ export default function AdminUsersPage() {
                     )}
                     {u.active === false && (
                       <span className="text-[10px] px-2 py-1 rounded-full bg-red-100 text-red-700">
-                        {u.deleted_at ? "Eliminado" : "Deshabilitado"}
+                        {u.deleted_at ? t("admin.management.tabs.deleted") : t("admin.users.inactive")}
                       </span>
                     )}
                   </p>
@@ -387,12 +387,12 @@ export default function AdminUsersPage() {
                     }`}
                   >
                     {status === "pending"
-                      ? "Pendiente"
+                      ? t("common.pending")
                       : status === "approved"
-                      ? "Aprobado"
+                      ? t("common.approved")
                       : status === "rejected"
-                      ? "Rechazado"
-                      : "Eliminado"}
+                      ? t("common.rejected")
+                      : t("admin.management.tabs.deleted")}
                   </span>
                 </div>
 
@@ -428,13 +428,13 @@ export default function AdminUsersPage() {
                         onClick={() => approve(u.id)}
                         className="bg-green-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-green-700 transition"
                       >
-                        Aprobar
+                        {t("admin.playersApproval.approve")}
                       </button>
                       <button
                         onClick={() => reject(u.id)}
                         className="bg-red-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-red-700 transition"
                       >
-                        Rechazar
+                        {t("admin.playersApproval.reject")}
                       </button>
                     </>
                   )}
@@ -444,7 +444,7 @@ export default function AdminUsersPage() {
                       onClick={() => setActive(u.id, true)}
                       className="bg-green-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-green-700 transition"
                     >
-                      Rehabilitar
+                      {t("admin.users.activate")}
                     </button>
                   )}
 
@@ -455,7 +455,7 @@ export default function AdminUsersPage() {
                           onClick={() => setActive(u.id, true)}
                           className="bg-green-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-green-700 transition"
                         >
-                          Habilitar
+                          {t("admin.users.activate")}
                         </button>
                       ) : (
                         <button
@@ -463,14 +463,14 @@ export default function AdminUsersPage() {
                           disabled={isMe || isAdmin}
                           title={
                             isMe
-                              ? "No podés deshabilitarte a vos mismo"
+                              ? t("admin.users.cantDeleteSelf")
                               : isAdmin
-                              ? "No se deshabilita el admin principal desde aquí"
+                              ? t("admin.users.cantDeleteAdmin")
                               : ""
                           }
                           className="bg-gray-900 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-black transition disabled:opacity-40"
                         >
-                          Deshabilitar
+                          {t("admin.users.deactivate")}
                         </button>
                       )}
 
@@ -480,14 +480,14 @@ export default function AdminUsersPage() {
                           disabled={isMe || isAdmin}
                           title={
                             isMe
-                              ? "No podés eliminarte a vos mismo"
+                              ? t("admin.users.cantDeleteSelf")
                               : isAdmin
-                              ? "No se elimina el admin principal desde aquí"
-                              : "Eliminar = deshabilitar (reversible)"
+                              ? t("admin.users.cantDeleteAdmin")
+                              : ""
                           }
                           className="bg-red-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-red-700 transition disabled:opacity-40"
                         >
-                          Eliminar
+                          {t("admin.users.delete")}
                         </button>
                       )}
 
@@ -496,7 +496,7 @@ export default function AdminUsersPage() {
                           onClick={() => approve(u.id)}
                           className="bg-green-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-green-700 transition"
                         >
-                          Aprobar
+                          {t("admin.playersApproval.approve")}
                         </button>
                       )}
                     </>
@@ -509,7 +509,7 @@ export default function AdminUsersPage() {
       </div>
 
       <p className="text-xs text-gray-500">
-        Nota: "Eliminar" es una baja lógica (reversible). El usuario pasa a la pestaña "Eliminados" y puede ser rehabilitado.
+        Nota: &quot;Eliminar&quot; es una baja lógica (reversible). El usuario pasa a la pestaña &quot;Eliminados&quot; y puede ser rehabilitado.
       </p>
     </main>
   );

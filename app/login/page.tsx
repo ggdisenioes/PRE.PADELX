@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslation } from "../i18n";
 
 function getBaseDomain(hostname: string) {
   const parts = hostname.split(".");
@@ -10,28 +11,29 @@ function getBaseDomain(hostname: string) {
   return parts.slice(-2).join(".");
 }
 
-function getLoginMessage(errorCode: string | null) {
-  switch (errorCode) {
-    case "tenant_incorrecto":
-      return "Este usuario pertenece a otro club. Ingresá desde el subdominio correcto.";
-    case "usuario_deshabilitado":
-      return "Usuario deshabilitado, contacte su administrador.";
-    case "tenant_no_asignado":
-      return "Tu usuario no tiene club asignado. Contactá al administrador.";
-    case "perfil_no_encontrado":
-      return "No se pudo leer tu perfil. Probá cerrar sesión e ingresar nuevamente.";
-    case "tenant_invalido":
-      return "Tu club no es válido. Contactá al administrador.";
-    case "aprobacion_en_curso":
-      return "Tu solicitud de acceso está en revisión. Contactá al administrador del club.";
-    default:
-      return null;
-  }
-}
-
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
+
+  function getLoginMessage(errorCode: string | null) {
+    switch (errorCode) {
+      case "tenant_incorrecto":
+        return t("errors.tenantIncorrecto");
+      case "usuario_deshabilitado":
+        return t("errors.usuarioDeshabilitado");
+      case "tenant_no_asignado":
+        return t("errors.tenantNoAsignado");
+      case "perfil_no_encontrado":
+        return t("errors.perfilNoEncontrado");
+      case "tenant_invalido":
+        return t("errors.tenantInvalido");
+      case "aprobacion_en_curso":
+        return t("auth.pendingApproval");
+      default:
+        return null;
+    }
+  }
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -67,8 +69,8 @@ export default function LoginPage() {
     if (error || !data.session || !data.user) {
       setErrorMsg(
         error?.message === "Invalid login credentials"
-          ? "Usuario o contraseña incorrectos"
-          : error?.message ?? "Error al iniciar sesión"
+          ? t("auth.invalidCredentials")
+          : error?.message ?? t("auth.loginError")
       );
       setLoading(false);
       return;
@@ -84,8 +86,8 @@ export default function LoginPage() {
       await supabase.auth.signOut();
       setErrorMsg(
         profile && profile.active === false
-          ? "Tu solicitud de acceso está en revisión. Contactá al administrador del club."
-          : "Usuario deshabilitado, contacte su administrador."
+          ? t("auth.pendingApproval")
+          : t("auth.userDisabled")
       );
       setLoading(false);
       return;
@@ -107,15 +109,15 @@ export default function LoginPage() {
           <span className="inline-block bg-gray-900 text-[#00b4ff] px-2 py-0.5 text-xs font-bold tracking-[0.2em] uppercase rounded-sm mt-1">
             Dashboard
           </span>
-          <p className="text-gray-400 text-sm mt-4">Bienvenido</p>
+          <p className="text-gray-400 text-sm mt-4">{t("auth.welcome")}</p>
         </div>
 
         {/* Banner PRO para tenant incorrecto */}
         {errorCode === "tenant_incorrecto" && (
           <div className="bg-amber-50 border-l-4 border-amber-500 text-amber-900 p-3 mb-4 text-sm rounded-r">
-            <p className="font-semibold">Acceso por subdominio incorrecto</p>
+            <p className="font-semibold">{t("auth.loginSubtitle")}</p>
             <p className="mt-1">
-              Este usuario pertenece a otro club. Para evitar errores, ingresá desde el subdominio correcto.
+              {t("errors.tenantIncorrecto")}
             </p>
 
             {tenantRedirectUrl && (
@@ -123,7 +125,7 @@ export default function LoginPage() {
                 href={tenantRedirectUrl}
                 className="inline-flex mt-3 items-center justify-center rounded-lg bg-gray-900 text-white font-bold px-4 py-2 hover:bg-black transition"
               >
-                Ir al club correcto
+                {t("auth.loginHere")}
               </a>
             )}
           </div>
@@ -137,7 +139,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Email</label>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">{t("auth.email")}</label>
             <input
               type="email"
               required
@@ -149,7 +151,7 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Contraseña</label>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">{t("auth.password")}</label>
             <input
               type="password"
               required
@@ -165,23 +167,23 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-gray-900 text-white font-bold py-3.5 rounded-lg hover:bg-black transition duration-200 disabled:opacity-70 shadow-lg"
           >
-            {loading ? "Accediendo..." : "Iniciar Sesión"}
+            {loading ? t("auth.loggingIn") : t("auth.login")}
           </button>
           <button
             type="button"
             onClick={() => router.push("/register")}
             className="w-full bg-white text-gray-900 font-bold py-3.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-200 shadow-sm"
           >
-            Registrarme
+            {t("auth.register")}
           </button>
           <p className="text-xs text-gray-500 text-center">
-            Si no ves tu club en el registro, contactá al administrador.
+            {t("auth.noClubHint")}
           </p>
         </form>
 
         <div className="mt-8 pt-6 border-t border-gray-100 text-center">
           <p className="text-xs text-gray-400">
-            Desarrollado por{" "}
+            {t("common.developedBy")}{" "}
             <a
               href="https://ggdisenio.es"
               target="_blank"

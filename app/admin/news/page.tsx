@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Card from "../../components/Card";
 import toast from "react-hot-toast";
 import { z } from "zod";
+import { useTranslation } from "../../i18n";
 
 const newsSchema = z.object({
   title: z.string().min(1, "Título requerido"),
@@ -19,6 +20,7 @@ type News = z.infer<typeof newsSchema> & { id: number };
 type FormNews = Partial<typeof newsSchema>;
 
 export default function AdminNewsPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [news, setNews] = useState<News[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +77,7 @@ export default function AdminNewsPage() {
       }
     } catch (error) {
       console.error("Error fetching news:", error);
-      toast.error("Error cargando noticias");
+      toast.error(t("admin.newsAdmin.errorLoading"));
     } finally {
       setLoading(false);
     }
@@ -115,7 +117,7 @@ export default function AdminNewsPage() {
       const result = await response.json();
 
       if (response.ok) {
-        toast.success(editingId ? "Noticia actualizada" : "Noticia creada");
+        toast.success(editingId ? t("news.saved") : t("news.created"));
         setFormData({
           title: "",
           content: "",
@@ -127,10 +129,10 @@ export default function AdminNewsPage() {
         setShowForm(false);
         fetchNews();
       } else {
-        toast.error(result.error || "Error al guardar");
+        toast.error(result.error || t("news.errorSaving"));
       }
     } catch (error: any) {
-      toast.error(error.message || "Error de validación");
+      toast.error(error.message || t("news.errorSaving"));
     }
   };
 
@@ -147,7 +149,7 @@ export default function AdminNewsPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("¿Estás seguro?")) return;
+    if (!confirm(t("admin.newsAdmin.deleteConfirm"))) return;
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -165,24 +167,24 @@ export default function AdminNewsPage() {
       });
 
       if (response.ok) {
-        toast.success("Noticia eliminada");
+        toast.success(t("admin.newsAdmin.deleted"));
         fetchNews();
       } else {
-        toast.error("Error al eliminar");
+        toast.error(t("admin.newsAdmin.errorDeleting"));
       }
     } catch (error) {
-      toast.error("Error");
+      toast.error(t("common.error"));
     }
   };
 
   if (loading) {
-    return <div className="p-8 text-center">Cargando...</div>;
+    return <div className="p-8 text-center">{t("admin.newsAdmin.loading")}</div>;
   }
 
   return (
     <main className="max-w-5xl mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">📝 Gestionar Noticias</h1>
+        <h1 className="text-3xl font-bold">📝 {t("admin.newsAdmin.title")}</h1>
         <button
           onClick={() => {
             setShowForm(!showForm);
@@ -199,18 +201,18 @@ export default function AdminNewsPage() {
           }}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          {showForm ? "Cancelar" : "+ Nueva Noticia"}
+          {showForm ? t("common.cancel") : `+ ${t("admin.newsAdmin.create")}`}
         </button>
       </div>
 
       {showForm && (
         <Card className="p-6">
           <h2 className="text-xl font-bold mb-4">
-            {editingId ? "Editar Noticia" : "Crear Nueva Noticia"}
+            {editingId ? t("news.editTitle") : t("news.createTitle")}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Título</label>
+              <label className="block text-sm font-medium mb-1">{t("news.titleField")}</label>
               <input
                 type="text"
                 value={formData.title || ""}
@@ -223,7 +225,7 @@ export default function AdminNewsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Contenido</label>
+              <label className="block text-sm font-medium mb-1">{t("news.content")}</label>
               <textarea
                 value={formData.content || ""}
                 onChange={(e) =>
@@ -235,7 +237,7 @@ export default function AdminNewsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">URL Imagen (opcional)</label>
+              <label className="block text-sm font-medium mb-1">{t("news.imageUrl")} ({t("common.optional")})</label>
               <input
                 type="url"
                 value={formData.image_url || ""}
@@ -255,7 +257,7 @@ export default function AdminNewsPage() {
                     setFormData({ ...formData, published: e.target.checked })
                   }
                 />
-                <span className="text-sm">Publicado</span>
+                <span className="text-sm">{t("news.published")}</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -265,7 +267,7 @@ export default function AdminNewsPage() {
                     setFormData({ ...formData, featured: e.target.checked })
                   }
                 />
-                <span className="text-sm">Destacado</span>
+                <span className="text-sm">{t("news.featured")}</span>
               </label>
             </div>
 
@@ -273,7 +275,7 @@ export default function AdminNewsPage() {
               type="submit"
               className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
             >
-              {editingId ? "Actualizar" : "Crear"}
+              {editingId ? t("common.save") : t("common.create")}
             </button>
           </form>
         </Card>
@@ -288,12 +290,12 @@ export default function AdminNewsPage() {
               <div className="flex gap-2 mt-2">
                 {item.published && (
                   <span className="text-xs px-2 py-1 bg-green-200 text-green-800 rounded">
-                    Publicado
+                    {t("news.published")}
                   </span>
                 )}
                 {item.featured && (
                   <span className="text-xs px-2 py-1 bg-yellow-200 text-yellow-800 rounded">
-                    Destacado
+                    {t("news.featured")}
                   </span>
                 )}
               </div>
@@ -303,13 +305,13 @@ export default function AdminNewsPage() {
                 onClick={() => handleEdit(item)}
                 className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
               >
-                Editar
+                {t("common.edit")}
               </button>
               <button
                 onClick={() => handleDelete(item.id)}
                 className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
               >
-                Eliminar
+                {t("common.delete")}
               </button>
             </div>
           </Card>

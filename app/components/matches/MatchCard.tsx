@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslation } from "../../i18n";
+
 type TeamProps = {
   p1?: string;
   p2?: string;
@@ -41,6 +43,7 @@ type MatchCardProps = {
 };
 
 export default function MatchCard(props: MatchCardProps) {
+  const { t } = useTranslation();
   const {
     match,
     playersMap = {},
@@ -55,8 +58,8 @@ export default function MatchCard(props: MatchCardProps) {
   } = props;
 
   const nameFromValue = (v?: PlayerValue) => {
-    if (!v) return "Por definir";
-    if (typeof v === "object") return v.name || "Por definir";
+    if (!v) return t("matches.tbd");
+    if (typeof v === "object") return v.name || t("matches.tbd");
     return playersMap[v] || `Jugador ${v}`;
   };
 
@@ -99,7 +102,7 @@ export default function MatchCard(props: MatchCardProps) {
   const headerRight =
     tournament ||
     match?.tournament_name ||
-    (match?.tournament_id ? `Torneo #${match.tournament_id}` : "Sin torneo");
+    (match?.tournament_id ? `Torneo #${match.tournament_id}` : t("matches.noTournament"));
 
   const startDate = toDateFromSupabase(match?.start_time);
 
@@ -133,7 +136,7 @@ export default function MatchCard(props: MatchCardProps) {
               : "bg-blue-100 text-blue-700"
           }`}
         >
-          {isFinished ? "Finalizado" : "Programado"}
+          {isFinished ? t("matches.statusFinished") : t("matches.statusScheduled")}
         </span>
       </div>
 
@@ -180,7 +183,7 @@ export default function MatchCard(props: MatchCardProps) {
       {showActions && (
         <div className="pt-2 flex justify-end">
           <button className="text-sm font-semibold text-indigo-600 hover:text-indigo-700">
-            Ver detalle →
+            {t("matches.viewDetail")}
           </button>
         </div>
       )}

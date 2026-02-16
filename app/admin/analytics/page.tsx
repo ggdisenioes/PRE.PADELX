@@ -5,6 +5,7 @@ import { supabase } from "../../lib/supabase";
 import { useRouter } from "next/navigation";
 import Card from "../../components/Card";
 import toast from "react-hot-toast";
+import { useTranslation } from "../../i18n";
 
 type Stats = {
   total_users: number;
@@ -25,6 +26,7 @@ type TopPlayer = {
 };
 
 export default function AnalyticsDashboard() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [topPlayers, setTopPlayers] = useState<TopPlayer[]>([]);
@@ -73,11 +75,11 @@ export default function AnalyticsDashboard() {
         setStats(result.stats);
         setTopPlayers(result.topPlayers || []);
       } else {
-        toast.error("Error cargando estadísticas");
+        toast.error(t("admin.analytics.errorLoading"));
       }
     } catch (error) {
       console.error("Error fetching analytics:", error);
-      toast.error("Error");
+      toast.error(t("admin.analytics.errorLoading"));
     } finally {
       setLoading(false);
     }
@@ -104,7 +106,7 @@ export default function AnalyticsDashboard() {
         const result = await response.json();
 
         if (!result.html) {
-          toast.error("Error: No se generó contenido HTML");
+          toast.error(t("admin.analytics.errorGeneratingPdf"));
           return;
         }
 
@@ -121,68 +123,68 @@ export default function AnalyticsDashboard() {
           URL.revokeObjectURL(blobUrl);
         }
 
-        toast.success("PDF generado");
+        toast.success(t("admin.analytics.pdfGenerated"));
       } else {
         const errorData = await response.json();
-        toast.error(errorData.error || "Error al generar PDF");
+        toast.error(errorData.error || t("admin.analytics.errorGeneratingPdf"));
       }
     } catch (error: any) {
       console.error("Export PDF error:", error);
-      toast.error(error.message || "Error al generar PDF");
+      toast.error(error.message || t("admin.analytics.errorGeneratingPdf"));
     }
   };
 
   if (loading) {
-    return <div className="p-8 text-center">Cargando estadísticas...</div>;
+    return <div className="p-8 text-center">{t("admin.analytics.loading")}</div>;
   }
 
   if (!stats) {
-    return <div className="p-8 text-center text-gray-500">Error cargando datos</div>;
+    return <div className="p-8 text-center text-gray-500">{t("admin.analytics.errorLoading")}</div>;
   }
 
   const metrics = [
     {
-      label: "Usuarios Totales",
+      label: t("admin.analytics.metricTotalUsers"),
       value: stats.total_users,
       color: "bg-blue-100 text-blue-800",
     },
     {
-      label: "Usuarios Activos",
+      label: t("admin.analytics.metricActiveUsers"),
       value: stats.total_active_users,
       color: "bg-green-100 text-green-800",
     },
     {
-      label: "Jugadores",
+      label: t("admin.analytics.metricPlayers"),
       value: stats.total_players,
       color: "bg-purple-100 text-purple-800",
     },
     {
-      label: "Partidos Totales",
+      label: t("admin.analytics.metricTotalMatches"),
       value: stats.total_matches,
       color: "bg-yellow-100 text-yellow-800",
     },
     {
-      label: "Partidos Completados",
+      label: t("admin.analytics.metricCompletedMatches"),
       value: stats.total_completed_matches,
       color: "bg-orange-100 text-orange-800",
     },
     {
-      label: "Torneos",
+      label: t("admin.analytics.metricTournaments"),
       value: stats.total_tournaments,
       color: "bg-pink-100 text-pink-800",
     },
     {
-      label: "Reservas de Pistas",
+      label: t("admin.analytics.metricBookings"),
       value: stats.total_bookings,
       color: "bg-indigo-100 text-indigo-800",
     },
     {
-      label: "Desafíos Pendientes",
+      label: t("admin.analytics.metricPendingChallenges"),
       value: stats.pending_challenges,
       color: "bg-red-100 text-red-800",
     },
     {
-      label: "Noticias Publicadas",
+      label: t("admin.analytics.metricNewsPublished"),
       value: stats.news_published,
       color: "bg-cyan-100 text-cyan-800",
     },
@@ -191,12 +193,12 @@ export default function AnalyticsDashboard() {
   return (
     <main className="max-w-6xl mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">📊 Analytics Avanzado</h1>
+        <h1 className="text-3xl font-bold">📊 {t("admin.analytics.title")}</h1>
         <button
           onClick={handleExportPDF}
           className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
         >
-          📥 Exportar PDF
+          📥 {t("admin.analytics.exportPdf")}
         </button>
       </div>
 
@@ -213,10 +215,10 @@ export default function AnalyticsDashboard() {
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="p-6">
-          <h2 className="text-lg font-bold mb-4">📈 Ratios Importantes</h2>
+          <h2 className="text-lg font-bold mb-4">📈 {t("admin.analytics.ratiosTitle")}</h2>
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span>Tasa de Actividad de Usuarios</span>
+              <span>{t("admin.analytics.userActivityRate")}</span>
               <span className="font-bold">
                 {stats.total_users > 0
                   ? Math.round((stats.total_active_users / stats.total_users) * 100)
@@ -225,7 +227,7 @@ export default function AnalyticsDashboard() {
               </span>
             </div>
             <div className="flex justify-between">
-              <span>Tasa de Partidos Completados</span>
+              <span>{t("admin.analytics.completedMatchesRate")}</span>
               <span className="font-bold">
                 {stats.total_matches > 0
                   ? Math.round((stats.total_completed_matches / stats.total_matches) * 100)
@@ -234,7 +236,7 @@ export default function AnalyticsDashboard() {
               </span>
             </div>
             <div className="flex justify-between">
-              <span>Promedio de Partidos por Usuario</span>
+              <span>{t("admin.analytics.avgMatchesPerUser")}</span>
               <span className="font-bold">
                 {stats.total_players > 0
                   ? (stats.total_matches / stats.total_players).toFixed(1)
@@ -245,19 +247,19 @@ export default function AnalyticsDashboard() {
         </Card>
 
         <Card className="p-6">
-          <h2 className="text-lg font-bold mb-4">🎯 Resumen de Actividad</h2>
+          <h2 className="text-lg font-bold mb-4">🎯 {t("admin.analytics.activitySummary")}</h2>
           <div className="space-y-3 text-sm">
             <p>
-              <strong>{stats.pending_challenges}</strong> desafíos esperando respuesta
+              <strong>{stats.pending_challenges}</strong> {t("admin.analytics.challengesWaiting")}
             </p>
             <p>
-              <strong>{stats.total_bookings}</strong> pistas reservadas en total
+              <strong>{stats.total_bookings}</strong> {t("admin.analytics.courtsBooked")}
             </p>
             <p>
-              <strong>{stats.news_published}</strong> noticias publicadas
+              <strong>{stats.news_published}</strong> {t("admin.analytics.newsPublished")}
             </p>
             <p>
-              <strong>{stats.total_tournaments}</strong> torneos creados
+              <strong>{stats.total_tournaments}</strong> {t("admin.analytics.tournamentsCreated")}
             </p>
           </div>
         </Card>
@@ -266,13 +268,13 @@ export default function AnalyticsDashboard() {
       {/* Top Players */}
       {topPlayers.length > 0 && (
         <Card className="p-6">
-          <h2 className="text-lg font-bold mb-4">🏆 Top 10 Jugadores</h2>
+          <h2 className="text-lg font-bold mb-4">🏆 {t("admin.analytics.topPlayersTitle")}</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2">Jugador</th>
-                  <th className="text-right py-2">Nivel</th>
+                  <th className="text-left py-2">{t("admin.analytics.colPlayer")}</th>
+                  <th className="text-right py-2">{t("admin.analytics.colLevel")}</th>
                 </tr>
               </thead>
               <tbody>

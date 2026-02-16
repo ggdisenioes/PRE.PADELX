@@ -8,6 +8,7 @@ import Link from "next/link";
 import Card from "../../components/Card";
 import { createUserSchema } from "../../lib/validation";
 import { z } from "zod";
+import { useTranslation } from "../../i18n";
 
 type TabType = "create" | "manage" | "logs";
 
@@ -32,6 +33,7 @@ type AuditLog = {
 };
 
 export default function AdminManagementPage() {
+  const { t } = useTranslation();
   const { isAdmin, isManager, loading: roleLoading } = useRole();
   const [activeTab, setActiveTab] = useState<TabType>("manage");
   const [loading, setLoading] = useState(true);
@@ -66,10 +68,10 @@ export default function AdminManagementPage() {
   if (!roleLoading && !isAdmin && !isManager) {
     return (
       <main className="flex-1 p-8">
-        <h1 className="text-2xl font-bold text-red-600">Acceso denegado</h1>
-        <p className="text-gray-600 mt-2">No tienes permisos para acceder a esta sección.</p>
+        <h1 className="text-2xl font-bold text-red-600">{t("admin.logs.accessDenied")}</h1>
+        <p className="text-gray-600 mt-2">{t("admin.users.noPermission")}</p>
         <Link href="/" className="text-blue-600 hover:underline mt-4 inline-block">
-          ← Volver al dashboard
+          {t("admin.logs.backToDashboard")}
         </Link>
       </main>
     );
@@ -136,10 +138,10 @@ export default function AdminManagementPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Error creando usuario");
+        throw new Error(error.error || t("admin.users.errorCreating"));
       }
 
-      toast.success("¡Usuario creado exitosamente!");
+      toast.success(t("admin.users.userCreated"));
       setCreateForm({ email: "", password: "", role: "user" });
 
       // Recargar usuarios
@@ -149,7 +151,7 @@ export default function AdminManagementPage() {
         .order("created_at", { ascending: false });
       setUsers((usersData as ProfileRow[]) || []);
     } catch (error: any) {
-      toast.error(error.message || "Error creando usuario");
+      toast.error(error.message || t("admin.users.errorCreating"));
     } finally {
       setCreatingUser(false);
     }
@@ -171,7 +173,7 @@ export default function AdminManagementPage() {
 
       if (error) throw error;
 
-      toast.success("Usuario actualizado");
+      toast.success(t("admin.users.changesSaved"));
       setEditingUserId(null);
 
       // Recargar
@@ -181,7 +183,7 @@ export default function AdminManagementPage() {
         .order("created_at", { ascending: false });
       setUsers((usersData as ProfileRow[]) || []);
     } catch (error: any) {
-      toast.error(error.message || "Error actualizando usuario");
+      toast.error(error.message || t("admin.users.errorSavingChanges"));
     } finally {
       setSavingEdit(false);
     }
@@ -190,7 +192,7 @@ export default function AdminManagementPage() {
   // Cambiar contraseña (solo admin)
   const handleChangePassword = async (userId: string, email: string) => {
     if (!isAdmin) {
-      toast.error("Solo admins pueden cambiar contraseñas");
+      toast.error(t("admin.users.errorChangingPassword"));
       return;
     }
 
@@ -207,7 +209,7 @@ export default function AdminManagementPage() {
 
       schema.parse({ password: newPassword });
     } catch (error: any) {
-      toast.error(error.errors?.[0]?.message || "Contraseña inválida");
+      toast.error(error.errors?.[0]?.message || t("admin.users.errorChangingPassword"));
       return;
     }
 
@@ -224,14 +226,14 @@ export default function AdminManagementPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Error cambiando contraseña");
+        throw new Error(error.error || t("admin.users.errorChangingPassword"));
       }
 
-      toast.success(`Contraseña de ${email} actualizada`);
+      toast.success(t("admin.users.passwordChanged", { email }));
       setChangingPasswordUserId(null);
       setNewPassword("");
     } catch (error: any) {
-      toast.error(error.message || "Error cambiando contraseña");
+      toast.error(error.message || t("admin.users.errorChangingPassword"));
     } finally {
       setChangingPassword(false);
     }
@@ -240,11 +242,11 @@ export default function AdminManagementPage() {
   // Eliminar usuario
   const handleDeleteUser = async (userId: string, email: string) => {
     if (userId === currentUserId) {
-      toast.error("No puedes eliminarte a ti mismo");
+      toast.error(t("admin.users.cantDeleteSelf"));
       return;
     }
 
-    if (!confirm(`¿Eliminar a ${email}? Esta acción no se puede deshacer.`)) return;
+    if (!confirm(t("admin.users.confirmDelete", { name: email }))) return;
 
     try {
       const response = await fetch("/api/admin/delete-user", {
@@ -257,10 +259,10 @@ export default function AdminManagementPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Error eliminando usuario");
+        throw new Error(t("admin.users.errorDeleting"));
       }
 
-      toast.success("Usuario eliminado");
+      toast.success(t("admin.users.userDeleted"));
 
       // Recargar
       const { data: usersData } = await supabase
@@ -269,7 +271,7 @@ export default function AdminManagementPage() {
         .order("created_at", { ascending: false });
       setUsers((usersData as ProfileRow[]) || []);
     } catch (error: any) {
-      toast.error(error.message || "Error eliminando usuario");
+      toast.error(error.message || t("admin.users.errorDeleting"));
     }
   };
 
@@ -287,8 +289,8 @@ export default function AdminManagementPage() {
   return (
     <main className="flex-1 p-8 overflow-y-auto">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">Administración</h1>
-        <p className="text-gray-600 mb-6">Gestiona usuarios, crea nuevas cuentas y revisa logs</p>
+        <h1 className="text-3xl font-bold mb-2">{t("admin.management.title")}</h1>
+        <p className="text-gray-600 mb-6">{t("admin.users.title")}</p>
 
         {/* TABS */}
         <div className="flex gap-4 mb-6 border-b border-gray-200">
@@ -300,7 +302,7 @@ export default function AdminManagementPage() {
                 : "border-transparent text-gray-600 hover:text-gray-800"
             }`}
           >
-            👥 Administrar Usuarios
+            👥 {t("admin.management.tabs.all")}
           </button>
           <button
             onClick={() => setActiveTab("create")}
@@ -310,7 +312,7 @@ export default function AdminManagementPage() {
                 : "border-transparent text-gray-600 hover:text-gray-800"
             }`}
           >
-            ➕ Crear Usuario
+            ➕ {t("admin.users.createButton")}
           </button>
           {isAdmin && (
             <button
@@ -321,23 +323,23 @@ export default function AdminManagementPage() {
                   : "border-transparent text-gray-600 hover:text-gray-800"
               }`}
             >
-              📋 Logs
+              📋 {t("admin.logs.title")}
             </button>
           )}
         </div>
 
         {/* CONTENT */}
         {loading ? (
-          <p className="text-gray-500 animate-pulse">Cargando...</p>
+          <p className="text-gray-500 animate-pulse">{t("common.loading")}</p>
         ) : (
           <>
             {/* TAB: CREAR USUARIO */}
             {activeTab === "create" && (
               <Card className="p-6 max-w-2xl">
-                <h2 className="text-xl font-bold mb-4">Crear nuevo usuario</h2>
+                <h2 className="text-xl font-bold mb-4">{t("admin.users.createButton")}</h2>
                 <form onSubmit={handleCreateUser} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Email</label>
+                    <label className="block text-sm font-medium mb-1">{t("admin.users.emailField")}</label>
                     <input
                       type="email"
                       value={createForm.email}
@@ -349,7 +351,7 @@ export default function AdminManagementPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Contraseña</label>
+                    <label className="block text-sm font-medium mb-1">{t("admin.users.passwordField")}</label>
                     <input
                       type="password"
                       value={createForm.password}
@@ -357,12 +359,12 @@ export default function AdminManagementPage() {
                         setCreateForm({ ...createForm, password: e.target.value })
                       }
                       className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Mín. 8 caracteres, mayúscula, número, símbolo"
+                      placeholder={t("admin.users.passwordPlaceholder")}
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Rol</label>
+                    <label className="block text-sm font-medium mb-1">{t("admin.users.roleField")}</label>
                     <select
                       value={createForm.role}
                       onChange={(e) =>
@@ -382,7 +384,7 @@ export default function AdminManagementPage() {
                     disabled={creatingUser}
                     className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition"
                   >
-                    {creatingUser ? "Creando..." : "Crear Usuario"}
+                    {creatingUser ? t("common.loading") : t("admin.users.create")}
                   </button>
                 </form>
               </Card>
@@ -392,7 +394,7 @@ export default function AdminManagementPage() {
             {activeTab === "manage" && (
               <div className="space-y-4">
                 {users.length === 0 ? (
-                  <p className="text-gray-500">No hay usuarios</p>
+                  <p className="text-gray-500">{t("common.noData")}</p>
                 ) : (
                   users.map((user) => (
                     <Card key={user.id} className="p-4">
@@ -406,7 +408,7 @@ export default function AdminManagementPage() {
                               onChange={(e) =>
                                 setEditForm({ ...editForm, first_name: e.target.value })
                               }
-                              placeholder="Nombre"
+                              placeholder={t("auth.firstName")}
                               className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                             <input
@@ -415,7 +417,7 @@ export default function AdminManagementPage() {
                               onChange={(e) =>
                                 setEditForm({ ...editForm, last_name: e.target.value })
                               }
-                              placeholder="Apellido"
+                              placeholder={t("auth.lastName")}
                               className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
@@ -443,7 +445,7 @@ export default function AdminManagementPage() {
                                 }
                                 className="rounded"
                               />
-                              <span className="text-sm">Activo</span>
+                              <span className="text-sm">{t("admin.users.active")}</span>
                             </label>
                           </div>
                           <div className="flex gap-2">
@@ -452,25 +454,25 @@ export default function AdminManagementPage() {
                               disabled={savingEdit}
                               className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition"
                             >
-                              {savingEdit ? "Guardando..." : "Guardar"}
+                              {savingEdit ? t("common.loading") : t("admin.users.save")}
                             </button>
                             <button
                               onClick={() => setEditingUserId(null)}
                               className="flex-1 bg-gray-300 text-gray-800 py-2 rounded-lg hover:bg-gray-400 transition"
                             >
-                              Cancelar
+                              {t("admin.users.cancel")}
                             </button>
                           </div>
                         </div>
                       ) : changingPasswordUserId === user.id ? (
                         // MODO CAMBIAR CONTRASEÑA (solo admin)
                         <div className="space-y-3">
-                          <p className="text-sm font-semibold">Cambiar contraseña de {user.email}</p>
+                          <p className="text-sm font-semibold">{t("admin.users.changePassword")} {user.email}</p>
                           <input
                             type="password"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
-                            placeholder="Nueva contraseña (8+ chars, mayúscula, número, símbolo)"
+                            placeholder={t("admin.users.newPassword")}
                             className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                           <div className="flex gap-2">
@@ -479,7 +481,7 @@ export default function AdminManagementPage() {
                               disabled={changingPassword || !newPassword}
                               className="flex-1 bg-orange-600 text-white py-2 rounded-lg hover:bg-orange-700 disabled:bg-gray-400 transition"
                             >
-                              {changingPassword ? "Actualizando..." : "Actualizar Contraseña"}
+                              {changingPassword ? t("common.loading") : t("admin.users.changePassword")}
                             </button>
                             <button
                               onClick={() => {
@@ -488,7 +490,7 @@ export default function AdminManagementPage() {
                               }}
                               className="flex-1 bg-gray-300 text-gray-800 py-2 rounded-lg hover:bg-gray-400 transition"
                             >
-                              Cancelar
+                              {t("admin.users.cancel")}
                             </button>
                           </div>
                         </div>
@@ -504,7 +506,7 @@ export default function AdminManagementPage() {
                               </span>
                               {!user.active && (
                                 <span className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-800 font-bold">
-                                  INACTIVO
+                                  {t("admin.users.inactive").toUpperCase()}
                                 </span>
                               )}
                             </div>
@@ -522,14 +524,14 @@ export default function AdminManagementPage() {
                               }}
                               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
                             >
-                              Editar
+                              {t("admin.users.edit")}
                             </button>
                             {isAdmin && (
                               <button
                                 onClick={() => setChangingPasswordUserId(user.id)}
                                 className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition text-sm"
                               >
-                                🔑 Contraseña
+                                🔑 {t("admin.users.changePassword")}
                               </button>
                             )}
                             <button
@@ -538,7 +540,7 @@ export default function AdminManagementPage() {
                               }
                               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
                             >
-                              Eliminar
+                              {t("admin.users.delete")}
                             </button>
                           </div>
                         </div>
@@ -553,7 +555,7 @@ export default function AdminManagementPage() {
             {activeTab === "logs" && isAdmin && (
               <div className="space-y-3">
                 {logs.length === 0 ? (
-                  <p className="text-gray-500">No hay logs registrados</p>
+                  <p className="text-gray-500">{t("admin.logs.empty")}</p>
                 ) : (
                   logs.map((log) => (
                     <Card key={log.id} className="p-4">
@@ -561,8 +563,8 @@ export default function AdminManagementPage() {
                         <div className="mt-1 h-2 w-2 rounded-full bg-green-500 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-800">
-                            <span className="font-semibold">{log.user_email ?? "Sistema"}</span>{" "}
-                            realizó{" "}
+                            <span className="font-semibold">{log.user_email ?? t("admin.logs.system")}</span>{" "}
+                            {t("admin.logs.performed")}{" "}
                             <span className="font-semibold">
                               {log.action.replace(/_/g, " ").toLowerCase()}
                             </span>

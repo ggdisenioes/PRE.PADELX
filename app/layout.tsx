@@ -3,6 +3,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Toaster } from "react-hot-toast";
 import AppShell from "./components/AppShell";
+import { LanguageProvider } from "./i18n";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -19,8 +20,10 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className="bg-[#05070b] text-gray-900 antialiased">
-        <AppShell>{children}</AppShell>
-        <Toaster position="top-right" />
+        <LanguageProvider>
+          <AppShell>{children}</AppShell>
+          <Toaster position="top-right" />
+        </LanguageProvider>
       </body>
     </html>
   );

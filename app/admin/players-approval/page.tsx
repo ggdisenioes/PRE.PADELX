@@ -7,8 +7,10 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase'; // Ajusta la ruta a tu lib/supabase
 import Card from '../../components/Card';
 import toast from 'react-hot-toast';
+import { useTranslation } from '../../i18n';
 
 export default function PlayersApprovalPage() {
+    const { t } = useTranslation();
     const router = useRouter();
     const [pendingPlayers, setPendingPlayers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -49,7 +51,7 @@ export default function PlayersApprovalPage() {
             .order('created_at', { ascending: true });
 
         if (error) {
-            toast.error('Error cargando solicitudes.');
+            toast.error(t('admin.playersApproval.errorLoading'));
         } else {
             setPendingPlayers(data || []);
         }
@@ -64,19 +66,17 @@ export default function PlayersApprovalPage() {
             .eq('id', playerId);
 
         if (error) {
-            toast.error(`Error al aprobar a ${playerName}.`);
+            toast.error(t('admin.playersApproval.errorApproving', { name: playerName }));
         } else {
-            toast.success(`${playerName} ha sido aprobado!`);
-            // Refrescar la lista de pendientes (se puede hacer de forma reactiva con el Realtime, 
-            // pero recargar es más simple por ahora)
-            fetchPendingPlayers(); 
+            toast.success(t('admin.playersApproval.approved', { name: playerName }));
+            fetchPendingPlayers();
         }
     };
 
     const handleReject = async (playerId: number, playerName: string) => {
-        if (!confirm(`¿Estás seguro de rechazar y eliminar a ${playerName}?`)) return;
+        if (!confirm(t('admin.playersApproval.confirmReject', { name: playerName }))) return;
         setLoading(true);
-        
+
         // Rechazar implica eliminar el registro
         const { error } = await supabase
             .from('players')
@@ -84,28 +84,30 @@ export default function PlayersApprovalPage() {
             .eq('id', playerId);
 
         if (error) {
-            toast.error(`Error al rechazar a ${playerName}.`);
+            toast.error(t('admin.playersApproval.errorRejecting', { name: playerName }));
         } else {
-            toast.success(`${playerName} ha sido rechazado y eliminado.`);
+            toast.success(t('admin.playersApproval.rejectedDeleted', { name: playerName }));
             fetchPendingPlayers();
         }
     };
-    
+
     if (loading) {
         return (
             <main className="flex-1 overflow-y-auto p-8">
-                <h2 className="text-3xl font-bold text-gray-800 mb-6">Aprobación de Jugadores</h2>
-                <p>Cargando solicitudes...</p>
+                <h2 className="text-3xl font-bold text-gray-800 mb-6">{t('admin.playersApproval.title')}</h2>
+                <p>{t('admin.playersApproval.loading')}</p>
             </main>
         );
     }
 
     return (
         <main className="flex-1 overflow-y-auto p-8">
-            <h2 className="text-3xl font-bold text-gray-800 mb-6">Aprobación de Jugadores ({pendingPlayers.length} pendientes)</h2>
+            <h2 className="text-3xl font-bold text-gray-800 mb-6">
+                {t('admin.playersApproval.titleWithCount', { count: pendingPlayers.length })}
+            </h2>
 
             {pendingPlayers.length === 0 ? (
-                <p className="text-gray-500">No hay solicitudes de jugadores pendientes en este momento.</p>
+                <p className="text-gray-500">{t('admin.playersApproval.empty')}</p>
             ) : (
                 <div className="space-y-4">
                     {pendingPlayers.map(player => (
@@ -120,14 +122,14 @@ export default function PlayersApprovalPage() {
                                     className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition"
                                     disabled={loading}
                                 >
-                                    Aprobar
+                                    {t('admin.playersApproval.approve')}
                                 </button>
                                 <button
                                     onClick={() => handleReject(player.id, player.name)}
                                     className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition"
                                     disabled={loading}
                                 >
-                                    Rechazar
+                                    {t('admin.playersApproval.reject')}
                                 </button>
                             </div>
                         </Card>

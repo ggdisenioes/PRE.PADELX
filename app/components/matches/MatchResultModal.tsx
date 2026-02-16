@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { toPng } from "html-to-image";
 import MatchShareCard from "./MatchShareCard";
+import { useTranslation } from "../../i18n";
 
 type Props = {
   open: boolean;
@@ -23,6 +24,7 @@ export default function MatchResultModal({
   isAdmin,
   onEdit,
 }: Props) {
+  const { t } = useTranslation();
   const cardRef = useRef<HTMLDivElement>(null);
 
   if (!open) return null;
@@ -55,7 +57,7 @@ export default function MatchResultModal({
             onClick={handleDownload}
             className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700"
           >
-            Descargar imagen
+            {t("shareModal.download")}
           </button>
 
           {isAdmin && onEdit && (
@@ -63,7 +65,7 @@ export default function MatchResultModal({
               onClick={onEdit}
               className="w-full bg-yellow-500 text-white py-2 rounded-lg font-semibold hover:bg-yellow-600"
             >
-              Editar resultado
+              {t("shareModal.editResult")}
             </button>
           )}
 
@@ -71,7 +73,7 @@ export default function MatchResultModal({
             onClick={onClose}
             className="w-full border py-2 rounded-lg"
           >
-            Cerrar
+            {t("shareModal.close")}
           </button>
         </div>
       </div>

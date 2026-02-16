@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 
 import { supabase } from "../../../lib/supabase";
 import { useRole } from "../../../hooks/useRole";
+import { notifyMatchCreated } from "../../../lib/notify";
 import Card from "../../../components/Card";
 
 type Player = {
@@ -406,13 +407,21 @@ export default function GenerateMatchesPage() {
     }
 
     // ➕ Insertar partidos
-    const { error: insertError } = await supabase.from("matches").insert(newMatches);
+    const { data: createdMatches, error: insertError } = await supabase
+      .from("matches")
+      .insert(newMatches)
+      .select("id");
 
     if (insertError) {
       console.error("SUPABASE INSERT ERROR:", insertError);
       toast.error(insertError.message || "Error al generar partidos");
       setCreating(false);
       return;
+    }
+
+    // Notificar a los jugadores de los partidos creados
+    if (createdMatches && createdMatches.length > 0) {
+      notifyMatchCreated(createdMatches.map((m: { id: number }) => m.id));
     }
 
     // 🧾 Insertar log de acción (no bloquea si falla)

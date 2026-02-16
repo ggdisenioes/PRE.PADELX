@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import Card from "../Card";
 import toast from "react-hot-toast";
+import { useTranslation } from "../../i18n";
 
 type Comment = {
   id: number;
@@ -19,6 +20,7 @@ type CommentSectionProps = {
 };
 
 export default function CommentSection({ entityType, entityId }: CommentSectionProps) {
+  const { t } = useTranslation();
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState("");
@@ -64,12 +66,12 @@ export default function CommentSection({ entityType, entityId }: CommentSectionP
     e.preventDefault();
 
     if (!currentUserId) {
-      toast.error("Debes iniciar sesión");
+      toast.error(t("comments.loginRequired"));
       return;
     }
 
     if (!newComment.trim()) {
-      toast.error("El comentario no puede estar vacío");
+      toast.error(t("comments.emptyComment"));
       return;
     }
 
@@ -95,18 +97,18 @@ export default function CommentSection({ entityType, entityId }: CommentSectionP
 
       if (response.ok) {
         setNewComment("");
-        toast.success("Comentario añadido");
+        toast.success(t("comments.added"));
         fetchComments();
       } else {
-        toast.error("Error al añadir comentario");
+        toast.error(t("comments.errorAdding"));
       }
     } catch (error) {
-      toast.error("Error");
+      toast.error(t("comments.errorAdding"));
     }
   };
 
   const handleDeleteComment = async (commentId: number) => {
-    if (!confirm("¿Eliminar comentario?")) return;
+    if (!confirm(t("comments.confirmDelete"))) return;
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -124,30 +126,30 @@ export default function CommentSection({ entityType, entityId }: CommentSectionP
       });
 
       if (response.ok) {
-        toast.success("Comentario eliminado");
+        toast.success(t("comments.deleted"));
         fetchComments();
       } else {
-        toast.error("Error al eliminar");
+        toast.error(t("comments.errorDeleting"));
       }
     } catch (error) {
-      toast.error("Error");
+      toast.error(t("comments.errorDeleting"));
     }
   };
 
   if (loading) {
-    return <div className="text-center text-gray-500 py-4">Cargando comentarios...</div>;
+    return <div className="text-center text-gray-500 py-4">{t("comments.loading")}</div>;
   }
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold">💬 Comentarios ({comments.length})</h3>
+      <h3 className="text-lg font-semibold">💬 {t("comments.title", { count: comments.length })}</h3>
 
       {currentUserId && (
         <form onSubmit={handleAddComment} className="space-y-2">
           <textarea
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Añade un comentario..."
+            placeholder={t("comments.placeholder")}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
             rows={3}
           />
@@ -155,7 +157,7 @@ export default function CommentSection({ entityType, entityId }: CommentSectionP
             type="submit"
             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
           >
-            Comentar
+            {t("comments.submit")}
           </button>
         </form>
       )}
@@ -163,7 +165,7 @@ export default function CommentSection({ entityType, entityId }: CommentSectionP
       <div className="space-y-3">
         {comments.length === 0 ? (
           <Card className="p-4 text-center text-gray-500 text-sm">
-            No hay comentarios aún
+            {t("comments.empty")}
           </Card>
         ) : (
           comments.map((comment) => (
@@ -181,7 +183,7 @@ export default function CommentSection({ entityType, entityId }: CommentSectionP
                     onClick={() => handleDeleteComment(comment.id)}
                     className="text-xs text-red-600 hover:text-red-800"
                   >
-                    Eliminar
+                    {t("comments.delete")}
                   </button>
                 )}
               </div>

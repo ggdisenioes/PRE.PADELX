@@ -112,9 +112,39 @@ export async function POST(req: Request) {
       const matchPlayerIds = [match.player_1_a, match.player_2_a, match.player_1_b, match.player_2_b]
         .filter((id): id is number => id != null);
 
+      // Log all players and their notification flags for debugging
+      const matchPlayers = players.filter((p: any) => matchPlayerIds.includes(p.id));
+      const skipped = matchPlayers.filter(
+        (p: any) => p.notify_email === false || !p.email
+      );
+      if (skipped.length > 0) {
+        console.warn(
+          `[notifications] Match ${match.id}: Skipped players:`,
+          skipped.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            email: p.email || "(vacío)",
+            notify_email: p.notify_email,
+          }))
+        );
+      }
+
+      // Filter eligible players and deduplicate by email
+      const seen = new Set<string>();
       const playerEmails = players
         .filter((p: any) => matchPlayerIds.includes(p.id) && p.notify_email !== false && p.email)
-        .map((p: any) => ({ name: p.name, email: p.email }));
+        .map((p: any) => ({ name: p.name, email: p.email as string }))
+        .filter((entry) => {
+          const key = entry.email.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+      console.log(
+        `[notifications] Match ${match.id}: Sending to ${playerEmails.length} unique emails:`,
+        playerEmails.map((p) => `${p.name} <${p.email}>`)
+      );
 
       if (playerEmails.length > 0) {
         await sendMatchNotification({
@@ -123,7 +153,7 @@ export async function POST(req: Request) {
           teamB,
           matchDate,
           court: courtText,
-          clubName: tenant?.name || "PadelX QA",
+          clubName: tenant?.name || "TWINCO",
         });
         totalSent += playerEmails.length;
       }

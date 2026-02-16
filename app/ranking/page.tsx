@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 import Card from "../components/Card";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { useTranslation } from "../i18n";
 
 type RankedPlayer = {
   id: number;
@@ -20,6 +21,7 @@ type RankedPlayer = {
 };
 
 export default function RankingPage() {
+  const { t } = useTranslation();
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -39,7 +41,7 @@ export default function RankingPage() {
 
     if (playerError) {
       console.error("Error cargando jugadores:", playerError);
-      toast.error("No se pudieron cargar los jugadores");
+      toast.error(t("ranking.errorLoading"));
       setLoading(false);
       return;
     }
@@ -66,7 +68,7 @@ export default function RankingPage() {
 
     if (matchError) {
       console.error("Error cargando partidos:", matchError);
-      toast.error("No se pudieron cargar los partidos");
+      toast.error(t("ranking.errorLoading"));
       setLoading(false);
       return;
     }
@@ -175,7 +177,7 @@ export default function RankingPage() {
         { event: "*", schema: "public", table: "matches" },
         () => {
           loadRanking();
-          toast.success("Ranking actualizado");
+          toast.success(t("ranking.title"));
         }
       )
       .subscribe();
@@ -198,7 +200,7 @@ export default function RankingPage() {
       <section className="max-w-5xl mx-auto">
         <div className="mb-6 text-center">
           <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-wide">
-            Ranking de Jugadores
+            {t("ranking.title")}
           </h1>
           <div className="mt-4 flex justify-center">
             <select
@@ -210,33 +212,33 @@ export default function RankingPage() {
               }
               className="border rounded-md px-3 py-2 text-sm"
             >
-              <option value="all">Todos los torneos</option>
-              {tournaments.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
+              <option value="all">{t("ranking.filterAll")}</option>
+              {tournaments.map((tournament) => (
+                <option key={tournament.id} value={tournament.id}>
+                  {tournament.name}
                 </option>
               ))}
             </select>
           </div>
           <p className="text-sm text-gray-600 mt-1">
-            Puntos calculados automáticamente: 3 por victoria y 1 por derrota.
+            {t("ranking.pointsNote")}
           </p>
         </div>
 
         {loading ? (
           <p className="text-gray-400 text-center animate-pulse">
-            Cargando ranking...
+            {t("ranking.loading")}
           </p>
         ) : players.length === 0 ? (
           <p className="text-gray-400 text-center">
-            Todavía no hay jugadores con puntos. ¡Registrá algunos partidos!
+            {t("ranking.empty")}
           </p>
         ) : (
           <>
             {/* 🔝 PODIO TOP 3 */}
             <Card className="mb-8">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.18em] mb-4 text-center">
-                Podio
+                {t("ranking.podium")}
               </h2>
               <div className="grid grid-cols-3 gap-3 items-end">
                 {podium.map((player, index) => (
@@ -276,14 +278,13 @@ export default function RankingPage() {
                       {player.name}
                     </span>
                     <span className="mt-1 text-xs text-gray-600">
-                      {player.points} pts · {player.wins} victoria
-                      {player.wins === 1 ? "" : "s"}
+                      {player.points} {t("ranking.points")} · {player.wins} {t("ranking.won")}
                     </span>
                   </button>
                 ))}
                 {podium.length === 0 && (
                   <p className="col-span-3 text-center text-gray-400 text-sm">
-                    Aún no hay jugadores en el podio.
+                    {t("ranking.empty")}
                   </p>
                 )}
               </div>
@@ -293,32 +294,32 @@ export default function RankingPage() {
             {rest.length > 0 && (
               <Card>
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.18em] mb-3">
-                  Resto del ranking
+                  {t("ranking.restOfTable")}
                 </h2>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-800 text-xs uppercase text-gray-400">
                         <th className="py-2 pr-2 text-left font-semibold">
-                          Posición
+                          {t("ranking.position")}
                         </th>
                         <th className="py-2 pr-2 text-left font-semibold">
-                          Jugador
+                          {t("ranking.player")}
                         </th>
                         <th className="py-2 pr-2 text-center font-semibold">
-                          PJ
+                          {t("ranking.played")}
                         </th>
                         <th className="py-2 pr-2 text-center font-semibold">
-                          PG
+                          {t("ranking.won")}
                         </th>
                         <th className="py-2 pr-2 text-center font-semibold">
-                          PP
+                          {t("ranking.lost")}
                         </th>
                         <th className="py-2 pr-2 text-center font-semibold">
-                          +/-
+                          {t("ranking.gamesDiff")}
                         </th>
                         <th className="py-2 text-center font-semibold">
-                          Puntos
+                          {t("ranking.points")}
                         </th>
                       </tr>
                     </thead>

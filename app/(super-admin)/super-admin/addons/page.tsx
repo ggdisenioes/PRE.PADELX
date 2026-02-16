@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react';
 import { Addon } from '@/lib/types/saas';
 import toast from 'react-hot-toast';
+import { useTranslation } from '../../../i18n';
 
 export default function AddonsPage() {
+  const { t } = useTranslation();
   const [addons, setAddons] = useState<Addon[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -18,19 +20,19 @@ export default function AddonsPage() {
       const json = await response.json();
       setAddons(json.data);
     } catch (error) {
-      toast.error('Error cargando add-ons');
+      toast.error(t('superAdmin.addons.errorLoading'));
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (isLoading) return <div>Cargando add-ons...</div>;
+  if (isLoading) return <div>{t('superAdmin.addons.loading')}</div>;
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">➕ Add-ons Disponibles</h1>
-        <p className="text-gray-600 mt-2">Servicios adicionales que ofrecemos</p>
+        <h1 className="text-3xl font-bold">➕ {t('superAdmin.addons.title')}</h1>
+        <p className="text-gray-600 mt-2">{t('superAdmin.addons.subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -48,7 +50,7 @@ export default function AddonsPage() {
               <p className="font-bold text-blue-600">
                 €{addon.price_eur}
                 <span className="text-sm">
-                  /{addon.billing_type === 'monthly' ? 'mes' : 'único'}
+                  /{addon.billing_type === 'monthly' ? t('superAdmin.addons.perMonth') : t('superAdmin.addons.oneTime')}
                 </span>
               </p>
             </div>
@@ -61,7 +63,7 @@ export default function AddonsPage() {
                     : 'bg-gray-100 text-gray-800'
                 }`}
               >
-                {addon.is_active ? '✅ Activo' : '❌ Inactivo'}
+                {addon.is_active ? `✅ ${t('superAdmin.addons.active')}` : `❌ ${t('superAdmin.addons.inactive')}`}
               </span>
             </div>
 
@@ -69,7 +71,7 @@ export default function AddonsPage() {
               className="mt-4 w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition disabled:opacity-50"
               disabled
             >
-              ⚙️ Editar (próximamente)
+              ⚙️ {t('superAdmin.addons.comingSoon')}
             </button>
           </div>
         ))}
@@ -77,7 +79,7 @@ export default function AddonsPage() {
 
       <div className="bg-green-50 border-l-4 border-green-600 rounded-lg p-6">
         <p className="text-green-900">
-          ✅ Total de add-ons disponibles: {addons.length}
+          ✅ {t('superAdmin.addons.totalAddons', { count: addons.length })}
         </p>
       </div>
     </div>

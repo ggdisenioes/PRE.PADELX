@@ -7,6 +7,7 @@ import Sidebar from "./Sidebar";
 import { Toaster } from "react-hot-toast";
 import toast from "react-hot-toast";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { useTranslation } from "../i18n";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -23,30 +24,21 @@ function buildCleanUrl(pathname: string, params: URLSearchParams) {
   return qs ? `${pathname}?${qs}` : pathname;
 }
 
-function getMessageFromError(code: string | null) {
-  switch (code) {
-    case "tenant_incorrecto":
-      return "Este usuario pertenece a otro club. Te redirigimos al subdominio correcto.";
-    case "usuario_deshabilitado":
-      return "Usuario deshabilitado. Contactá al administrador.";
-    case "tenant_no_asignado":
-      return "Tu usuario no tiene club asignado. Contactá al administrador.";
-    case "perfil_no_encontrado":
-      return "No se pudo leer tu perfil. Probá cerrar sesión e ingresar nuevamente.";
-    case "tenant_invalido":
-      return "Tu club no es válido. Contactá al administrador.";
-    case "config_supabase":
-      return "Falta configuración de Supabase en el entorno. Revisá las variables NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY.";
-    default:
-      return null;
-  }
-}
+const ERROR_KEYS: Record<string, string> = {
+  tenant_incorrecto: "errors.tenantIncorrecto",
+  usuario_deshabilitado: "errors.usuarioDeshabilitado",
+  tenant_no_asignado: "errors.tenantNoAsignado",
+  perfil_no_encontrado: "errors.perfilNoEncontrado",
+  tenant_invalido: "errors.tenantInvalido",
+  config_supabase: "errors.configSupabase",
+};
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [checkingSession, setCheckingSession] = useState(true);
   const [sidebarVisible, setSidebarVisible] = useState(false);
@@ -115,8 +107,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
     if (!error) return;
 
-    const msg = getMessageFromError(error);
-    if (!msg) return;
+    const errorKey = ERROR_KEYS[error];
+    if (!errorKey) return;
+    const msg = t(errorKey);
 
     const toastKey = `${pathname}|${error}|${tenant ?? ""}`;
     if (lastToastKeyRef.current === toastKey) return;
@@ -176,7 +169,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
             <button
               type="button"
-              aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
+              aria-label={mobileOpen ? t("shell.closeMenu") : t("shell.openMenu")}
               className="absolute right-4 inline-flex items-center gap-2 rounded-md border border-white/40 bg-black/30 px-3 py-2 shadow-sm hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#05070b] focus:ring-[#00b4ff]"
               style={{ color: "#ffffff" }}
               onClick={() => setMobileOpen((o) => !o)}
@@ -202,7 +195,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               )}
-              <span className="text-xs font-semibold">{mobileOpen ? "Cerrar" : "Menú"}</span>
+              <span className="text-xs font-semibold">{mobileOpen ? t("shell.close") : t("shell.menu")}</span>
             </button>
           </header>
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link';
+import { useTranslation } from '../i18n';
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,6 +16,7 @@ export default function SuperAdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -58,7 +60,7 @@ export default function SuperAdminLayout({
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-4">🔒</div>
-          <p className="text-gray-600">Verificando acceso...</p>
+          <p className="text-gray-600">{t('superAdmin.layout.verifying')}</p>
         </div>
       </div>
     );
@@ -87,43 +89,43 @@ export default function SuperAdminLayout({
           <NavLink
             href="/super-admin"
             icon="📊"
-            label="Dashboard"
+            label={t('superAdmin.layout.dashboardLabel')}
             isOpen={isSidebarOpen}
           />
           <NavLink
             href="/super-admin/tenants"
             icon="👥"
-            label="Clientes"
+            label={t('superAdmin.layout.clientsLabel')}
             isOpen={isSidebarOpen}
           />
           <NavLink
             href="/super-admin/analytics"
             icon="📈"
-            label="Analytics"
+            label={t('superAdmin.layout.analyticsLabel')}
             isOpen={isSidebarOpen}
           />
           <NavLink
             href="/super-admin/plans"
             icon="📋"
-            label="Planes"
+            label={t('superAdmin.layout.plansLabel')}
             isOpen={isSidebarOpen}
           />
           <NavLink
             href="/super-admin/addons"
             icon="➕"
-            label="Add-ons"
+            label={t('superAdmin.layout.addonsLabel')}
             isOpen={isSidebarOpen}
           />
           <NavLink
             href="/super-admin/logs"
             icon="📝"
-            label="Auditoría"
+            label={t('superAdmin.layout.auditLabel')}
             isOpen={isSidebarOpen}
           />
           <NavLink
             href="/super-admin/settings"
             icon="⚙️"
-            label="Config"
+            label={t('superAdmin.layout.configLabel')}
             isOpen={isSidebarOpen}
           />
         </nav>
@@ -140,7 +142,7 @@ export default function SuperAdminLayout({
             onClick={handleLogout}
             className="w-full p-2 bg-red-600 hover:bg-red-700 rounded-lg text-left text-sm"
           >
-            {isSidebarOpen ? '🚪 Logout' : '🚪'}
+            {isSidebarOpen ? `🚪 ${t('superAdmin.layout.logout')}` : '🚪'}
           </button>
         </div>
       </div>
@@ -150,8 +152,8 @@ export default function SuperAdminLayout({
         {/* Header */}
         <div className="bg-white shadow-sm border-b">
           <div className="px-8 py-6">
-            <h1 className="text-2xl font-bold text-gray-900">Super Admin Dashboard</h1>
-            <p className="text-sm text-gray-600">Control total de tu plataforma SaaS</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('superAdmin.layout.headerTitle')}</h1>
+            <p className="text-sm text-gray-600">{t('superAdmin.layout.headerSubtitle')}</p>
           </div>
         </div>
 

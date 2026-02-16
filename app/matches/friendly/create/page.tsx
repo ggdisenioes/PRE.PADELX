@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { supabase } from "../../../lib/supabase";
 import { useRole } from "../../../hooks/useRole";
 import { notifyMatchCreated } from "../../../lib/notify";
+import { useTranslation } from "../../../i18n";
 
 type Player = {
   id: number;
@@ -58,6 +59,7 @@ function isoToDatetimeLocal(iso: string | null | undefined) {
 
 export default function CreateFriendlyMatchPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { isAdmin, isManager, loading: roleLoading } = useRole();
 
   const [loading, setLoading] = useState(false);
@@ -96,7 +98,7 @@ export default function CreateFriendlyMatchPage() {
 
     if (playersError) {
       console.error(playersError);
-      toast.error("No se pudieron cargar los jugadores");
+      toast.error(t("players.errorLoading"));
       setPlayers([]);
     } else {
       setPlayers((playersData as Player[]) || []);
@@ -110,7 +112,7 @@ export default function CreateFriendlyMatchPage() {
 
     if (courtsError) {
       console.error(courtsError);
-      toast.error("No se pudieron cargar las pistas");
+      toast.error(t("courts.errorLoading"));
       setCourts([]);
     } else {
       setCourts((courtsData as Court[]) || []);
@@ -157,23 +159,23 @@ export default function CreateFriendlyMatchPage() {
 
   const handleCreate = async () => {
     if (!canAccess) {
-      toast.error("No tenés permisos para crear amistosos.");
+      toast.error(t("matches.noPermission"));
       return;
     }
 
     if (!canCreate) {
-      toast.error("Para 2vs2 necesitás un número PAR de jugadores (mínimo 4).");
+      toast.error(t("matches.oddPlayersWarning"));
       return;
     }
 
     if (!form.start_time) {
-      toast.error("Seleccioná día y horario");
+      toast.error(t("matches.selectDateTime"));
       return;
     }
 
     // Si hay pistas cargadas, recomendamos elegir una pista, pero permitimos fallback texto.
     if (courts.length > 0 && !form.court_id && !form.court_text) {
-      toast.error("Seleccioná una pista o completá la pista manualmente");
+      toast.error(t("matches.selectCourtOrManual"));
       return;
     }
 
@@ -226,34 +228,34 @@ export default function CreateFriendlyMatchPage() {
         return;
       }
 
-      toast.success("Partidos amistosos creados");
+      toast.success(t("matches.friendlyCreated"));
       if (created) notifyMatchCreated(created.map((m: any) => m.id));
       router.push("/matches");
     } catch (e: any) {
       console.error(e);
-      toast.error("Error inesperado al crear amistosos");
+      toast.error(t("matches.errorCreating"));
       setLoading(false);
     }
   };
 
   if (roleLoading) {
-    return <p className="text-gray-500">Cargando permisos…</p>;
+    return <p className="text-gray-500">{t("common.loading")}</p>;
   }
 
   if (!canAccess) {
-    return <p className="text-red-600 font-semibold">No tenés permisos para crear partidos amistosos.</p>;
+    return <p className="text-red-600 font-semibold">{t("matches.noPermission")}</p>;
   }
 
   return (
     <main className="max-w-3xl mx-auto p-6 space-y-6">
       <header>
-        <h1 className="text-2xl font-bold">Crear partido amistoso</h1>
-        <p className="text-sm text-gray-500">Los partidos amistosos no pertenecen a ningún torneo.</p>
+        <h1 className="text-2xl font-bold">{t("matches.createFriendlyTitle")}</h1>
+        <p className="text-sm text-gray-500">{t("matches.createFriendlyDesc")}</p>
       </header>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
         <section>
-          <h2 className="font-semibold mb-2">Detalles y horario</h2>
+          <h2 className="font-semibold mb-2">{t("matches.dateTime")}</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <input
@@ -270,10 +272,10 @@ export default function CreateFriendlyMatchPage() {
               onChange={handleFormChange}
               className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              <option value="30">Duración: 30 min</option>
-              <option value="60">Duración: 60 min</option>
-              <option value="90">Duración: 90 min</option>
-              <option value="120">Duración: 120 min</option>
+              <option value="30">{t("matches.duration")}: 30 min</option>
+              <option value="60">{t("matches.duration")}: 60 min</option>
+              <option value="90">{t("matches.duration")}: 90 min</option>
+              <option value="120">{t("matches.duration")}: 120 min</option>
             </select>
 
             <select
@@ -282,10 +284,10 @@ export default function CreateFriendlyMatchPage() {
               onChange={handleFormChange}
               className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              <option value="">Seleccionar pista</option>
+              <option value="">{t("matches.selectCourt")}</option>
               {courts.map((c) => (
                 <option key={c.id} value={String(c.id)}>
-                  {c.name} · {c.is_covered ? "Cubierta" : "Descubierta"}
+                  {c.name} · {c.is_covered ? t("courts.covered") : t("courts.uncovered")}
                 </option>
               ))}
             </select>
@@ -295,7 +297,7 @@ export default function CreateFriendlyMatchPage() {
             <input
               type="text"
               name="place"
-              placeholder="Lugar (opcional)"
+              placeholder={t("matches.placePlaceholder")}
               value={form.place}
               onChange={handleFormChange}
               className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -304,7 +306,7 @@ export default function CreateFriendlyMatchPage() {
             <input
               type="text"
               name="court_text"
-              placeholder="Pista manual (opcional si elegís pista)"
+              placeholder={t("matches.courtManual")}
               value={form.court_text}
               onChange={handleFormChange}
               className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -313,14 +315,13 @@ export default function CreateFriendlyMatchPage() {
 
           {matchesCount > 1 && (
             <p className="text-xs text-gray-600 mt-2">
-              Se van a crear <strong>{matchesCount}</strong> partidos consecutivos en la misma pista, sumando un total de{" "}
-              <strong>{matchesCount * Number(form.duration_minutes || 60)}</strong> minutos.
+              {t("matches.consecutiveNote", { count: matchesCount, minutes: matchesCount * Number(form.duration_minutes || 60) })}
             </p>
           )}
         </section>
 
         <section>
-          <h2 className="font-semibold mb-2">Seleccioná jugadores (mínimo 4, número par)</h2>
+          <h2 className="font-semibold mb-2">{t("matches.selectPlayers")}</h2>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {players.map((p) => (
@@ -341,18 +342,18 @@ export default function CreateFriendlyMatchPage() {
 
           {isOdd && (
             <p className="mt-3 text-sm text-orange-600 font-medium">
-              Para 2vs2 necesitás un número PAR de jugadores (se arman parejas).
+              {t("matches.oddPlayersWarning")}
             </p>
           )}
         </section>
 
         {canCreate && previewPairs.length > 0 && (
           <section className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-semibold mb-2">Vista previa de parejas</h3>
+            <h3 className="font-semibold mb-2">{t("matches.previewPairs")}</h3>
             <ul className="space-y-2 text-sm">
               {previewPairs.map((g, idx) => (
                 <li key={idx}>
-                  <strong>Partido {idx + 1}:</strong> {players.find((p) => p.id === g[0])?.name} &{" "}
+                  <strong>{t("matches.match")} {idx + 1}:</strong> {players.find((p) => p.id === g[0])?.name} &{" "}
                   {players.find((p) => p.id === g[1])?.name} vs {players.find((p) => p.id === g[2])?.name} &{" "}
                   {players.find((p) => p.id === g[3])?.name}
                 </li>
@@ -366,7 +367,7 @@ export default function CreateFriendlyMatchPage() {
             onClick={() => router.back()}
             className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-semibold hover:bg-gray-200 transition"
           >
-            Cancelar
+            {t("common.cancel")}
           </button>
 
           <button
@@ -374,7 +375,7 @@ export default function CreateFriendlyMatchPage() {
             disabled={loading}
             className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-green-700 transition disabled:opacity-50"
           >
-            {loading ? "Creando…" : "Crear partidos amistosos"}
+            {loading ? t("matches.creating") : t("matches.createFriendly")}
           </button>
         </div>
       </div>

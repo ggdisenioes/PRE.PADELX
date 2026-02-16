@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { Tenant, PaginatedResponse } from '@/lib/types/saas';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { useTranslation } from '../../../i18n';
 
 export default function TenantsPage() {
+  const { t } = useTranslation();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -33,7 +35,7 @@ export default function TenantsPage() {
       setTenants(json.data);
       setTotalPages(json.pagination.totalPages);
     } catch (error) {
-      toast.error('Error cargando tenants');
+      toast.error(t('superAdmin.tenants.errorLoading'));
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -44,14 +46,14 @@ export default function TenantsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">👥 Clientes</h1>
-          <p className="text-gray-600 mt-1">Gestiona todos tus clientes SaaS</p>
+          <h1 className="text-3xl font-bold">👥 {t('superAdmin.tenants.listTitle')}</h1>
+          <p className="text-gray-600 mt-1">{t('superAdmin.tenants.listSubtitle')}</p>
         </div>
         <Link
           href="/super-admin/tenants/create"
           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
         >
-          ➕ Nuevo Cliente
+          ➕ {t('superAdmin.tenants.newClient')}
         </Link>
       </div>
 
@@ -60,7 +62,7 @@ export default function TenantsPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <input
             type="text"
-            placeholder="Buscar por nombre o email..."
+            placeholder={t('superAdmin.tenants.searchPlaceholder')}
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -77,11 +79,11 @@ export default function TenantsPage() {
             }}
             className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">Todos los estados</option>
-            <option value="trial">En Trial</option>
-            <option value="active">Activos</option>
-            <option value="suspended">Suspendidos</option>
-            <option value="cancelled">Cancelados</option>
+            <option value="">{t('superAdmin.tenants.filterAll')}</option>
+            <option value="trial">{t('superAdmin.tenants.filterTrial')}</option>
+            <option value="active">{t('superAdmin.tenants.filterActive')}</option>
+            <option value="suspended">{t('superAdmin.tenants.filterSuspended')}</option>
+            <option value="cancelled">{t('superAdmin.tenants.filterCancelled')}</option>
           </select>
 
           <button
@@ -92,17 +94,17 @@ export default function TenantsPage() {
             }}
             className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
           >
-            Limpiar Filtros
+            {t('common.search')}
           </button>
         </div>
       </div>
 
       {/* Tabla */}
       {isLoading ? (
-        <div className="text-center py-12">Cargando clientes...</div>
+        <div className="text-center py-12">{t('superAdmin.tenants.loading')}</div>
       ) : tenants.length === 0 ? (
         <div className="text-center py-12 text-gray-600">
-          No hay clientes que coincidan con los filtros
+          {t('superAdmin.tenants.empty')}
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -110,22 +112,22 @@ export default function TenantsPage() {
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                  Nombre
+                  {t('superAdmin.tenants.colName')}
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                  Email
+                  {t('superAdmin.tenants.colEmail')}
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                  Plan
+                  {t('superAdmin.tenants.colPlan')}
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                  Estado
+                  {t('superAdmin.tenants.colStatus')}
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                  Desde
+                  {t('superAdmin.tenants.colFrom')}
                 </th>
                 <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
-                  Acciones
+                  {t('superAdmin.tenants.colActions')}
                 </th>
               </tr>
             </thead>
@@ -154,7 +156,7 @@ export default function TenantsPage() {
                       href={`/super-admin/tenants/${tenant.id}`}
                       className="text-blue-600 hover:text-blue-800 font-medium"
                     >
-                      Ver →
+                      {t('superAdmin.tenants.viewLink')}
                     </Link>
                   </td>
                 </tr>
@@ -172,17 +174,17 @@ export default function TenantsPage() {
             disabled={page === 1}
             className="px-4 py-2 border rounded-lg disabled:opacity-50"
           >
-            ← Anterior
+            {t('common.previous')}
           </button>
           <span className="px-4 py-2">
-            Página {page} de {totalPages}
+            {t('common.page', { page, total: totalPages })}
           </span>
           <button
             onClick={() => setPage(Math.min(totalPages, page + 1))}
             disabled={page === totalPages}
             className="px-4 py-2 border rounded-lg disabled:opacity-50"
           >
-            Siguiente →
+            {t('common.next')}
           </button>
         </div>
       )}
@@ -198,16 +200,18 @@ function StatusBadge({ status }: { status: string }) {
     cancelled: 'bg-gray-100 text-gray-800',
   };
 
-  const labels: Record<string, string> = {
-    trial: 'En Trial',
-    active: 'Activo',
-    suspended: 'Suspendido',
-    cancelled: 'Cancelado',
+  const labelKeys: Record<string, string> = {
+    trial: 'superAdmin.tenants.statusTrial',
+    active: 'superAdmin.tenants.statusActive',
+    suspended: 'superAdmin.tenants.statusSuspended',
+    cancelled: 'superAdmin.tenants.statusCancelled',
   };
+
+  const { t } = useTranslation();
 
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${colors[status] || colors.active}`}>
-      {labels[status] || status}
+      {labelKeys[status] ? t(labelKeys[status] as any) : status}
     </span>
   );
 }

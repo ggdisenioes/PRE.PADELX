@@ -9,6 +9,7 @@ import { useRole } from '../hooks/useRole';
 import Card from '../components/Card';
 import toast from 'react-hot-toast'; // Para notificaciones
 import { useRouter } from 'next/navigation'; // Necesario para la navegación de edición
+import { useTranslation } from '../i18n';
 
 const logAction = async ({
   action,
@@ -40,7 +41,8 @@ const logAction = async ({
 };
 
 export default function PlayersPage() {
-    const router = useRouter(); 
+    const router = useRouter();
+    const { t } = useTranslation();
     const [players, setPlayers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -63,7 +65,7 @@ export default function PlayersPage() {
         
         if (error) {
             console.error("Error al cargar jugadores:", error);
-            toast.error(`Error al cargar jugadores: ${error.message}. Verifica los permisos RLS.`, { duration: 5000 });
+            toast.error(`${t("players.errorLoading")}: ${error.message}`, { duration: 5000 });
             setPlayers([]); 
         } else {
             setPlayers(data || []);
@@ -117,7 +119,7 @@ export default function PlayersPage() {
         .eq('id', playerId);
 
       if (error) {
-        toast.error(`Error al aprobar a ${playerName}.`);
+        toast.error(t("players.errorCreating"));
         return;
       }
 
@@ -135,11 +137,11 @@ export default function PlayersPage() {
         metadata: { playerName },
       });
 
-      toast.success(`${playerName} ha sido aprobado!`);
+      toast.success(t("players.saved"));
     };
 
     const handleReject = async (playerId: number, playerName: string) => {
-      if (!confirm(`¿Rechazar a ${playerName}? Esta acción no se puede deshacer.`)) return;
+      if (!confirm(t("players.deleteConfirm"))) return;
 
       // Optimistic UI: lo quitamos primero
       setPlayers(prev => prev.filter(p => p.id !== playerId));
@@ -150,7 +152,7 @@ export default function PlayersPage() {
         .eq('id', playerId);
 
       if (error) {
-        toast.error(`Error al rechazar a ${playerName}.`);
+        toast.error(t("players.errorDeleting"));
         // rollback si falla
         fetchPlayers();
         return;
@@ -163,11 +165,11 @@ export default function PlayersPage() {
         metadata: { playerName },
       });
 
-      toast.success(`${playerName} fue rechazado`);
+      toast.success(t("players.deleted"));
     };
     
     const handleAdminDelete = async (playerId: number, playerName: string) => {
-      if (!confirm(`¿Estás seguro de ELIMINAR permanentemente a ${playerName}?`)) return;
+      if (!confirm(t("players.deleteConfirm"))) return;
 
       // 🔥 Optimistic UI: lo quitamos al instante
       const previousPlayers = players;
@@ -179,7 +181,7 @@ export default function PlayersPage() {
         .eq('id', playerId);
 
       if (error) {
-        toast.error(`Error al eliminar a ${playerName}.`);
+        toast.error(t("players.errorDeleting"));
         // ⏪ rollback si falla
         setPlayers(previousPlayers);
         return;
@@ -192,7 +194,7 @@ export default function PlayersPage() {
         metadata: { playerName },
       });
 
-      toast.success(`${playerName} ha sido eliminado`);
+      toast.success(t("players.deleted"));
     };
 
     const handleAdminEdit = (playerId: number) => { 
@@ -206,7 +208,7 @@ export default function PlayersPage() {
     if (roleLoading) {
       return (
         <main className="flex-1 p-8">
-          <p className="text-gray-500 animate-pulse">Cargando permisos…</p>
+          <p className="text-gray-500 animate-pulse">{t("common.loading")}</p>
         </main>
       );
     }
@@ -217,7 +219,7 @@ export default function PlayersPage() {
             {/* ENCABEZADO CON BOTÓN */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
-                    {role !== 'user' ? 'Gestión de Jugadores' : 'Jugadores Registrados'}
+                    {role !== 'user' ? t("players.title") : t("players.title")}
                 </h2>
                 
                 <div className="flex w-full md:w-auto gap-3 items-stretch sm:items-center">
@@ -226,7 +228,7 @@ export default function PlayersPage() {
                         href="/players/create" 
                         className="bg-[#007bff] text-white px-4 py-2 rounded-lg hover:bg-[#0056b3] transition shadow-sm font-bold flex justify-center items-center gap-2"
                     >
-                        <span>+</span> Nuevo Jugador
+                        <span>+</span> {t("players.create")}
                     </Link>
                 </div>
             </div>
@@ -236,7 +238,7 @@ export default function PlayersPage() {
                 <section className="mb-8 p-4 rounded-lg bg-yellow-50 shadow-md">
                     <h3 className="text-xl font-bold text-yellow-800 mb-4 flex items-center gap-2">
                         <i className="fas fa-clock"></i>
-                        Solicitudes Pendientes ({pendingPlayers.length})
+                        {t("common.pending")} ({pendingPlayers.length})
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {pendingPlayers.map((player) => (
@@ -252,14 +254,14 @@ export default function PlayersPage() {
                                         className="flex-1 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition"
                                         disabled={loading}
                                     >
-                                        Aceptar
+                                        {t("common.confirm")}
                                     </button>
                                     <button
                                         onClick={() => handleReject(player.id, player.name)}
                                         className="flex-1 px-3 py-1 bg-red-100 text-red-700 text-sm rounded hover:bg-red-200 transition border border-red-200"
                                         disabled={loading}
                                     >
-                                        Rechazar
+                                        {t("common.rejected")}
                                     </button>
                                 </div>
                             </Card>
@@ -268,16 +270,16 @@ export default function PlayersPage() {
                 </section>
             )}
 
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Jugadores Aprobados</h3>
+            <h3 className="text-xl font-bold text-gray-800 mb-4">{t("players.title")}</h3>
 
             {/* CONTENIDO PRINCIPAL: Lista de Jugadores Aprobados */}
             {loading ? ( 
-                <p className="text-gray-500 animate-pulse">Cargando lista de jugadores...</p>
+                <p className="text-gray-500 animate-pulse">{t("players.loading")}</p>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {approvedPlayers.length === 0 ? (
                         <p className="col-span-full text-gray-500">
-                            {role !== 'user' ? 'No hay jugadores aprobados todavía.' : 'No hay jugadores disponibles.'}
+                            {t("players.empty")}
                         </p>
                     ) : (
                         approvedPlayers.map((player) => (
@@ -322,7 +324,7 @@ export default function PlayersPage() {
                                                 }}
                                                 className="flex-1 px-3 py-1 bg-blue-50 text-blue-600 text-sm rounded hover:bg-blue-100 transition flex items-center justify-center gap-1"
                                             >
-                                                <i className="fas fa-edit"></i> Editar
+                                                <i className="fas fa-edit"></i> {t("common.edit")}
                                             </button>
                                             {isAdmin && (
                                               <button
@@ -333,7 +335,7 @@ export default function PlayersPage() {
                                                 }}
                                                 className="flex-1 px-3 py-1 bg-red-50 text-red-600 text-sm rounded hover:bg-red-100 transition flex items-center justify-center gap-1"
                                               >
-                                                <i className="fas fa-trash"></i> Eliminar
+                                                <i className="fas fa-trash"></i> {t("common.delete")}
                                               </button>
                                             )}
                                         </div>

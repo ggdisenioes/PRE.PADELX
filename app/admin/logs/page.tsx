@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabase";
 import { useRole } from "../../hooks/useRole";
 import { formatDateTimeMadrid } from "@/lib/dates";
 import Link from "next/link";
+import { useTranslation } from "../../i18n";
 
 type AuditLog = {
   id: number;
@@ -18,6 +19,7 @@ type AuditLog = {
 };
 
 export default function AdminLogsPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { isAdmin, loading: roleLoading } = useRole();
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -47,16 +49,16 @@ export default function AdminLogsPage() {
     loadLogs();
   }, [isAdmin]);
 
-  // 🔒 Protección dura
+  // Protección dura
   if (!isAdmin) {
     return (
       <div className="p-8">
-        <h1 className="text-xl font-bold">Acceso denegado</h1>
+        <h1 className="text-xl font-bold">{t("admin.logs.accessDenied")}</h1>
         <p className="text-gray-600">
-          No tenés permisos para ver esta sección.
+          {t("admin.logs.noPermission")}
         </p>
         <Link href="/" className="text-indigo-600 underline mt-4 inline-block">
-          Volver al dashboard
+          {t("admin.logs.backToDashboard")}
         </Link>
       </div>
     );
@@ -67,10 +69,10 @@ export default function AdminLogsPage() {
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Logs del sistema
+            {t("admin.logs.title")}
           </h1>
           <p className="text-sm text-gray-500">
-            Historial de acciones realizadas por los usuarios
+            {t("admin.logs.subtitle")}
           </p>
         </div>
 
@@ -78,16 +80,16 @@ export default function AdminLogsPage() {
           href="/"
           className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
         >
-          ← Volver al dashboard
+          {t("admin.logs.backToDashboard")}
         </Link>
       </header>
 
       <div className="bg-white rounded-xl border shadow-sm divide-y">
         {loading ? (
-          <p className="p-4 text-sm text-gray-500">Cargando logs…</p>
+          <p className="p-4 text-sm text-gray-500">{t("admin.logs.loading")}</p>
         ) : logs.length === 0 ? (
           <p className="p-4 text-sm text-gray-500">
-            No hay acciones registradas.
+            {t("admin.logs.empty")}
           </p>
         ) : (
           logs.map((log) => (
@@ -97,16 +99,16 @@ export default function AdminLogsPage() {
               <div className="flex-1">
                 <p className="text-sm text-gray-800">
                   <span className="font-semibold">
-                    {log.user_email ?? "Sistema"}
+                    {log.user_email ?? t("admin.logs.system")}
                   </span>{" "}
-                  realizó{" "}
+                  {t("admin.logs.performed")}{" "}
                   <span className="font-semibold">
                     {log.action.replace(/_/g, " ").toLowerCase()}
                   </span>
                   {log.entity && (
                     <>
                       {" "}
-                      en <span className="font-semibold">{log.entity}</span>
+                      {t("admin.logs.in")} <span className="font-semibold">{log.entity}</span>
                     </>
                   )}
                 </p>

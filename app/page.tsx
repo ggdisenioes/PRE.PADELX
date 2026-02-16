@@ -11,6 +11,7 @@ import MatchCard from "@/components/matches/MatchCard";
 import toast from "react-hot-toast";
 import MatchShareCard from "./components/matches/MatchShareCard";
 import { formatTimeMadrid, formatDateTimeMadrid } from "@/lib/dates";
+import { useTranslation } from "./i18n";
 
 type PlayerMap = {
   [key: number]: string;
@@ -113,6 +114,7 @@ type RankingMatchRow = {
 
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const [countPlayers, setCountPlayers] = useState(0);
   const [countTournaments, setCountTournaments] = useState(0);
   const [countPendingMatches, setCountPendingMatches] = useState(0);
@@ -600,8 +602,8 @@ export default function DashboardPage() {
         {/* HEADER */}
         <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-3xl font-extrabold text-gray-900">Panel General</h1>
-            <p className="text-sm text-gray-500 mt-1">Resumen de tu club en tiempo real.</p>
+            <h1 className="text-3xl font-extrabold text-gray-900">{t("dashboard.title")}</h1>
+            <p className="text-sm text-gray-500 mt-1">{t("dashboard.welcome")}</p>
           </div>
 
           <div className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm text-gray-500 shadow-sm w-fit">
@@ -622,7 +624,7 @@ export default function DashboardPage() {
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                    Resumen
+                    {t("dashboard.lastDaysActivity")}
                   </h2>
                   <Link
                     href="/matches"
@@ -645,11 +647,11 @@ export default function DashboardPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                     <div className="rounded-xl border border-gray-200 p-4 flex items-center justify-between">
                       <div>
-                        <p className="text-xs text-gray-500">Torneos</p>
+                        <p className="text-xs text-gray-500">{t("dashboard.totalTournaments")}</p>
                         <p className="text-2xl font-extrabold text-gray-900">
                           {countTournaments}
                         </p>
-                        <p className="text-[11px] text-gray-500 mt-1">Activos / creados</p>
+                        <p className="text-[11px] text-gray-500 mt-1">{t("dashboard.viewAllTournaments")}</p>
                       </div>
                       <div className="h-11 w-11 rounded-lg bg-green-100 flex items-center justify-center text-green-700 text-xl">
                         🏆
@@ -658,11 +660,11 @@ export default function DashboardPage() {
 
                     <div className="rounded-xl border border-gray-200 p-4 flex items-center justify-between">
                       <div>
-                        <p className="text-xs text-gray-500">Pendientes</p>
+                        <p className="text-xs text-gray-500">{t("common.pending")}</p>
                         <p className="text-2xl font-extrabold text-gray-900">
                           {countPendingMatches}
                         </p>
-                        <p className="text-[11px] text-gray-500 mt-1">Sin resultado</p>
+                        <p className="text-[11px] text-gray-500 mt-1">{t("dashboard.pendingMatches")}</p>
                       </div>
                       <div className="h-11 w-11 rounded-lg bg-green-100 flex items-center justify-center text-green-700 text-xl">
                         🎾
@@ -671,9 +673,9 @@ export default function DashboardPage() {
 
                     <div className="rounded-xl border border-gray-200 p-4 flex items-center justify-between">
                       <div>
-                        <p className="text-xs text-gray-500">Jugadores</p>
+                        <p className="text-xs text-gray-500">{t("dashboard.totalPlayers")}</p>
                         <p className="text-2xl font-extrabold text-gray-900">{countPlayers}</p>
-                        <p className="text-[11px] text-gray-500 mt-1">Aprobados</p>
+                        <p className="text-[11px] text-gray-500 mt-1">{t("common.approved")}</p>
                       </div>
                       <div className="h-11 w-11 rounded-lg bg-green-100 flex items-center justify-center text-green-700 text-xl">
                         👥
@@ -682,11 +684,11 @@ export default function DashboardPage() {
 
                     <div className="rounded-xl border border-gray-200 p-4 flex items-center justify-between">
                       <div>
-                        <p className="text-xs text-gray-500">Próximo</p>
+                        <p className="text-xs text-gray-500">{t("dashboard.upcomingMatches")}</p>
                         <p className="text-2xl font-extrabold text-gray-900">
                           {formatTimeMadrid(upcomingMatches[0]?.start_time)}
                         </p>
-                        <p className="text-[11px] text-gray-500 mt-1">Hora del partido</p>
+                        <p className="text-[11px] text-gray-500 mt-1">{t("dashboard.dateToBeConfirmed")}</p>
                       </div>
                       <div className="h-11 w-11 rounded-lg bg-green-100 flex items-center justify-center text-green-700 text-xl">
                         📅
@@ -701,14 +703,14 @@ export default function DashboardPage() {
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                  Actividad (7 días)
+                  {t("dashboard.lastDaysActivity")}
                 </h2>
-                <span className="text-xs text-gray-400">Pendientes vs finalizados</span>
+                <span className="text-xs text-gray-400">{t("common.pending")} vs {t("common.completed")}</span>
               </div>
 
               {chart7d.length === 0 ? (
                 <div className="h-40 rounded-xl bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center text-sm text-gray-500">
-                  No hay datos para graficar.
+                  {t("common.noData")}
                 </div>
               ) : (
                 (() => {
@@ -745,11 +747,11 @@ export default function DashboardPage() {
                       <div className="flex items-center gap-4 text-xs text-gray-500">
                         <div className="flex items-center gap-2">
                           <span className="inline-block h-2 w-2 rounded bg-yellow-300" />
-                          Pendientes
+                          {t("matches.filterPending")}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="inline-block h-2 w-2 rounded bg-green-400" />
-                          Finalizados
+                          {t("matches.filterCompleted")}
                         </div>
                       </div>
                     </div>
@@ -763,9 +765,9 @@ export default function DashboardPage() {
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                    Alertas
+                    {t("dashboard.alerts")}
                   </h2>
-                  <span className="text-xs text-gray-400">Sugerencias inteligentes</span>
+                  <span className="text-xs text-gray-400">{t("dashboard.alerts")}</span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -797,7 +799,7 @@ export default function DashboardPage() {
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                  Próximos partidos
+                  {t("dashboard.upcomingMatches")}
                 </h2>
                 <Link
                   href="/matches"
@@ -810,7 +812,7 @@ export default function DashboardPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {upcomingMatches.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-200 p-6 text-sm text-gray-500">
-                    No hay partidos pendientes para mostrar.
+                    {t("dashboard.noUpcomingMatches")}
                   </div>
                 ) : (
                   upcomingMatches.map((m: UpcomingMatch) => {
@@ -852,7 +854,7 @@ export default function DashboardPage() {
               <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                    Resultados recientes
+                    {t("dashboard.recentResults")}
                   </h2>
                   <Link
                     href="/matches?status=finished"
@@ -865,7 +867,7 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {recentResults.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-gray-200 p-6 text-sm text-gray-500">
-                      Todavía no hay resultados cargados.
+                      {t("dashboard.noRecentResults")}
                     </div>
                   ) : (
                     recentResults.map((m: FinishedMatch) => {
@@ -897,9 +899,9 @@ export default function DashboardPage() {
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                    Ranking
+                    {t("dashboard.topRanking")}
                   </h2>
-                  <span className="text-xs text-gray-400">3 pts victoria / 1 derrota</span>
+                  <span className="text-xs text-gray-400">3 pts / 1 pts</span>
                 </div>
 
                 <div className="mb-3">
@@ -907,7 +909,7 @@ export default function DashboardPage() {
                     htmlFor="tournament-selector"
                     className="block text-xs font-medium text-gray-500 mb-1"
                   >
-                    Torneo
+                    {t("nav.tournaments")}
                   </label>
                   <select
                     id="tournament-selector"
@@ -918,7 +920,7 @@ export default function DashboardPage() {
                     }}
                     className="w-full rounded-md border-gray-300 py-1.5 px-2 text-sm"
                   >
-                    <option value="">Todos los torneos</option>
+                    <option value="">{t("ranking.filterAll")}</option>
                     {Object.entries(tournamentMap).map(([tid, tname]) => (
                       <option key={tid} value={tid}>
                         {tname}
@@ -929,14 +931,14 @@ export default function DashboardPage() {
 
                 <div className="rounded-xl border border-gray-200 overflow-hidden">
                   <div className="flex font-semibold text-[11px] text-gray-600 px-3 py-2 bg-gray-50 border-b border-gray-200">
-                    <div className="w-6 text-center">#</div>
-                    <div className="flex-1">Jugador</div>
-                    <div className="w-10 text-center">Pts</div>
+                    <div className="w-6 text-center">{t("ranking.position")}</div>
+                    <div className="flex-1">{t("ranking.player")}</div>
+                    <div className="w-10 text-center">{t("ranking.points")}</div>
                   </div>
 
                   {topRanking.length === 0 ? (
                     <div className="p-4 text-sm text-gray-500">
-                      No hay datos de ranking para mostrar.
+                      {t("ranking.empty")}
                     </div>
                   ) : (
                     topRanking.slice(0, 8).map((r: RankingItem, idx: number) => {
@@ -984,7 +986,7 @@ export default function DashboardPage() {
             {(isAdmin || isManager) && (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                  Acciones rápidas
+                  {t("dashboard.quickActions")}
                 </h2>
 
                 <div className="grid grid-cols-1 gap-2">
@@ -992,7 +994,7 @@ export default function DashboardPage() {
                     href="/matches/create"
                     className="inline-flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
                   >
-                    <span>➕ Crear partido</span>
+                    <span>➕ {t("dashboard.newFriendlyMatch")}</span>
                     <span className="text-gray-400">→</span>
                   </Link>
 
@@ -1000,7 +1002,7 @@ export default function DashboardPage() {
                     href="/matches?status=pending"
                     className="inline-flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
                   >
-                    <span>🎯 Cargar resultados</span>
+                    <span>🎯 {t("dashboard.viewAllMatches")}</span>
                     <span className="text-gray-400">→</span>
                   </Link>
 
@@ -1009,7 +1011,7 @@ export default function DashboardPage() {
                       href="/tournaments/create"
                       className="inline-flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
                     >
-                      <span>🏆 Crear torneo</span>
+                      <span>🏆 {t("dashboard.newTournament")}</span>
                       <span className="text-gray-400">→</span>
                     </Link>
                   )}
@@ -1019,7 +1021,7 @@ export default function DashboardPage() {
                       href="/admin/management"
                       className="inline-flex items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 shadow-sm hover:bg-indigo-100 transition"
                     >
-                      <span>👤 Crear usuario</span>
+                      <span>👤 {t("dashboard.newPlayer")}</span>
                       <span className="text-indigo-400">→</span>
                     </Link>
                   )}
@@ -1029,7 +1031,7 @@ export default function DashboardPage() {
                       href="/admin/users"
                       className="inline-flex items-center justify-between gap-2 rounded-lg border border-purple-200 bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 shadow-sm hover:bg-purple-100 transition"
                     >
-                      <span>🛠️ Administrar usuarios</span>
+                      <span>🛠️ {t("nav.userManagement")}</span>
                       <span className="text-purple-400">→</span>
                     </Link>
                   )}
@@ -1039,7 +1041,7 @@ export default function DashboardPage() {
                       href="/admin/logs"
                       className="inline-flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
                     >
-                      <span>📜 Ver logs</span>
+                      <span>📜 {t("admin.logs.title")}</span>
                       <span className="text-gray-400">→</span>
                     </Link>
                   )}
@@ -1052,13 +1054,13 @@ export default function DashboardPage() {
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
                 <div className="p-5 border-b border-gray-200">
                   <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                    Actividad reciente
+                    {t("dashboard.recentResults")}
                   </h2>
                 </div>
 
                 <div className="divide-y">
                   {recentLogs.length === 0 ? (
-                    <p className="p-4 text-sm text-gray-500">No hay actividad registrada.</p>
+                    <p className="p-4 text-sm text-gray-500">{t("admin.logs.empty")}</p>
                   ) : (
                     recentLogs.map((log) => (
                       <div key={log.id} className="p-4 flex items-start gap-3">
@@ -1068,14 +1070,14 @@ export default function DashboardPage() {
                             <span className="font-semibold">
                               {log.user_email ?? "Sistema"}
                             </span>{" "}
-                            realizó{" "}
+                            {t("admin.logs.performed")}{" "}
                             <span className="font-semibold">
                               {log.action.replace(/_/g, " ").toLowerCase()}
                             </span>
                             {log.entity && (
                               <>
                                 {" "}
-                                en <span className="font-semibold">{log.entity}</span>
+                                {t("admin.logs.in")} <span className="font-semibold">{log.entity}</span>
                               </>
                             )}
                           </p>
@@ -1093,17 +1095,17 @@ export default function DashboardPage() {
             {/* AYUDA RÁPIDA */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                Atajos
+                {t("dashboard.quickActions")}
               </h2>
               <div className="text-sm text-gray-600 space-y-2">
                 <Link href="/players" className="block hover:text-gray-900">
-                  Jugadores →
+                  {t("nav.players")} →
                 </Link>
                 <Link href="/tournaments" className="block hover:text-gray-900">
-                  Torneos →
+                  {t("nav.tournaments")} →
                 </Link>
                 <Link href="/matches" className="block hover:text-gray-900">
-                  Partidos →
+                  {t("nav.matches")} →
                 </Link>
               </div>
             </div>
@@ -1200,7 +1202,7 @@ export default function DashboardPage() {
                   try {
                     const result = await generatePngFromShareRef();
                     if (!result) {
-                      toast.error("No se pudo generar la imagen");
+                      toast.error(t("shareModal.errorCreating"));
                       return;
                     }
 
@@ -1213,10 +1215,10 @@ export default function DashboardPage() {
                       try {
                         await navigator.share({
                           files: [file],
-                          title: "Resultado del partido",
-                          text: "Resultado PadelX QA",
+                          title: t("matches.shareResult"),
+                          text: t("matches.shareResult"),
                         });
-                        toast.success("¡Imagen compartida!");
+                        toast.success(t("shareModal.download"));
                         URL.revokeObjectURL(url);
                         return;
                       } catch (err: any) {
@@ -1236,11 +1238,11 @@ export default function DashboardPage() {
                     a.href = url;
                     a.download = "resultado-padelx-qa.png";
                     a.click();
-                    toast.success("Imagen descargada");
+                    toast.success(t("shareModal.download"));
                     URL.revokeObjectURL(url);
                   } catch (err) {
                     console.error(err);
-                    toast.error("No se pudo generar la imagen");
+                    toast.error(t("shareModal.errorCreating"));
                   }
                 }}
                 className={`w-full mt-2 py-2 rounded-xl font-semibold transition ${
@@ -1249,7 +1251,7 @@ export default function DashboardPage() {
                     : "bg-white/10 text-white/40 cursor-not-allowed"
                 }`}
               >
-                Compartir imagen
+                {t("matches.shareResult")}
               </button>
 
               <button
@@ -1268,11 +1270,11 @@ export default function DashboardPage() {
                     a.href = url;
                     a.download = "resultado-padelx-qa.png";
                     a.click();
-                    toast.success("Imagen descargada");
+                    toast.success(t("shareModal.download"));
                     URL.revokeObjectURL(url);
                   } catch (err) {
                     console.error(err);
-                    toast.error("No se pudo generar la imagen");
+                    toast.error(t("shareModal.errorCreating"));
                   }
                 }}
                 className={`w-full py-2 rounded-xl font-semibold transition ${
@@ -1281,11 +1283,11 @@ export default function DashboardPage() {
                     : "bg-white/5 text-white/30 cursor-not-allowed"
                 }`}
               >
-                Descargar imagen
+                {t("shareModal.download")}
               </button>
 
               <p className="text-center text-xs text-white/60">
-                Ideal para WhatsApp e Instagram.
+                {t("matches.shareResult")}
               </p>
             </div>
           </div>
