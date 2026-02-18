@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase";
 import { useRouter } from "next/navigation";
 import Card from "../components/Card";
 import toast from "react-hot-toast";
+import { useTranslation } from "../i18n";
 
 type Court = {
   id: number;
@@ -22,6 +23,7 @@ type Booking = {
 
 export default function BookingsPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [courts, setCourts] = useState<Court[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [selectedDate, setSelectedDate] = useState(
@@ -89,7 +91,7 @@ export default function BookingsPage() {
       }
     } catch (error) {
       console.error("Error fetching bookings:", error);
-      toast.error("Error cargando reservas");
+      toast.error(t("bookings.errorLoading"));
     } finally {
       setLoading(false);
     }
@@ -103,7 +105,7 @@ export default function BookingsPage() {
     e.preventDefault();
 
     if (!formData.court_id) {
-      toast.error("Selecciona una pista");
+      toast.error(t("bookings.selectCourt"));
       return;
     }
 
@@ -130,7 +132,7 @@ export default function BookingsPage() {
       });
 
       if (response.ok) {
-        toast.success("¡Pista reservada!");
+        toast.success(t("bookings.created"));
         setFormData({
           court_id: formData.court_id,
           booking_date: selectedDate,
@@ -142,10 +144,10 @@ export default function BookingsPage() {
         fetchBookings();
       } else {
         const result = await response.json();
-        toast.error(result.error || "Error al reservar");
+        toast.error(result.error || t("bookings.errorCreating"));
       }
     } catch (error) {
-      toast.error("Error");
+      toast.error(t("common.error"));
     }
   };
 
@@ -164,28 +166,28 @@ export default function BookingsPage() {
   };
 
   if (loading) {
-    return <div className="p-8 text-center">Cargando reservas...</div>;
+    return <div className="p-8 text-center">{t("bookings.loading")}</div>;
   }
 
   return (
     <main className="max-w-5xl mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">📅 Reservar Pista</h1>
+        <h1 className="text-3xl font-bold">📅 {t("bookings.createTitle")}</h1>
         <button
           onClick={() => setShowForm(!showForm)}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          {showForm ? "Cancelar" : "+ Nueva Reserva"}
+          {showForm ? t("common.cancel") : `+ ${t("bookings.create")}`}
         </button>
       </div>
 
       {showForm && (
         <Card className="p-6">
-          <h2 className="text-xl font-bold mb-4">Reservar Pista</h2>
+          <h2 className="text-xl font-bold mb-4">{t("bookings.createTitle")}</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Pista</label>
+                <label className="block text-sm font-medium mb-1">{t("bookings.court")}</label>
                 <select
                   value={formData.court_id}
                   onChange={(e) =>
@@ -203,7 +205,7 @@ export default function BookingsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Fecha</label>
+                <label className="block text-sm font-medium mb-1">{t("bookings.date")}</label>
                 <input
                   type="date"
                   value={formData.booking_date}
@@ -216,7 +218,7 @@ export default function BookingsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Hora Inicio</label>
+                <label className="block text-sm font-medium mb-1">{t("bookings.startTime")}</label>
                 <input
                   type="time"
                   value={formData.start_time}
@@ -229,7 +231,7 @@ export default function BookingsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Hora Fin</label>
+                <label className="block text-sm font-medium mb-1">{t("bookings.endTime")}</label>
                 <input
                   type="time"
                   value={formData.end_time}
@@ -244,7 +246,7 @@ export default function BookingsPage() {
 
             <div>
               <label className="block text-sm font-medium mb-1">
-                Notas (opcional)
+                {t("bookings.notes")} ({t("common.optional")})
               </label>
               <textarea
                 value={formData.notes}
@@ -259,7 +261,7 @@ export default function BookingsPage() {
               type="submit"
               className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
             >
-              Reservar
+              {t("bookings.create")}
             </button>
           </form>
         </Card>
@@ -268,13 +270,13 @@ export default function BookingsPage() {
       <div className="space-y-4">
         <div className="flex gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Filtrar por pista</label>
+            <label className="block text-sm font-medium mb-1">{t("bookings.filterByCourt")}</label>
             <select
               value={selectedCourt}
               onChange={(e) => setSelectedCourt(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg"
             >
-              <option value="">Todas las pistas</option>
+              <option value="">{t("bookings.allCourts")}</option>
               {courts.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -284,7 +286,7 @@ export default function BookingsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Fecha</label>
+            <label className="block text-sm font-medium mb-1">{t("bookings.date")}</label>
             <input
               type="date"
               value={selectedDate}
@@ -311,7 +313,7 @@ export default function BookingsPage() {
                     </p>
                   </div>
                   <span className="px-3 py-1 bg-green-200 text-green-800 rounded text-sm">
-                    {booking.status === "confirmed" ? "Confirmada" : booking.status}
+                    {booking.status === "confirmed" ? t("bookings.statusConfirmed") : booking.status}
                   </span>
                 </div>
               ))}
@@ -319,7 +321,7 @@ export default function BookingsPage() {
           </Card>
         ) : (
           <Card className="p-6 text-center text-gray-500">
-            No hay reservas para esta fecha y pista
+            {t("bookings.emptyByFilter")}
           </Card>
         )}
       </div>

@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase";
 import { useRouter } from "next/navigation";
 import Card from "../components/Card";
 import toast from "react-hot-toast";
+import { useTranslation } from "../i18n";
 
 type Challenge = {
   id: number;
@@ -36,6 +37,7 @@ type Court = {
 
 export default function ChallengesPage() {
   const router = useRouter();
+  const { t, locale } = useTranslation();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
@@ -51,6 +53,7 @@ export default function ChallengesPage() {
   });
   const [scheduleForm, setScheduleForm] = useState<Record<number, { date: string; court: string; place: string }>>({});
   const [showSchedule, setShowSchedule] = useState<Record<number, boolean>>({});
+  const dateLocale = locale === "en" ? "en-US" : "es-ES";
 
   useEffect(() => {
     checkAuth();
@@ -113,7 +116,7 @@ export default function ChallengesPage() {
       }
     } catch (error) {
       console.error("Error fetching challenges:", error);
-      toast.error("Error cargando desafíos");
+      toast.error(t("challenges.errorLoading"));
     } finally {
       setLoading(false);
     }
@@ -123,7 +126,7 @@ export default function ChallengesPage() {
     e.preventDefault();
 
     if (!formData.challenger_id || !formData.challenger_partner_id || !formData.challenged_id || !formData.challenged_partner_id) {
-      toast.error("Todos los 4 jugadores son obligatorios");
+      toast.error(t("challenges.allPlayersRequired"));
       return;
     }
 
@@ -150,16 +153,16 @@ export default function ChallengesPage() {
       });
 
       if (response.ok) {
-        toast.success("¡Desafío creado!");
+        toast.success(t("challenges.created"));
         setFormData({ challenger_id: "", challenger_partner_id: "", challenged_id: "", challenged_partner_id: "", message: "" });
         setShowForm(false);
         fetchChallenges();
       } else {
         const result = await response.json();
-        toast.error(result.error || "Error al crear desafío");
+        toast.error(result.error || t("challenges.errorCreating"));
       }
     } catch (error: any) {
-      toast.error(error.message || "Error al crear desafío");
+      toast.error(error.message || t("challenges.errorCreating"));
     }
   };
 
@@ -180,21 +183,21 @@ export default function ChallengesPage() {
       });
 
       if (res.ok) {
-        toast.success(response === "accept" ? "¡Desafío aceptado!" : "Desafío rechazado");
+        toast.success(response === "accept" ? t("challenges.accepted") : t("challenges.rejected"));
         fetchChallenges();
       } else {
         const result = await res.json();
-        toast.error(result.error || "Error al responder");
+        toast.error(result.error || t("challenges.errorResponding"));
       }
     } catch {
-      toast.error("Error al responder");
+      toast.error(t("challenges.errorResponding"));
     }
   };
 
   const handleSchedule = async (challengeId: number) => {
     const form = scheduleForm[challengeId];
     if (!form?.date) {
-      toast.error("La fecha y hora son obligatorias");
+      toast.error(t("challenges.requiredDateTime"));
       return;
     }
 
@@ -219,20 +222,20 @@ export default function ChallengesPage() {
       });
 
       if (res.ok) {
-        toast.success("¡Propuesta enviada al administrador!");
+        toast.success(t("challenges.proposalSent"));
         setShowSchedule((prev) => ({ ...prev, [challengeId]: false }));
         fetchChallenges();
       } else {
         const result = await res.json();
-        toast.error(result.error || "Error al enviar propuesta");
+        toast.error(result.error || t("challenges.errorSendingProposal"));
       }
     } catch {
-      toast.error("Error al enviar propuesta");
+      toast.error(t("challenges.errorSendingProposal"));
     }
   };
 
   const getPlayerName = (playerId: number) => {
-    return players.find((p) => p.id === playerId)?.name || `Jugador ${playerId}`;
+    return players.find((p) => p.id === playerId)?.name || `${t("ranking.player")} ${playerId}`;
   };
 
   const getStatusBadgeColor = (status: string) => {
@@ -254,49 +257,49 @@ export default function ChallengesPage() {
     if (challenge.status === "pending") {
       const accepted = [challenge.challenged_accepted, challenge.challenged_partner_accepted].filter((v) => v === true).length;
       const total = challenge.challenged_partner_id ? 2 : 1;
-      if (accepted > 0) return `Pendiente (${accepted}/${total} aceptaron)`;
-      return "Pendiente";
+      if (accepted > 0) return t("challenges.pendingProgress", { accepted, total });
+      return t("challenges.statusPending");
     }
-    if (challenge.status === "accepted") return "Aceptado";
-    if (challenge.status === "declined") return "Rechazado";
-    if (challenge.status === "completed") return "Completado";
-    if (challenge.status === "cancelled") return "Cancelado";
+    if (challenge.status === "accepted") return t("challenges.statusAccepted");
+    if (challenge.status === "declined") return t("challenges.statusRejected");
+    if (challenge.status === "completed") return t("challenges.statusCompleted");
+    if (challenge.status === "cancelled") return t("challenges.statusCancelled");
     return challenge.status;
   };
 
   const renderPlayerStatus = (label: string, accepted: boolean | null) => {
-    if (accepted === true) return <span className="text-green-600 font-semibold text-xs">{label}: Aceptó</span>;
-    if (accepted === false) return <span className="text-red-600 font-semibold text-xs">{label}: Rechazó</span>;
-    return <span className="text-yellow-600 font-semibold text-xs">{label}: Pendiente</span>;
+    if (accepted === true) return <span className="text-green-600 font-semibold text-xs">{label}: {t("challenges.acceptLabel")}</span>;
+    if (accepted === false) return <span className="text-red-600 font-semibold text-xs">{label}: {t("challenges.rejectLabel")}</span>;
+    return <span className="text-yellow-600 font-semibold text-xs">{label}: {t("challenges.statusPending")}</span>;
   };
 
   if (loading) {
-    return <div className="p-8 text-center">Cargando desafíos...</div>;
+    return <div className="p-8 text-center">{t("challenges.loading")}</div>;
   }
 
   return (
     <main className="max-w-4xl mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Desafíos</h1>
+        <h1 className="text-3xl font-bold">{t("challenges.title")}</h1>
         <button
           onClick={() => setShowForm(!showForm)}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          {showForm ? "Cancelar" : "+ Nuevo Desafío"}
+          {showForm ? t("common.cancel") : `+ ${t("challenges.create")}`}
         </button>
       </div>
 
       {showForm && (
         <Card className="p-6">
-          <h2 className="text-xl font-bold mb-4">Crear Desafío 2vs2</h2>
+          <h2 className="text-xl font-bold mb-4">{t("challenges.createTitle")}</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Mi equipo (Retadores) */}
               <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-bold text-blue-600 mb-3">Mi Equipo (Retadores)</h3>
+                <h3 className="font-bold text-blue-600 mb-3">{t("challenges.yourTeam")}</h3>
 
                 <div className="mb-3">
-                  <label className="block text-sm font-medium mb-1">Jugador 1 *</label>
+                  <label className="block text-sm font-medium mb-1">{t("matches.player1")} *</label>
                   <select
                     value={formData.challenger_id}
                     onChange={(e) =>
@@ -305,7 +308,7 @@ export default function ChallengesPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
                   >
-                    <option value="">Selecciona jugador 1</option>
+                    <option value="">{t("challenges.selectPlayer1")}</option>
                     {players.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
@@ -315,7 +318,7 @@ export default function ChallengesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Jugador 2 (Pareja) *</label>
+                  <label className="block text-sm font-medium mb-1">{t("challenges.partnerLabel")} *</label>
                   <select
                     value={formData.challenger_partner_id}
                     onChange={(e) =>
@@ -324,7 +327,7 @@ export default function ChallengesPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
                   >
-                    <option value="">Selecciona jugador 2</option>
+                    <option value="">{t("challenges.selectPlayer2")}</option>
                     {players
                       .filter((p) => p.id !== parseInt(formData.challenger_id || "0"))
                       .map((p) => (
@@ -336,12 +339,12 @@ export default function ChallengesPage() {
                 </div>
               </div>
 
-              {/* Equipo Contrario (Retados) */}
+            {/* Equipo Contrario (Retados) */}
               <div className="border-l-4 border-red-500 pl-4">
-                <h3 className="font-bold text-red-600 mb-3">Equipo Contrario (Retados)</h3>
+                <h3 className="font-bold text-red-600 mb-3">{t("challenges.rivalTeam")}</h3>
 
                 <div className="mb-3">
-                  <label className="block text-sm font-medium mb-1">Jugador 1 *</label>
+                  <label className="block text-sm font-medium mb-1">{t("matches.player1")} *</label>
                   <select
                     value={formData.challenged_id}
                     onChange={(e) =>
@@ -350,7 +353,7 @@ export default function ChallengesPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
                   >
-                    <option value="">Selecciona jugador 1</option>
+                    <option value="">{t("challenges.selectPlayer1")}</option>
                     {players.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
@@ -360,7 +363,7 @@ export default function ChallengesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Jugador 2 (Pareja) *</label>
+                  <label className="block text-sm font-medium mb-1">{t("challenges.partnerLabel")} *</label>
                   <select
                     value={formData.challenged_partner_id}
                     onChange={(e) =>
@@ -369,7 +372,7 @@ export default function ChallengesPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
                   >
-                    <option value="">Selecciona jugador 2</option>
+                    <option value="">{t("challenges.selectPlayer2")}</option>
                     {players
                       .filter((p) => p.id !== parseInt(formData.challenged_id || "0"))
                       .map((p) => (
@@ -384,14 +387,14 @@ export default function ChallengesPage() {
 
             <div>
               <label className="block text-sm font-medium mb-1">
-                Mensaje (opcional)
+                {t("challenges.message")}
               </label>
               <textarea
                 value={formData.message}
                 onChange={(e) =>
                   setFormData({ ...formData, message: e.target.value })
                 }
-                placeholder="¿Quieres añadir un mensaje?"
+                placeholder={t("challenges.messagePlaceholderInline")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg h-20"
               />
             </div>
@@ -400,7 +403,7 @@ export default function ChallengesPage() {
               type="submit"
               className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
             >
-              Enviar Desafío
+              {t("challenges.send")}
             </button>
           </form>
         </Card>
@@ -409,7 +412,7 @@ export default function ChallengesPage() {
       <div className="space-y-3">
         {challenges.length === 0 ? (
           <Card className="p-4 text-center text-gray-500">
-            No hay desafíos aún. ¡Crea uno!
+            {t("challenges.emptyCta")}
           </Card>
         ) : (
           challenges.map((challenge) => {
@@ -455,7 +458,7 @@ export default function ChallengesPage() {
                           {getStatusLabel(challenge)}
                         </span>
                         <p className="text-xs text-gray-500">
-                          {new Date(challenge.created_at).toLocaleDateString("es-ES")}
+                          {new Date(challenge.created_at).toLocaleDateString(dateLocale)}
                         </p>
                       </div>
                     </div>
@@ -472,19 +475,19 @@ export default function ChallengesPage() {
                   {/* Respond buttons for challenged players */}
                   {canRespond && myPlayerId && (
                     <div className="border-t pt-3">
-                      <p className="text-sm font-medium mb-2">Tu respuesta:</p>
+                      <p className="text-sm font-medium mb-2">{t("challenges.yourResponse")}</p>
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleRespond(challenge.id, myPlayerId, "accept")}
                           className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-semibold"
                         >
-                          Aceptar
+                          {t("challenges.accept")}
                         </button>
                         <button
                           onClick={() => handleRespond(challenge.id, myPlayerId, "decline")}
                           className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 font-semibold"
                         >
-                          Rechazar
+                          {t("challenges.reject")}
                         </button>
                       </div>
                     </div>
@@ -498,15 +501,15 @@ export default function ChallengesPage() {
                           onClick={() => setShowSchedule((prev) => ({ ...prev, [challenge.id]: true }))}
                           className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 font-semibold"
                         >
-                          Proponer Partido
+                          {t("challenges.proposeMatch")}
                         </button>
                       ) : (
                         <div className="space-y-3 bg-gray-50 rounded-lg p-4">
-                          <h4 className="font-bold text-sm">Proponer Partido Amistoso</h4>
-                          <p className="text-xs text-gray-500">Se enviará una notificación al administrador del club para que confirme y cree el partido.</p>
+                          <h4 className="font-bold text-sm">{t("challenges.proposeMatchTitle")}</h4>
+                          <p className="text-xs text-gray-500">{t("challenges.proposeMatchHelp")}</p>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-medium mb-1">Fecha y hora *</label>
+                              <label className="block text-xs font-medium mb-1">{t("matches.dateTime")} *</label>
                               <input
                                 type="datetime-local"
                                 value={sf.date}
@@ -521,7 +524,7 @@ export default function ChallengesPage() {
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium mb-1">Pista</label>
+                              <label className="block text-xs font-medium mb-1">{t("bookings.court")}</label>
                               <select
                                 value={sf.court}
                                 onChange={(e) =>
@@ -532,7 +535,7 @@ export default function ChallengesPage() {
                                 }
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                               >
-                                <option value="">Sin pista</option>
+                                <option value="">{t("challenges.noCourt")}</option>
                                 {courts.map((c) => (
                                   <option key={c.id} value={c.name}>
                                     {c.name}
@@ -542,7 +545,7 @@ export default function ChallengesPage() {
                             </div>
                           </div>
                           <div>
-                            <label className="block text-xs font-medium mb-1">Lugar (opcional)</label>
+                            <label className="block text-xs font-medium mb-1">{t("matches.place")} ({t("common.optional")})</label>
                             <input
                               type="text"
                               value={sf.place}
@@ -550,9 +553,9 @@ export default function ChallengesPage() {
                                 setScheduleForm((prev) => ({
                                   ...prev,
                                   [challenge.id]: { ...sf, place: e.target.value },
-                                }))
-                              }
-                              placeholder="Ej: Club de Pádel Centro"
+                                  }))
+                                }
+                              placeholder={t("challenges.placePlaceholder")}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                             />
                           </div>
@@ -561,13 +564,13 @@ export default function ChallengesPage() {
                               onClick={() => handleSchedule(challenge.id)}
                               className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-semibold"
                             >
-                              Enviar Propuesta
+                              {t("challenges.sendProposal")}
                             </button>
                             <button
                               onClick={() => setShowSchedule((prev) => ({ ...prev, [challenge.id]: false }))}
                               className="px-4 py-2 bg-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-400"
                             >
-                              Cancelar
+                              {t("common.cancel")}
                             </button>
                           </div>
                         </div>
@@ -579,10 +582,10 @@ export default function ChallengesPage() {
                   {challenge.status === "accepted" && challenge.scheduled_date && !challenge.match_id && (
                     <div className="border-t pt-3">
                       <p className="text-sm text-green-700 font-medium">
-                        Propuesta enviada al administrador — pendiente de confirmación
+                        {t("challenges.proposalPending")}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
-                        Fecha propuesta: {new Date(challenge.scheduled_date).toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}
+                        {t("challenges.proposedDate")}: {new Date(challenge.scheduled_date).toLocaleDateString(dateLocale, { weekday: "long", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}
                         {challenge.scheduled_court ? ` · ${challenge.scheduled_court}` : ""}
                         {challenge.scheduled_place ? ` · ${challenge.scheduled_place}` : ""}
                       </p>
@@ -596,7 +599,7 @@ export default function ChallengesPage() {
                         onClick={() => router.push("/matches")}
                         className="text-sm text-blue-600 hover:underline font-medium"
                       >
-                        Ver partido creado
+                        {t("challenges.viewCreatedMatch")}
                       </button>
                     </div>
                   )}

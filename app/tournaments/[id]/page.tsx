@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabase";
 import Badge from "../../components/Badge";
 import toast from "react-hot-toast";
 import MatchCard, { type Match } from "../../components/matches/MatchCard";
+import { useTranslation } from "../../i18n";
 
 type Tournament = {
   id: number;
@@ -22,6 +23,7 @@ type PlayerMap = {
 export default function TournamentDetail() {
   const params = useParams();
   const router = useRouter();
+  const { t, locale } = useTranslation();
 
   const rawId = (params as any)?.id;
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
@@ -31,11 +33,12 @@ export default function TournamentDetail() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [playersMap, setPlayersMap] = useState<PlayerMap>({});
   const [loading, setLoading] = useState(true);
+  const dateLocale = locale === "en" ? "en-US" : "es-ES";
 
   // Cargar torneo + partidos + jugadores
   useEffect(() => {
     if (!id || Number.isNaN(idNum)) {
-      toast.error("ID de torneo inválido.");
+      toast.error(t("tournaments.invalidId"));
       router.push("/tournaments");
       return;
     }
@@ -52,7 +55,7 @@ export default function TournamentDetail() {
 
       if (tError || !tData) {
         console.error("Error cargando torneo:", tError);
-        toast.error("No se pudo cargar el torneo.");
+        toast.error(t("tournaments.errorLoading"));
         router.push("/tournaments");
         return;
       }
@@ -71,7 +74,7 @@ export default function TournamentDetail() {
 
       if (mError) {
         console.error("Error cargando partidos:", mError);
-        toast.error("No se pudieron cargar los partidos del torneo.");
+        toast.error(t("matches.errorLoading"));
       } else {
         setMatches((mData || []) as Match[]);
       }
@@ -95,12 +98,25 @@ export default function TournamentDetail() {
     };
 
     load();
-  }, [id, idNum, router]);
+  }, [id, idNum, router, t]);
 
 
   const formatDate = (iso: string | null) => {
     if (!iso) return "-";
-    return new Date(iso).toLocaleDateString("es-ES");
+    return new Date(iso).toLocaleDateString(dateLocale);
+  };
+
+  const translateRoundName = (roundName: string) => {
+    const keyMap: Record<string, string> = {
+      "Fase de Grupos": "matches.filterRoundGroups",
+      Octavos: "tournaments.round16",
+      Cuartos: "matches.filterRoundQuarterfinals",
+      Semifinal: "matches.filterRoundSemifinal",
+      Final: "matches.filterRoundFinal",
+      "Sin ronda": "tournaments.noRound",
+    };
+    const key = keyMap[roundName];
+    return key ? t(key) : roundName;
   };
 
 
@@ -133,7 +149,7 @@ export default function TournamentDetail() {
   if (loading) {
     return (
       <main className="p-10 text-center">
-        Cargando cuadro...
+        {t("tournaments.detailLoading")}
       </main>
     );
   }
@@ -141,7 +157,7 @@ export default function TournamentDetail() {
   if (!tournament) {
     return (
       <main className="p-10 text-center">
-        No se encontró el torneo.
+        {t("tournaments.detailNotFound")}
       </main>
     );
   }
@@ -158,7 +174,7 @@ export default function TournamentDetail() {
               </h1>
               {tournament.category && (
                 <p className="text-sm text-gray-500 mt-1">
-                  Categoría: {tournament.category}
+                  {t("tournaments.category")}: {tournament.category}
                 </p>
               )}
               <p className="text-xs text-gray-400 mt-1">
@@ -168,7 +184,7 @@ export default function TournamentDetail() {
 
             {/* Badge simple usando SOLO prop label */}
             <div className="flex items-center md:items-end justify-start md:justify-end">
-              <Badge label="Cuadro de Partidos" />
+              <Badge label={t("tournaments.bracket")} />
             </div>
           </div>
         </section>
@@ -177,13 +193,13 @@ export default function TournamentDetail() {
         <section className="space-y-6">
           {sortedRounds.length === 0 ? (
             <p className="text-sm text-gray-500">
-              Aún no hay partidos cargados para este torneo.
+              {t("tournaments.noMatchesYet")}
             </p>
           ) : (
             sortedRounds.map((roundName) => (
               <div key={roundName} className="space-y-3">
                 <h2 className="text-sm md:text-base font-semibold text-gray-800">
-                  {roundName}
+                  {translateRoundName(roundName)}
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

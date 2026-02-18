@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import Card from "../components/Card";
+import { useTranslation } from "../i18n";
 
 type Player = {
   id: number;
@@ -23,6 +24,7 @@ type PlayerWithStats = Player & {
 };
 
 export default function StatsPage() {
+  const { t } = useTranslation();
   const [players, setPlayers] = useState<PlayerWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<"level" | "matches" | "winRate">("level");
@@ -108,13 +110,13 @@ export default function StatsPage() {
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-gray-500">Cargando estadísticas...</div>;
+    return <div className="p-8 text-center text-gray-500">{t("stats.loading")}</div>;
   }
 
   return (
     <main className="max-w-5xl mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">📈 Estadísticas Avanzadas</h1>
+        <h1 className="text-3xl font-bold">📈 {t("admin.analytics.title")}</h1>
         <div className="flex gap-2">
           <button
             onClick={() => setSortBy("level")}
@@ -124,7 +126,7 @@ export default function StatsPage() {
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
           >
-            Por Nivel
+            {t("stats.sortByLevel")}
           </button>
           <button
             onClick={() => setSortBy("matches")}
@@ -134,7 +136,7 @@ export default function StatsPage() {
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
           >
-            Por Partidos
+            {t("stats.sortByMatches")}
           </button>
           <button
             onClick={() => setSortBy("winRate")}
@@ -144,7 +146,7 @@ export default function StatsPage() {
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
           >
-            Por % Victorias
+            {t("stats.sortByWinRate")}
           </button>
         </div>
       </div>
@@ -154,13 +156,13 @@ export default function StatsPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-3 px-2">Jugador</th>
-                <th className="text-center py-3 px-2">Nivel</th>
-                <th className="text-center py-3 px-2">Partidos</th>
-                <th className="text-center py-3 px-2">Victorias</th>
-                <th className="text-center py-3 px-2">Derrotas</th>
-                <th className="text-center py-3 px-2">% Victorias</th>
-                <th className="text-center py-3 px-2">Acción</th>
+                <th className="text-left py-3 px-2">{t("stats.player")}</th>
+                <th className="text-center py-3 px-2">{t("stats.level")}</th>
+                <th className="text-center py-3 px-2">{t("stats.matchesPlayed")}</th>
+                <th className="text-center py-3 px-2">{t("stats.wins")}</th>
+                <th className="text-center py-3 px-2">{t("stats.losses")}</th>
+                <th className="text-center py-3 px-2">{t("stats.winRate")}</th>
+                <th className="text-center py-3 px-2">{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -210,7 +212,7 @@ export default function StatsPage() {
                         href={`/players/${player.id}`}
                         className="text-blue-600 hover:underline text-sm"
                       >
-                        Ver más
+                        {t("dashboard.viewMore")}
                       </Link>
                     </td>
                   </tr>
@@ -223,7 +225,7 @@ export default function StatsPage() {
 
       {players.length === 0 && (
         <Card className="p-8 text-center text-gray-500">
-          No hay jugadores aprobados aún
+          {t("stats.emptyApproved")}
         </Card>
       )}
     </main>

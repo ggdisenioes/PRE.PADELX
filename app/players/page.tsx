@@ -71,7 +71,7 @@ export default function PlayersPage() {
             setPlayers(data || []);
         }
         setLoading(false);
-    }, [role]);
+    }, [role, t]);
 
     useEffect(() => {
         if (roleLoading) return;
@@ -119,7 +119,7 @@ export default function PlayersPage() {
         .eq('id', playerId);
 
       if (error) {
-        toast.error(t("players.errorCreating"));
+        toast.error(t("admin.playersApproval.errorApproving", { name: playerName }));
         return;
       }
 
@@ -137,11 +137,11 @@ export default function PlayersPage() {
         metadata: { playerName },
       });
 
-      toast.success(t("players.saved"));
+      toast.success(t("admin.playersApproval.approved", { name: playerName }));
     };
 
     const handleReject = async (playerId: number, playerName: string) => {
-      if (!confirm(t("players.deleteConfirm"))) return;
+      if (!confirm(t("admin.playersApproval.confirmReject", { name: playerName }))) return;
 
       // Optimistic UI: lo quitamos primero
       setPlayers(prev => prev.filter(p => p.id !== playerId));
@@ -152,7 +152,7 @@ export default function PlayersPage() {
         .eq('id', playerId);
 
       if (error) {
-        toast.error(t("players.errorDeleting"));
+        toast.error(t("admin.playersApproval.errorRejecting", { name: playerName }));
         // rollback si falla
         fetchPlayers();
         return;
@@ -165,7 +165,7 @@ export default function PlayersPage() {
         metadata: { playerName },
       });
 
-      toast.success(t("players.deleted"));
+      toast.success(t("admin.playersApproval.rejectedDeleted", { name: playerName }));
     };
     
     const handleAdminDelete = async (playerId: number, playerName: string) => {
@@ -219,7 +219,7 @@ export default function PlayersPage() {
             {/* ENCABEZADO CON BOTÓN */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
-                    {role !== 'user' ? t("players.title") : t("players.title")}
+                    {t("players.title")}
                 </h2>
                 
                 <div className="flex w-full md:w-auto gap-3 items-stretch sm:items-center">
@@ -244,9 +244,9 @@ export default function PlayersPage() {
                         {pendingPlayers.map((player) => (
                             <Card key={player.id} className="p-4 flex flex-col justify-between border-l-4 border-l-yellow-500">
                                 <div>
-                                    <p className="font-bold">{player.name} <span className="text-xs text-yellow-600">(PENDIENTE)</span></p>
+                                    <p className="font-bold">{player.name} <span className="text-xs text-yellow-600">({t("common.pending").toUpperCase()})</span></p>
                                     <p className="text-sm text-gray-600 truncate">{player.email}</p>
-                                    <p className="text-sm text-gray-500 mt-1">Nivel: {player.level}</p>
+                                    <p className="text-sm text-gray-500 mt-1">{t("stats.level")}: {player.level}</p>
                                 </div>
                                 <div className="mt-3 flex gap-2">
                                     <button
@@ -254,14 +254,14 @@ export default function PlayersPage() {
                                         className="flex-1 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition"
                                         disabled={loading}
                                     >
-                                        {t("common.confirm")}
+                                        {t("admin.playersApproval.approve")}
                                     </button>
                                     <button
                                         onClick={() => handleReject(player.id, player.name)}
                                         className="flex-1 px-3 py-1 bg-red-100 text-red-700 text-sm rounded hover:bg-red-200 transition border border-red-200"
                                         disabled={loading}
                                     >
-                                        {t("common.rejected")}
+                                        {t("admin.playersApproval.reject")}
                                     </button>
                                 </div>
                             </Card>
@@ -270,7 +270,7 @@ export default function PlayersPage() {
                 </section>
             )}
 
-            <h3 className="text-xl font-bold text-gray-800 mb-4">{t("players.title")}</h3>
+            <h3 className="text-xl font-bold text-gray-800 mb-4">{t("players.approvedPlayers")}</h3>
 
             {/* CONTENIDO PRINCIPAL: Lista de Jugadores Aprobados */}
             {loading ? ( 
@@ -304,10 +304,10 @@ export default function PlayersPage() {
                                         />
                                         <div>
                                             <p className="font-bold group-hover:text-blue-600 transition">{player.name}</p>
-                                            <p className="text-sm text-gray-500">Nivel: {player.level}</p>
+                                            <p className="text-sm text-gray-500">{t("stats.level")}: {player.level}</p>
                                             {role === 'user' && (
                                               <p className="text-xs text-gray-400 mt-1">
-                                                Ver estadísticas →
+                                                {t("players.viewStats")}
                                               </p>
                                             )}
                                         </div>

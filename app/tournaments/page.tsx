@@ -22,10 +22,11 @@ type Tournament = {
 };
 
 export default function TournamentsPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const dateLocale = locale === "en" ? "en-US" : "es-ES";
 
   const STATUS_MAP = {
     en_curso: {
@@ -78,7 +79,7 @@ export default function TournamentsPage() {
     };
 
     load();
-  }, []);
+  }, [t]);
 
   const handleDeleteTournament = async (id: number) => {
     const confirmed = window.confirm(t("tournaments.deleteConfirm"));
@@ -90,7 +91,7 @@ export default function TournamentsPage() {
       return;
     }
 
-    setTournaments((prev) => prev.filter((tournament) => tournament.id !== id));
+    setTournaments((prev) => prev.filter((t) => t.id !== id));
     toast.success(t("tournaments.deleted"));
   };
 
@@ -103,7 +104,7 @@ export default function TournamentsPage() {
               {t("tournaments.title")}
             </h1>
             <p className="text-sm text-gray-500">
-              {t("tournaments.detail")}
+              {t("tournaments.subtitle")}
             </p>
           </div>
 
@@ -120,7 +121,7 @@ export default function TournamentsPage() {
         {/* Métricas */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
           <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-            <p className="text-xs text-gray-500">{t("tournaments.totalMatches")}</p>
+            <p className="text-xs text-gray-500">{t("tournaments.totalCount")}</p>
             <p className="text-2xl font-bold text-gray-900">{tournaments.length}</p>
           </div>
 
@@ -210,15 +211,15 @@ export default function TournamentsPage() {
                       <p className="text-lg font-bold text-gray-900">{tournament.played_matches}/{tournament.total_matches}</p>
                     </div>
                     <div className="bg-gray-50 rounded-xl p-3 text-center">
-                      <p className="text-xs text-gray-500">{t("tournaments.startDate")}</p>
+                      <p className="text-xs text-gray-500">{t("tournaments.startDateShort")}</p>
                       <p className="text-sm font-semibold text-gray-900">
-                        {tournament.start_date ? new Date(tournament.start_date).toLocaleDateString("es-ES") : "—"}
+                        {tournament.start_date ? new Date(tournament.start_date).toLocaleDateString(dateLocale) : "—"}
                       </p>
                     </div>
                     <div className="bg-gray-50 rounded-xl p-3 text-center">
-                      <p className="text-xs text-gray-500">{t("tournaments.endDate")}</p>
+                      <p className="text-xs text-gray-500">{t("tournaments.endDateShort")}</p>
                       <p className="text-sm font-semibold text-gray-900">
-                        {tournament.end_date ? new Date(tournament.end_date).toLocaleDateString("es-ES") : "—"}
+                        {tournament.end_date ? new Date(tournament.end_date).toLocaleDateString(dateLocale) : "—"}
                       </p>
                     </div>
                   </div>
@@ -248,7 +249,7 @@ export default function TournamentsPage() {
                       href={`/tournaments/edit/${tournament.id}`}
                       className="inline-flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 transition"
                     >
-                      {t("tournaments.detail")} →
+                      {t("common.details")} →
                     </Link>
 
                     {isAdmin && (

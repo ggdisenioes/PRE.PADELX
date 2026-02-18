@@ -223,8 +223,8 @@ export default function DashboardPage() {
           alertsList.push({
             id: `player-${p.id}`,
             type: "info",
-            message: `ℹ️ El jugador "${p.name}" aún no tiene partidos jugados.`,
-            actionLabel: "Asignar partido",
+            message: t("dashboard.playerWithoutMatches", { name: p.name }),
+            actionLabel: t("dashboard.assignMatch"),
             actionHref: `/matches/create?player=${p.id}`,
           });
         }
@@ -1190,7 +1190,7 @@ export default function DashboardPage() {
                   </p>
                 </>
               ) : (
-                <p className="text-sm text-white/60">Resultado todavía no cargado</p>
+                <p className="text-sm text-white/60">{t("dashboard.resultPending")}</p>
               )}
             </div>
 

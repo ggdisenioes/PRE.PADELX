@@ -6,6 +6,7 @@ import Card from "../components/Card";
 import { supabase } from "../lib/supabase";
 import { useRole } from "../hooks/useRole";
 import toast from "react-hot-toast";
+import { useTranslation } from "../i18n";
 
 type Court = {
   id: number;
@@ -16,6 +17,7 @@ type Court = {
 
 export default function CourtsPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { role, isAdmin, isManager, loading: roleLoading } = useRole();
 
   const normalizedRole = (role || "").toLowerCase();
@@ -44,9 +46,9 @@ export default function CourtsPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const title = useMemo(() => {
-    if (role === "user") return "Pistas disponibles";
-    return "Administrador de Pistas";
-  }, [role]);
+    if (role === "user") return t("courts.availableTitle");
+    return t("nav.courtAdmin");
+  }, [role, t]);
 
   const fetchCourts = async () => {
     setLoading(true);
@@ -57,7 +59,7 @@ export default function CourtsPage() {
 
     if (error) {
       console.error("[courts] fetch error", error);
-      toast.error("No se pudieron cargar las pistas. Revisá los permisos (RLS).", { duration: 5000 });
+      toast.error(t("courts.errorLoading"), { duration: 5000 });
       setCourts([]);
       setLoading(false);
       return;
@@ -91,13 +93,13 @@ export default function CourtsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canWrite) {
-      toast.error("No tenés permisos para crear pistas");
+      toast.error(t("courts.noPermissionCreate"));
       return;
     }
 
     const trimmed = name.trim();
     if (!trimmed) {
-      toast.error("Ingresá un nombre de pista");
+      toast.error(t("courts.nameRequired"));
       return;
     }
 
@@ -109,14 +111,14 @@ export default function CourtsPage() {
 
     if (error) {
       console.error("[courts] insert error", error);
-      toast.error(`No se pudo crear la pista: ${error.message}`);
+      toast.error(`${t("courts.errorCreating")}: ${error.message}`);
       setSaving(false);
       return;
     }
 
-    toast.success("Pista creada");
+    toast.success(t("courts.created"));
     setSaving(false);
-    setName("Pista " + (courts.length + 1));
+    setName(`${t("bookings.court")} ${courts.length + 1}`);
     setIsCovered(false);
     fetchCourts();
   };
@@ -139,7 +141,7 @@ export default function CourtsPage() {
 
     const trimmed = editName.trim();
     if (!trimmed) {
-      toast.error("Ingresá un nombre de pista");
+      toast.error(t("courts.nameRequired"));
       return;
     }
 
@@ -151,12 +153,12 @@ export default function CourtsPage() {
 
     if (error) {
       console.error("[courts] update error", error);
-      toast.error(`No se pudo editar la pista: ${error.message}`);
+      toast.error(`${t("courts.errorSaving")}: ${error.message}`);
       setSavingEdit(false);
       return;
     }
 
-    toast.success("Pista actualizada");
+    toast.success(t("courts.saved"));
     setSavingEdit(false);
     cancelEdit();
     fetchCourts();
@@ -164,11 +166,11 @@ export default function CourtsPage() {
 
   const deleteCourt = async (c: Court) => {
     if (!canDelete) {
-      toast.error("Solo un administrador puede eliminar pistas");
+      toast.error(t("courts.noPermissionDelete"));
       return;
     }
 
-    const ok = window.confirm(`¿Eliminar la pista "${c.name}"? Esta acción no se puede deshacer.`);
+    const ok = window.confirm(t("courts.deleteConfirmNamed", { name: c.name }));
     if (!ok) return;
 
     setDeletingId(c.id);
@@ -176,12 +178,12 @@ export default function CourtsPage() {
 
     if (error) {
       console.error("[courts] delete error", error);
-      toast.error(`No se pudo eliminar la pista: ${error.message}`);
+      toast.error(`${t("courts.errorDeleting")}: ${error.message}`);
       setDeletingId(null);
       return;
     }
 
-    toast.success("Pista eliminada");
+    toast.success(t("courts.deleted"));
     setDeletingId(null);
     // Si estaba en edición, salimos
     if (editingId === c.id) cancelEdit();
@@ -197,8 +199,8 @@ export default function CourtsPage() {
           </h1>
           <p className="mt-2 text-sm text-gray-600">
             {role === "user"
-              ? "Podés ver las pistas para reservar."
-              : "Creá y gestioná tus pistas. Los clientes las verán para reservar."}
+              ? t("courts.userSubtitle")
+              : t("courts.adminSubtitle")}
           </p>
         </div>
 
@@ -206,24 +208,24 @@ export default function CourtsPage() {
           <Card>
             <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">{t("common.name")}</label>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2"
-                  placeholder="Ej: Pista 1"
+                  placeholder={t("courts.namePlaceholder")}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">{t("courts.surface")}</label>
                 <select
                   value={isCovered ? "covered" : "open"}
                   onChange={(e) => setIsCovered(e.target.value === "covered")}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2"
                 >
-                  <option value="open">Descubierta</option>
-                  <option value="covered">Cubierta</option>
+                  <option value="open">{t("courts.uncovered")}</option>
+                  <option value="covered">{t("courts.covered")}</option>
                 </select>
               </div>
 
@@ -232,7 +234,7 @@ export default function CourtsPage() {
                 disabled={saving}
                 className="w-full rounded-lg bg-blue-600 text-white px-4 py-2 font-semibold hover:bg-blue-700 transition disabled:opacity-60"
               >
-                {saving ? "Creando..." : "Crear pista"}
+                {saving ? t("courts.creating") : t("courts.create")}
               </button>
             </form>
           </Card>
@@ -240,18 +242,18 @@ export default function CourtsPage() {
 
         <Card>
           {loading ? (
-            <p className="text-gray-400 text-center animate-pulse">Cargando pistas...</p>
+            <p className="text-gray-400 text-center animate-pulse">{t("courts.loading")}</p>
           ) : courts.length === 0 ? (
-            <p className="text-gray-500 text-center">Todavía no hay pistas creadas.</p>
+            <p className="text-gray-500 text-center">{t("courts.empty")}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-gray-500 border-b">
-                    <th className="py-2">Pista</th>
-                    <th className="py-2">Cubierta</th>
-                    <th className="py-2">Estado</th>
-                    {canWrite && <th className="py-2 text-right">Acciones</th>}
+                    <th className="py-2">{t("bookings.court")}</th>
+                    <th className="py-2">{t("courts.covered")}</th>
+                    <th className="py-2">{t("common.status")}</th>
+                    {canWrite && <th className="py-2 text-right">{t("common.actions")}</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -276,17 +278,17 @@ export default function CourtsPage() {
                             onChange={(e) => setEditCovered(e.target.value === "covered")}
                             className="w-full max-w-[180px] rounded-lg border border-gray-300 px-3 py-2"
                           >
-                            <option value="open">Descubierta</option>
-                            <option value="covered">Cubierta</option>
+                            <option value="open">{t("courts.uncovered")}</option>
+                            <option value="covered">{t("courts.covered")}</option>
                           </select>
                         ) : (
-                          c.is_covered ? "Sí" : "No"
+                          c.is_covered ? t("common.yes") : t("common.no")
                         )}
                       </td>
 
                       <td className="py-3">
                         <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-semibold text-green-700 border border-green-200">
-                          Libre
+                          {t("courts.available")}
                         </span>
                       </td>
 
@@ -300,7 +302,7 @@ export default function CourtsPage() {
                                 onClick={saveEdit}
                                 className="rounded-lg bg-blue-600 text-white px-3 py-2 text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-60"
                               >
-                                {savingEdit ? "Guardando..." : "Guardar"}
+                                {savingEdit ? t("common.loading") : t("common.save")}
                               </button>
                               <button
                                 type="button"
@@ -308,7 +310,7 @@ export default function CourtsPage() {
                                 onClick={cancelEdit}
                                 className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 transition disabled:opacity-60"
                               >
-                                Cancelar
+                                {t("common.cancel")}
                               </button>
                             </div>
                           ) : (
@@ -318,7 +320,7 @@ export default function CourtsPage() {
                                 onClick={() => startEdit(c)}
                                 className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 transition"
                               >
-                                Editar
+                                {t("common.edit")}
                               </button>
 
                               {canDelete && (
@@ -328,7 +330,7 @@ export default function CourtsPage() {
                                   onClick={() => deleteCourt(c)}
                                   className="rounded-lg bg-red-600 text-white px-3 py-2 text-sm font-semibold hover:bg-red-700 transition disabled:opacity-60"
                                 >
-                                  {deletingId === c.id ? "Eliminando..." : "Eliminar"}
+                                  {deletingId === c.id ? t("common.loading") : t("common.delete")}
                                 </button>
                               )}
                             </div>
