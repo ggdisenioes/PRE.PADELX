@@ -144,7 +144,18 @@
     "resultPending": "Resultado todavía no cargado",
     "won": "Ganó",
     "viewMore": "Ver más",
-    "noPermission": "No tenés permisos para acceder al panel."
+    "noPermission": "No tenés permisos para acceder al panel.",
+    "taskCenter": "Centro de tareas",
+    "pendingUserRequests": "Solicitudes pendientes",
+    "pendingMatchesTitle": "Partidos pendientes",
+    "overdueMatches": "Partidos atrasados",
+    "managePendingUsers": "Gestionar usuarios",
+    "noPendingUserRequests": "No hay solicitudes pendientes.",
+    "readyToScore": "Partidos para cargar resultado",
+    "noPendingMatches": "No hay partidos pendientes.",
+    "userApproved": "Usuario aprobado.",
+    "userRejected": "Usuario rechazado.",
+    "userActionError": "No se pudo actualizar el usuario."
   },
   "tournaments": {
     "title": "Torneos",

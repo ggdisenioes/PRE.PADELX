@@ -3,14 +3,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import html2canvas from "html2canvas";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useRole } from "@/hooks/useRole";
 import MatchCard from "@/components/matches/MatchCard";
 import toast from "react-hot-toast";
-import MatchShareCard from "./components/matches/MatchShareCard";
-import { formatTimeMadrid, formatDateTimeMadrid } from "@/lib/dates";
+import { formatDateMadrid, formatTimeMadrid, formatDateTimeMadrid } from "@/lib/dates";
 import { useTranslation } from "./i18n";
 
 type PlayerMap = {
@@ -61,6 +59,14 @@ type AlertItem = {
   actionHref?: string;
 };
 
+type PendingApprovalUser = {
+  id: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  created_at: string | null;
+};
+
 // --- Dashboard extra types ---
 type RankingItem = {
   player_id: number;
@@ -73,10 +79,25 @@ type RankingItem = {
   games_against: number;
 };
 
+type TournamentRankingRow = {
+  tournament_id: number;
+  player_id: number;
+  points: number;
+  matches_won: number;
+  matches_lost: number;
+  games_for: number;
+  games_against: number;
+  players: { name: string | null } | { name: string | null }[] | null;
+};
+
 type FinishedMatch = {
   id: number;
   tournament_id: number | null;
   start_time: string | null;
+  round_name?: string | null;
+  place?: string | null;
+  court?: string | null;
+  tournament_name?: string;
   score: string | null;
   winner: string | null;
   // Esquema anterior
@@ -94,25 +115,6 @@ type FinishedMatch = {
   created_at: string;
 };
 
-type RankingMatchRow = {
-  winner: "A" | "B" | string | null;
-  // Esquema anterior
-  player_1_a: number | null;
-  player_2_a: number | null;
-  player_1_b: number | null;
-  player_2_b: number | null;
-
-  // Nuevo esquema (amistosos)
-  player_1_a_id?: number | null;
-  player_2_a_id?: number | null;
-  player_1_b_id?: number | null;
-  player_2_b_id?: number | null;
-
-  score: string | null;
-  tournament_id: number | null;
-};
-
-
 export default function DashboardPage() {
   const { t } = useTranslation();
   const [countPlayers, setCountPlayers] = useState(0);
@@ -125,6 +127,11 @@ export default function DashboardPage() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const { isAdmin, isManager } = useRole();
   const isUser = !isAdmin && !isManager;
+  const canManageUsers = isAdmin || isManager;
+  const [pendingApprovalUsers, setPendingApprovalUsers] = useState<PendingApprovalUser[]>([]);
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+  const [overdueMatchesCount, setOverdueMatchesCount] = useState(0);
+  const [actingPendingUserId, setActingPendingUserId] = useState<string | null>(null);
 
   const [topRanking, setTopRanking] = useState<RankingItem[]>([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState<number | null>(null);
@@ -157,240 +164,324 @@ export default function DashboardPage() {
   };
 
 
-  // Función para calcular alertas inteligentes (estable para hooks/realtime)
-  const calculateAlerts = useCallback(async () => {
-    const alertsList: AlertItem[] = [];
-    const now = new Date();
+  // Función para calcular alertas inteligentes usando datasets ya cargados.
+  const calculateAlerts = useCallback(
+    ({
+      overdueCount,
+      tournaments,
+      players,
+      matchesLite,
+    }: {
+      overdueCount: number;
+      tournaments: Array<{ id: number; name: string }>;
+      players: Array<{ id: number; name: string }>;
+      matchesLite: Array<{
+        tournament_id: number | null;
+        player_1_a: number | null;
+        player_2_a: number | null;
+        player_1_b: number | null;
+        player_2_b: number | null;
+        player_1_a_id?: number | null;
+        player_2_a_id?: number | null;
+        player_1_b_id?: number | null;
+        player_2_b_id?: number | null;
+      }>;
+    }) => {
+      const alertsList: AlertItem[] = [];
 
-    // 1️⃣ Partido atrasado
-    const { data: overdueMatches, error: overdueErr } = await supabase
-      .from("matches")
-      .select("id, start_time")
-      .eq("winner", "pending")
-      .lt("start_time", now.toISOString());
+      if (overdueCount > 0) {
+        alertsList.push({
+          id: "overdue-matches",
+          type: "warning",
+          message: `⚠️ Hay ${overdueCount} partido(s) atrasado(s) sin resultado.`,
+          actionLabel: t("matches.loadResult"),
+          actionHref: "/matches?status=pending",
+        });
+      }
 
-    if (!overdueErr && overdueMatches && overdueMatches.length > 0) {
-      alertsList.push({
-        id: "overdue-matches",
-        type: "warning",
-        message: `⚠️ Hay ${overdueMatches.length} partido(s) atrasado(s) sin resultado.`,
-        actionLabel: "Cargar resultados",
-        actionHref: "/matches?status=pending",
-      });
-    }
+      const tournamentsWithMatches = new Set<number>();
+      const playersWithMatches = new Set<number>();
 
-    // 2️⃣ Torneos sin partidos
-    const { data: tournaments, error: tErr } = await supabase
-      .from("tournaments")
-      .select("id, name");
+      for (const match of matchesLite) {
+        const tournamentId = Number(match.tournament_id);
+        if (Number.isFinite(tournamentId) && tournamentId > 0) {
+          tournamentsWithMatches.add(tournamentId);
+        }
 
-    if (!tErr && tournaments) {
-      for (const t of tournaments) {
-        const { count } = await supabase
-          .from("matches")
-          .select("*", { count: "exact", head: true })
-          .eq("tournament_id", t.id);
+        const participantIdsRaw = [
+          match.player_1_a ?? match.player_1_a_id,
+          match.player_2_a ?? match.player_2_a_id,
+          match.player_1_b ?? match.player_1_b_id,
+          match.player_2_b ?? match.player_2_b_id,
+        ];
 
-        if (!count || count === 0) {
+        for (const rawId of participantIdsRaw) {
+          const id = Number(rawId);
+          if (Number.isFinite(id) && id > 0) playersWithMatches.add(id);
+        }
+      }
+
+      for (const tournament of tournaments) {
+        const tournamentId = Number(tournament.id);
+        if (!Number.isFinite(tournamentId) || !tournamentsWithMatches.has(tournamentId)) {
           alertsList.push({
-            id: `tournament-${t.id}`,
+            id: `tournament-${tournament.id}`,
             type: "info",
-            message: `ℹ️ El torneo "${t.name}" no tiene partidos cargados.`,
-            actionLabel: "Crear partido",
-            actionHref: `/matches/create?tournament=${t.id}`,
+            message: `ℹ️ El torneo "${tournament.name}" no tiene partidos cargados.`,
+            actionLabel: t("matches.createManual"),
+            actionHref: `/matches/create?tournament=${tournament.id}`,
           });
         }
       }
-    }
 
-    // 3️⃣ Jugadores inactivos
-    const { data: players, error: pErr } = await supabase
-      .from("players")
-      .select("id, name")
-      .eq("is_approved", true);
-
-    if (!pErr && players) {
-      for (const p of players) {
-        const { count } = await supabase
-          .from("matches")
-          .select("*", { count: "exact", head: true })
-          .or(
-            `player_1_a.eq.${p.id},player_2_a.eq.${p.id},player_1_b.eq.${p.id},player_2_b.eq.${p.id},` +
-            `player_1_a_id.eq.${p.id},player_2_a_id.eq.${p.id},player_1_b_id.eq.${p.id},player_2_b_id.eq.${p.id}`
-          );
-
-        if (!count || count === 0) {
-          alertsList.push({
-            id: `player-${p.id}`,
-            type: "info",
-            message: t("dashboard.playerWithoutMatches", { name: p.name }),
-            actionLabel: t("dashboard.assignMatch"),
-            actionHref: `/matches/create?player=${p.id}`,
-          });
-        }
+      for (const player of players) {
+        const playerId = Number(player.id);
+        if (!Number.isFinite(playerId) || playersWithMatches.has(playerId)) continue;
+        alertsList.push({
+          id: `player-${player.id}`,
+          type: "info",
+          message: t("dashboard.playerWithoutMatches", { name: player.name }),
+          actionLabel: t("dashboard.assignMatch"),
+          actionHref: `/matches/create?player=${player.id}`,
+        });
       }
+
+      setAlerts(alertsList.slice(0, 4));
+    },
+    [t]
+  );
+
+  const loadPendingApprovalUsers = useCallback(async () => {
+    if (!canManageUsers) {
+      setPendingApprovalUsers([]);
+      setPendingApprovalCount(0);
+      return;
     }
 
-    setAlerts(alertsList.slice(0, 4));
-  }, []);
+    const { data, count, error } = await supabase
+      .from("profiles")
+      .select("id,email,first_name,last_name,created_at", { count: "exact" })
+      .eq("approval_status", "pending")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true })
+      .limit(4);
 
+    if (error) {
+      console.error("[dashboard] pending users error:", error);
+      return;
+    }
+
+    setPendingApprovalUsers((data as PendingApprovalUser[]) || []);
+    setPendingApprovalCount(count || 0);
+  }, [canManageUsers]);
 
   useEffect(() => {
+    let active = true;
+
     const loadData = async () => {
-      // 1) Contadores
-      const [{ count: pendingCount }, { count: playersCount }, { count: tournamentsCount }] =
-        await Promise.all([
+      setLoadingDashboard(true);
+
+      try {
+        const start7d = new Date();
+        start7d.setDate(start7d.getDate() - 6);
+        start7d.setHours(0, 0, 0, 0);
+        const nowIso = new Date().toISOString();
+
+        const [
+          { data: playersData, error: playersErr },
+          { data: tournamentsData, error: tournamentsErr },
+          { data: pendingMatches, count: pendingCount, error: pendingErr },
+          { data: matches7d, error: m7Err },
+          { data: finishedMatches, error: finishedErr },
+          { data: logs, error: logsErr },
+          { data: matchesLite, error: matchesLiteErr },
+          { count: overdueCount, error: overdueErr },
+        ] = await Promise.all([
+          supabase.from("players").select("id, name").eq("is_approved", true),
+          supabase.from("tournaments").select("id, name"),
           supabase
             .from("matches")
-            .select("*", { count: "exact", head: true })
-            .eq("winner", "pending"),
+            .select(
+              "id, start_time, tournament_id, round_name, place, court, player_1_a, player_2_a, player_1_b, player_2_b, player_1_a_id, player_2_a_id, player_1_b_id, player_2_b_id, winner, score",
+              { count: "exact" }
+            )
+            .eq("winner", "pending")
+            .order("start_time", { ascending: true })
+            .limit(5),
           supabase
-            .from("players")
-            .select("*", { count: "exact", head: true })
-            .eq("is_approved", true),
-          supabase.from("tournaments").select("*", { count: "exact", head: true }),
+            .from("matches")
+            .select("start_time, winner")
+            .gte("start_time", start7d.toISOString()),
+          supabase
+            .from("matches")
+            .select("id, tournament_id, start_time, round_name, place, court, score, winner, player_1_a, player_2_a, player_1_b, player_2_b, player_1_a_id, player_2_a_id, player_1_b_id, player_2_b_id, created_at")
+            .neq("winner", "pending")
+            .order("created_at", { ascending: false })
+            .limit(5),
+          supabase
+            .from("action_logs")
+            .select("id, action, entity, entity_id, user_email, created_at")
+            .order("created_at", { ascending: false })
+            .limit(6),
+          supabase
+            .from("matches")
+            .select("tournament_id, player_1_a, player_2_a, player_1_b, player_2_b, player_1_a_id, player_2_a_id, player_1_b_id, player_2_b_id"),
+          supabase
+            .from("matches")
+            .select("id", { count: "exact", head: true })
+            .eq("winner", "pending")
+            .lt("start_time", nowIso),
         ]);
 
-      setCountPendingMatches(pendingCount || 0);
-      setCountPlayers(playersCount || 0);
-      setCountTournaments(tournamentsCount || 0);
+        if (!active) return;
 
-      // 2) Jugadores (mapa id -> nombre)
-      const { data: players } = await supabase
-        .from("players")
-        .select("id, name")
-        .eq("is_approved", true);
+        if (playersErr) console.error("[dashboard] players error:", playersErr);
+        if (tournamentsErr) console.error("[dashboard] tournaments error:", tournamentsErr);
+        if (pendingErr) console.error("[dashboard] pending matches error:", pendingErr);
+        if (m7Err) console.error("[dashboard] chart matches error:", m7Err);
+        if (finishedErr) console.error("[dashboard] finished matches error:", finishedErr);
+        if (logsErr) console.error("[dashboard] logs error:", logsErr);
+        if (matchesLiteErr) console.error("[dashboard] matches lite error:", matchesLiteErr);
+        if (overdueErr) console.error("[dashboard] overdue count error:", overdueErr);
 
-      const pMap: PlayerMap = {};
-      (players || []).forEach((p: { id: number; name: string }) => {
-        pMap[p.id] = p.name;
-      });
-      setPlayerMap(pMap);
-      // Guardamos el mapa local para usarlo en el ranking (evita estado stale)
-      const localPlayerMap = pMap;
+        const approvedPlayers = (playersData || []) as Array<{ id: number; name: string }>;
+        const tournaments = (tournamentsData || []) as Array<{ id: number; name: string }>;
 
-      // 3) Torneos (mapa id -> nombre)
-      const { data: tournaments } = await supabase
-        .from("tournaments")
-        .select("id, name");
-
-      const tMap: TournamentMap = {};
-      (tournaments || []).forEach((t: { id: number; name: string }) => {
-        tMap[t.id] = t.name;
-      });
-      setTournamentMap(tMap);
-
-      // 4) Partidos pendientes
-      const { data: matches } = await supabase
-        .from("matches")
-        .select(
-          "id, start_time, tournament_id, round_name, place, court, player_1_a, player_2_a, player_1_b, player_2_b, player_1_a_id, player_2_a_id, player_1_b_id, player_2_b_id, winner, score"
-        )
-        .eq("winner", "pending")
-        .order("start_time", { ascending: true })
-        .limit(5);
-
-      setUpcomingMatches((matches || []).map((m: any) => normalizePlayersFromIds(m)));
-
-      // 4.25) Gráfico simple (últimos 7 días): partidos pendientes vs finalizados
-      const start7d = new Date();
-      start7d.setDate(start7d.getDate() - 6);
-      start7d.setHours(0, 0, 0, 0);
-
-      const { data: matches7d, error: m7Err } = await supabase
-        .from("matches")
-        .select("start_time, winner")
-        .gte("start_time", start7d.toISOString());
-
-      const days: { key: string; date: Date; label: string }[] = [];
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(start7d);
-        d.setDate(start7d.getDate() + i);
-        const key = d.toISOString().slice(0, 10);
-        const label = d.toLocaleDateString("es-ES", { weekday: "short" });
-        days.push({ key, date: d, label });
-      }
-
-      const byDay: Record<
-        string,
-        { key: string; label: string; pending: number; finished: number; total: number }
-      > = {};
-      days.forEach((d) => {
-        byDay[d.key] = { key: d.key, label: d.label, pending: 0, finished: 0, total: 0 };
-      });
-
-      if (!m7Err && matches7d) {
-        for (const row of matches7d as { start_time: string | null; winner: string | null }[]) {
-          if (!row.start_time) continue;
-          const k = new Date(row.start_time).toISOString().slice(0, 10);
-          if (!byDay[k]) continue;
-
-          const isPending = !row.winner || String(row.winner).toLowerCase() === "pending";
-          if (isPending) byDay[k].pending += 1;
-          else byDay[k].finished += 1;
-          byDay[k].total += 1;
+        const pMap: PlayerMap = {};
+        for (const player of approvedPlayers) {
+          pMap[player.id] = player.name;
         }
+        setPlayerMap(pMap);
+
+        const tMap: TournamentMap = {};
+        for (const tournament of tournaments) {
+          tMap[tournament.id] = tournament.name;
+        }
+        setTournamentMap(tMap);
+
+        setCountPendingMatches(pendingCount || 0);
+        setCountPlayers(approvedPlayers.length);
+        setCountTournaments(tournaments.length);
+
+        setUpcomingMatches((pendingMatches || []).map((m: any) => normalizePlayersFromIds(m)));
+        setRecentResults((finishedMatches || []).map((m: any) => normalizePlayersFromIds(m)));
+        setRecentLogs(logs || []);
+        setOverdueMatchesCount(overdueCount || 0);
+
+        const days: { key: string; label: string }[] = [];
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(start7d);
+          d.setDate(start7d.getDate() + i);
+          days.push({
+            key: d.toISOString().slice(0, 10),
+            label: d.toLocaleDateString("es-ES", { weekday: "short" }),
+          });
+        }
+
+        const byDay: Record<string, { key: string; label: string; pending: number; finished: number; total: number }> = {};
+        for (const d of days) {
+          byDay[d.key] = { key: d.key, label: d.label, pending: 0, finished: 0, total: 0 };
+        }
+
+        for (const row of (matches7d || []) as { start_time: string | null; winner: string | null }[]) {
+          if (!row.start_time) continue;
+          const key = new Date(row.start_time).toISOString().slice(0, 10);
+          if (!byDay[key]) continue;
+          const isPending = !row.winner || String(row.winner).toLowerCase() === "pending";
+          if (isPending) byDay[key].pending += 1;
+          else byDay[key].finished += 1;
+          byDay[key].total += 1;
+        }
+
+        setChart7d(days.map((d) => byDay[d.key]));
+
+        calculateAlerts({
+          overdueCount: overdueCount || 0,
+          tournaments,
+          players: approvedPlayers,
+          matchesLite: (matchesLite || []) as Array<{
+            tournament_id: number | null;
+            player_1_a: number | null;
+            player_2_a: number | null;
+            player_1_b: number | null;
+            player_2_b: number | null;
+            player_1_a_id?: number | null;
+            player_2_a_id?: number | null;
+            player_1_b_id?: number | null;
+            player_2_b_id?: number | null;
+          }>,
+        });
+
+        await loadPendingApprovalUsers();
+      } catch (error) {
+        console.error("[dashboard] loadData error:", error);
+      } finally {
+        if (active) setLoadingDashboard(false);
       }
+    };
 
-      setChart7d(days.map((d) => byDay[d.key]));
+    void loadData();
 
-      // 4.5) Resultados recientes
-      const { data: finishedMatches } = await supabase
-        .from("matches")
-        .select("id, tournament_id, start_time, round_name, court, score, winner, player_1_a, player_2_a, player_1_b, player_2_b, player_1_a_id, player_2_a_id, player_1_b_id, player_2_b_id, created_at")
-        .neq("winner", "pending")
-        .order("created_at", { ascending: false })
-        .limit(5);
+    return () => {
+      active = false;
+    };
+  }, [calculateAlerts, loadPendingApprovalUsers]);
 
-      setRecentResults((finishedMatches || []).map((m: any) => normalizePlayersFromIds(m)));
+  useEffect(() => {
+    let active = true;
 
-      // 5) Logs iniciales
-      const { data: logs } = await supabase
-        .from("action_logs")
-        .select("id, action, entity, entity_id, user_email, created_at")
-        .order("created_at", { ascending: false })
-        .limit(6);
-
-      setRecentLogs(logs || []);
-
-      // 5.5) Ranking real (3 pts victoria, 1 pt derrota)
-      const { data: rankingMatches } = await supabase
+    const buildRankingFromMatchesFallback = async () => {
+      let matchesQuery = supabase
         .from("matches")
         .select("winner, player_1_a, player_2_a, player_1_b, player_2_b, player_1_a_id, player_2_a_id, player_1_b_id, player_2_b_id, score, tournament_id")
         .neq("winner", "pending");
 
-      // Filter by tournament if selected
-      const filteredRankingMatches = selectedTournamentId
-        ? (rankingMatches || []).filter((m) => m.tournament_id === selectedTournamentId)
-        : rankingMatches || [];
+      if (selectedTournamentId) {
+        matchesQuery = matchesQuery.eq("tournament_id", selectedTournamentId);
+      }
 
-      const normalizedRankingMatches = filteredRankingMatches.map((m: any) => normalizePlayersFromIds(m));
+      const { data: rankingMatches, error: rankingMatchesError } = await matchesQuery;
+      if (!active) return;
+      if (rankingMatchesError) {
+        console.error("[dashboard] ranking fallback error:", rankingMatchesError);
+        setTopRanking([]);
+        return;
+      }
 
       const rankingMap: Record<number, RankingItem> = {};
+      for (const match of (rankingMatches || []) as Array<{
+        winner: string | null;
+        player_1_a: number | null;
+        player_2_a: number | null;
+        player_1_b: number | null;
+        player_2_b: number | null;
+        player_1_a_id?: number | null;
+        player_2_a_id?: number | null;
+        player_1_b_id?: number | null;
+        player_2_b_id?: number | null;
+        score: string | null;
+      }>) {
+        const normalized = normalizePlayersFromIds(match);
+        const teamA = [normalized.player_1_a, normalized.player_2_a].filter(Boolean) as number[];
+        const teamB = [normalized.player_1_b, normalized.player_2_b].filter(Boolean) as number[];
+        const winners = normalized.winner === "A" ? teamA : normalized.winner === "B" ? teamB : [];
+        const losers = normalized.winner === "A" ? teamB : normalized.winner === "B" ? teamA : [];
 
-      (normalizedRankingMatches).forEach((m: RankingMatchRow) => {
-        const teamA = [m.player_1_a, m.player_2_a].filter(Boolean) as number[];
-        const teamB = [m.player_1_b, m.player_2_b].filter(Boolean) as number[];
-
-        const winners = m.winner === "A" ? teamA : m.winner === "B" ? teamB : [];
-        const losers = m.winner === "A" ? teamB : m.winner === "B" ? teamA : [];
-
-        // Parse score for games_for/games_against
-        // Accepts "6-4", "6 4", "6:4", "6,4" etc, only first two numbers
-        let teamAScore = 0, teamBScore = 0;
-        if (typeof m.score === "string") {
-          const match = m.score.match(/(\d+)[\s\-:,]+(\d+)/);
-          if (match) {
-            teamAScore = parseInt(match[1], 10);
-            teamBScore = parseInt(match[2], 10);
+        let teamAScore = 0;
+        let teamBScore = 0;
+        if (typeof normalized.score === "string") {
+          const scoreMatch = normalized.score.match(/(\d+)[\s\-:,]+(\d+)/);
+          if (scoreMatch) {
+            teamAScore = parseInt(scoreMatch[1], 10);
+            teamBScore = parseInt(scoreMatch[2], 10);
           }
         }
-        // Winners
-        winners.forEach((pid) => {
-          if (!rankingMap[pid]) {
-            rankingMap[pid] = {
-              player_id: pid,
-              name: localPlayerMap[pid] || `Jugador ${pid}`,
+
+        for (const playerId of winners) {
+          if (!rankingMap[playerId]) {
+            rankingMap[playerId] = {
+              player_id: playerId,
+              name: playerMap[playerId] || `Jugador ${playerId}`,
               points: 0,
               wins: 0,
               played: 0,
@@ -399,24 +490,23 @@ export default function DashboardPage() {
               games_against: 0,
             };
           }
-          rankingMap[pid].wins += 1;
-          rankingMap[pid].points += 3;
-          rankingMap[pid].played += 1;
-          // Games for/against
-          if (m.winner === "A") {
-            rankingMap[pid].games_for += teamAScore;
-            rankingMap[pid].games_against += teamBScore;
-          } else if (m.winner === "B") {
-            rankingMap[pid].games_for += teamBScore;
-            rankingMap[pid].games_against += teamAScore;
+          rankingMap[playerId].wins += 1;
+          rankingMap[playerId].points += 3;
+          rankingMap[playerId].played += 1;
+          if (normalized.winner === "A") {
+            rankingMap[playerId].games_for += teamAScore;
+            rankingMap[playerId].games_against += teamBScore;
+          } else {
+            rankingMap[playerId].games_for += teamBScore;
+            rankingMap[playerId].games_against += teamAScore;
           }
-        });
-        // Losers
-        losers.forEach((pid) => {
-          if (!rankingMap[pid]) {
-            rankingMap[pid] = {
-              player_id: pid,
-              name: localPlayerMap[pid] || `Jugador ${pid}`,
+        }
+
+        for (const playerId of losers) {
+          if (!rankingMap[playerId]) {
+            rankingMap[playerId] = {
+              player_id: playerId,
+              name: playerMap[playerId] || `Jugador ${playerId}`,
               points: 0,
               wins: 0,
               played: 0,
@@ -425,23 +515,86 @@ export default function DashboardPage() {
               games_against: 0,
             };
           }
-          rankingMap[pid].points += 1;
-          rankingMap[pid].played += 1;
-          rankingMap[pid].losses += 1;
-          // Games for/against
-          if (m.winner === "A") {
-            rankingMap[pid].games_for += teamBScore;
-            rankingMap[pid].games_against += teamAScore;
-          } else if (m.winner === "B") {
-            rankingMap[pid].games_for += teamAScore;
-            rankingMap[pid].games_against += teamBScore;
+          rankingMap[playerId].losses += 1;
+          rankingMap[playerId].points += 1;
+          rankingMap[playerId].played += 1;
+          if (normalized.winner === "A") {
+            rankingMap[playerId].games_for += teamBScore;
+            rankingMap[playerId].games_against += teamAScore;
+          } else {
+            rankingMap[playerId].games_for += teamAScore;
+            rankingMap[playerId].games_against += teamBScore;
           }
-        });
-      });
+        }
+      }
 
       setTopRanking(
-        Object.values(rankingMap)
-          .sort((a, b) => {
+        Object.values(rankingMap).sort((a, b) => {
+          if (b.points !== a.points) return b.points - a.points;
+          const diffA = a.games_for - a.games_against;
+          const diffB = b.games_for - b.games_against;
+          if (diffB !== diffA) return diffB - diffA;
+          if (b.games_for !== a.games_for) return b.games_for - a.games_for;
+          return b.wins - a.wins;
+        })
+      );
+    };
+
+    const loadRanking = async () => {
+      try {
+        let query = supabase
+          .from("tournament_rankings")
+          .select("tournament_id, player_id, points, matches_won, matches_lost, games_for, games_against, players(name)");
+
+        if (selectedTournamentId) {
+          query = query.eq("tournament_id", selectedTournamentId);
+        }
+
+        const { data, error } = await query;
+        if (!active) return;
+
+        if (error) {
+          console.error("[dashboard] ranking error:", error);
+          await buildRankingFromMatchesFallback();
+          return;
+        }
+
+        const rankingMap: Record<number, RankingItem> = {};
+
+        for (const row of (data || []) as TournamentRankingRow[]) {
+          const playerId = Number(row.player_id);
+          if (!Number.isFinite(playerId)) continue;
+
+          const relation = Array.isArray(row.players) ? row.players[0] : row.players;
+          const resolvedName =
+            relation?.name ||
+            playerMap[playerId] ||
+            `Jugador ${playerId}`;
+
+          if (!rankingMap[playerId]) {
+            rankingMap[playerId] = {
+              player_id: playerId,
+              name: resolvedName,
+              points: 0,
+              wins: 0,
+              played: 0,
+              losses: 0,
+              games_for: 0,
+              games_against: 0,
+            };
+          }
+
+          rankingMap[playerId].points += Number(row.points) || 0;
+          rankingMap[playerId].wins += Number(row.matches_won) || 0;
+          rankingMap[playerId].losses += Number(row.matches_lost) || 0;
+          rankingMap[playerId].games_for += Number(row.games_for) || 0;
+          rankingMap[playerId].games_against += Number(row.games_against) || 0;
+          rankingMap[playerId].played =
+            rankingMap[playerId].wins + rankingMap[playerId].losses;
+        }
+
+        setTopRanking(
+          Object.values(rankingMap).sort((a, b) => {
             if (b.points !== a.points) return b.points - a.points;
             const diffA = a.games_for - a.games_against;
             const diffB = b.games_for - b.games_against;
@@ -449,16 +602,18 @@ export default function DashboardPage() {
             if (b.games_for !== a.games_for) return b.games_for - a.games_for;
             return b.wins - a.wins;
           })
-      );
-
-      // 6) Alertas inteligentes
-      await calculateAlerts();
-
-      setLoadingDashboard(false);
+        );
+      } catch (error) {
+        console.error("[dashboard] loadRanking error:", error);
+      }
     };
 
-    loadData();
-  }, [calculateAlerts, selectedTournamentId]);
+    void loadRanking();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedTournamentId, playerMap]);
 
 
   useEffect(() => {
@@ -537,6 +692,35 @@ export default function DashboardPage() {
     };
   }, []);
 
+  const getPendingUserDisplayName = (user: PendingApprovalUser) => {
+    const full = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+    return full || user.email || user.id;
+  };
+
+  const handlePendingUserAction = async (
+    userId: string,
+    action: "approve" | "reject"
+  ) => {
+    setActingPendingUserId(userId);
+    try {
+      const rpcName = action === "approve" ? "approve_user" : "reject_user";
+      const { error } = await supabase.rpc(rpcName, { p_user_id: userId });
+      if (error) throw error;
+
+      toast.success(
+        action === "approve"
+          ? t("dashboard.userApproved")
+          : t("dashboard.userRejected")
+      );
+      await loadPendingApprovalUsers();
+    } catch (error) {
+      console.error("[dashboard] pending user action error:", error);
+      toast.error(t("dashboard.userActionError"));
+    } finally {
+      setActingPendingUserId(null);
+    }
+  };
+
 
   const getPlayerName = (id: number | null) =>
     id && playerMap[id] ? playerMap[id] : id ? `ID ${id}` : "-";
@@ -552,7 +736,7 @@ export default function DashboardPage() {
   const buildTeamNameFromIds = (p1: number | null, p2: number | null) => {
     const a = getPlayerName(p1);
     const b = getPlayerName(p2);
-    const joined = [a, b].filter((x) => x && x !== "-").join(" / ");
+    const joined = [a, b].filter((x) => x && x !== "-").join(" y ");
     return joined || "Por definir";
   };
 
@@ -565,33 +749,6 @@ export default function DashboardPage() {
     if (m.winner === "B") return { winnerTeam: teamB, loserTeam: teamA, score };
     return { winnerTeam: teamA, loserTeam: teamB, score };
   };
-
-  // Helper: Genera PNG desde el shareCardRef usando html2canvas (devuelve Blob + URL)
-  const generatePngFromShareRef = async () => {
-  if (!shareCardRef.current) return null;
-
-  try {
-    const canvas = await html2canvas(shareCardRef.current, {
-      backgroundColor: "#020617",
-      scale: 2,
-      useCORS: true,
-      foreignObjectRendering: true,
-    } as any);
-
-    const blob: Blob | null = await new Promise((resolve) => {
-      canvas.toBlob((b) => resolve(b), "image/png");
-    });
-
-    if (!blob) return null;
-
-    const url = URL.createObjectURL(blob);
-    return { blob, url };
-  } catch (err) {
-    console.error("Error generando imagen:", err);
-    return null;
-  }
-};
-
 
   if (isUser) {
     // Usuario cliente: solo vista informativa
@@ -982,6 +1139,143 @@ export default function DashboardPage() {
 
           {/* COLUMNA DERECHA */}
           <aside className="lg:col-span-4 space-y-6">
+            {/* CENTRO DE TAREAS */}
+            {canManageUsers && (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                    {t("dashboard.taskCenter")}
+                  </h2>
+                  <span className="text-xs font-semibold text-gray-500">
+                    {pendingApprovalCount + countPendingMatches + overdueMatchesCount}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-2 mb-4">
+                  <Link
+                    href="/admin/users"
+                    className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 flex items-center justify-between"
+                  >
+                    <span className="text-xs font-semibold text-indigo-700">
+                      {t("dashboard.pendingUserRequests")}
+                    </span>
+                    <span className="text-xs font-bold text-indigo-800">{pendingApprovalCount}</span>
+                  </Link>
+                  <Link
+                    href="/matches?status=pending"
+                    className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 flex items-center justify-between"
+                  >
+                    <span className="text-xs font-semibold text-yellow-700">
+                      {t("dashboard.pendingMatchesTitle")}
+                    </span>
+                    <span className="text-xs font-bold text-yellow-800">{countPendingMatches}</span>
+                  </Link>
+                  <Link
+                    href="/matches?status=pending"
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 flex items-center justify-between"
+                  >
+                    <span className="text-xs font-semibold text-red-700">
+                      {t("dashboard.overdueMatches")}
+                    </span>
+                    <span className="text-xs font-bold text-red-800">{overdueMatchesCount}</span>
+                  </Link>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      {t("dashboard.pendingUserRequests")}
+                    </p>
+                    <Link
+                      href="/admin/users"
+                      className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700"
+                    >
+                      {t("dashboard.managePendingUsers")} →
+                    </Link>
+                  </div>
+
+                  {pendingApprovalUsers.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
+                      {t("dashboard.noPendingUserRequests")}
+                    </p>
+                  ) : (
+                    pendingApprovalUsers.map((user) => (
+                      <div
+                        key={user.id}
+                        className="rounded-lg border border-gray-200 p-3 space-y-2"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 truncate">
+                              {getPendingUserDisplayName(user)}
+                            </p>
+                            <p className="text-[11px] text-gray-500 truncate">
+                              {user.email || user.id}
+                            </p>
+                          </div>
+                          {user.created_at && (
+                            <span className="text-[11px] text-gray-400 shrink-0">
+                              {formatDateMadrid(user.created_at)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void handlePendingUserAction(user.id, "approve")}
+                            disabled={actingPendingUserId === user.id}
+                            className="flex-1 rounded-md bg-green-600 text-white py-1.5 text-xs font-semibold hover:bg-green-700 transition disabled:opacity-50"
+                          >
+                            {t("admin.playersApproval.approve")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handlePendingUserAction(user.id, "reject")}
+                            disabled={actingPendingUserId === user.id}
+                            className="flex-1 rounded-md bg-red-600 text-white py-1.5 text-xs font-semibold hover:bg-red-700 transition disabled:opacity-50"
+                          >
+                            {t("admin.playersApproval.reject")}
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    {t("dashboard.readyToScore")}
+                  </p>
+                  {upcomingMatches.slice(0, 3).map((m) => (
+                    <div
+                      key={m.id}
+                      className="rounded-lg border border-gray-200 p-3 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs text-gray-800 truncate">
+                          {buildTeamNameFromIds(m.player_1_a, m.player_2_a)}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {buildTeamNameFromIds(m.player_1_b, m.player_2_b)}
+                        </p>
+                      </div>
+                      <Link
+                        href={`/matches/score/${m.id}`}
+                        className="shrink-0 rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
+                      >
+                        {t("matches.loadResult")}
+                      </Link>
+                    </div>
+                  ))}
+                  {upcomingMatches.length === 0 && (
+                    <p className="rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
+                      {t("dashboard.noPendingMatches")}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* ACCIONES RÁPIDAS */}
             {(isAdmin || isManager) && (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
@@ -1113,33 +1407,162 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      {/* Render oculto para generar imagen (Instagram 1:1) */}
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: -10000,
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      >
-        {openResultMatch && isPlayed(openResultMatch) && (
-          <div ref={shareCardRef}>
-            {(() => {
-              const t = getWinnerLoserTeams(openResultMatch);
-              return (
-                <MatchShareCard
-                  winnerTeam={t.winnerTeam}
-                  loserTeam={t.loserTeam}
-                  score={t.score}
-                />
-              );
-            })()}
-          </div>
-        )}
-      </div>
+      {openResultMatch && isPlayed(openResultMatch) && (() => {
+        const match = openResultMatch;
+        const result = getWinnerLoserTeams(match);
+        const matchType = match.tournament_id
+          ? match.tournament_name || tournamentMap[match.tournament_id] || t("matches.typeTournament")
+          : t("matches.friendlyMatchLabel");
+        const dateStr = match.start_time ? formatDateMadrid(match.start_time) : "";
+        const timeStr = match.start_time ? formatTimeMadrid(match.start_time) : "";
+        const courtPlace = [match.court, match.place].filter(Boolean).join(" · ");
 
-      {openResultMatch && (
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 relative shadow-2xl">
+              <button
+                onClick={() => setOpenResultMatch(null)}
+                className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl"
+              >
+                ✕
+              </button>
+
+              <div style={{ overflow: "hidden", borderRadius: 16 }}>
+                <div
+                  ref={shareCardRef}
+                  style={{
+                    width: 480,
+                    height: 520,
+                    backgroundColor: "#0b1220",
+                    borderRadius: 0,
+                    padding: "28px 32px",
+                    color: "#fff",
+                    fontFamily: "system-ui, -apple-system, sans-serif",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    transform: "scale(0.82)",
+                    transformOrigin: "top left",
+                    marginBottom: -90,
+                  }}
+                >
+                  <div style={{ textAlign: "center" }}>
+                    <img
+                      src="/logo.svg"
+                      alt="TWINCO"
+                      style={{ height: 44, width: "auto", margin: "0 auto", objectFit: "contain" }}
+                    />
+                  </div>
+
+                  <div style={{ textAlign: "center", marginTop: 14 }}>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        backgroundColor: match.tournament_id ? "#1a3a2a" : "#1a2a3a",
+                        color: match.tournament_id ? "#4ade80" : "#60a5fa",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: "5px 16px",
+                        borderRadius: 20,
+                        letterSpacing: 1,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {matchType}
+                    </span>
+                  </div>
+
+                  <div style={{ textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 6 }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#4ade80", letterSpacing: 3, marginBottom: 6 }}>
+                        {t("matches.shareCardWinners").toUpperCase()}
+                      </div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: "#ffffff" }}>
+                        {result.winnerTeam}
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: 56, fontWeight: 900, letterSpacing: 4, color: "#ccff00", margin: "8px 0" }}>
+                      {result.score}
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#666", letterSpacing: 3, marginBottom: 6 }}>
+                        {t("matches.shareCardLosers").toUpperCase()}
+                      </div>
+                      <div style={{ fontSize: 16, color: "#999" }}>
+                        {result.loserTeam}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ height: 1, backgroundColor: "#1e293b", marginBottom: 12 }} />
+                    <div style={{ display: "flex", justifyContent: "center", gap: 16, fontSize: 11, color: "#64748b" }}>
+                      {dateStr && <span>{dateStr}</span>}
+                      {timeStr && <span>{timeStr}h</span>}
+                      {courtPlace && <span>{courtPlace}</span>}
+                    </div>
+                    <div style={{ textAlign: "center", marginTop: 10, fontSize: 10, color: "#334155" }}>
+                      {process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, "") || "padelx.es"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    const el = shareCardRef.current;
+                    if (!el) {
+                      toast.error(t("shareModal.errorCreating"));
+                      return;
+                    }
+
+                    const origTransform = el.style.transform;
+                    const origMargin = el.style.marginBottom;
+                    el.style.transform = "none";
+                    el.style.marginBottom = "0";
+
+                    try {
+                      const { toPng } = await import("html-to-image");
+                      const dataUrl = await toPng(el, {
+                        cacheBust: true,
+                        pixelRatio: 2,
+                        width: 480,
+                        height: 520,
+                      });
+                      const link = document.createElement("a");
+                      link.download = `Twinco_Partido_${match.id}.png`;
+                      link.href = dataUrl;
+                      link.click();
+                      toast.success(t("matches.imageDownloaded"));
+                    } catch (err) {
+                      console.error("toPng error:", err);
+                      toast.error(t("shareModal.errorCreating"));
+                    } finally {
+                      el.style.transform = origTransform;
+                      el.style.marginBottom = origMargin;
+                    }
+                  }}
+                  className="flex-1 bg-gray-900 text-white py-2.5 rounded-xl font-semibold hover:bg-black transition text-sm"
+                >
+                  {t("shareModal.download")}
+                </button>
+              </div>
+
+              <button
+                onClick={() => setOpenResultMatch(null)}
+                className="w-full border border-gray-200 py-2 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition"
+              >
+                {t("shareModal.close")}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {openResultMatch && !isPlayed(openResultMatch) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-[#0F172A] w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4 relative text-white">
             <button
@@ -1148,148 +1571,13 @@ export default function DashboardPage() {
             >
               ✕
             </button>
-
-            <div className="flex flex-col items-center gap-1">
-              <img
-                src="/logo.svg"
-                alt="DEMO Padel Manager"
-                className="h-8 w-auto object-contain"
-              />
-              <span className="text-xs tracking-widest text-green-400">PADEL MANAGER</span>
-            </div>
-
-            <div className="text-center space-y-2 mt-4">
-              {isPlayed(openResultMatch) ? (
-                <>
-                  <p className="text-lg font-semibold">
-                    {openResultMatch.winner === "A"
-                      ? buildTeamNameFromIds(
-                          openResultMatch.player_1_a,
-                          openResultMatch.player_2_a
-                        )
-                      : buildTeamNameFromIds(
-                          openResultMatch.player_1_b,
-                          openResultMatch.player_2_b
-                        )}
-                  </p>
-
-                  <p className="text-5xl font-extrabold my-2">
-                    {formatScoreForDisplay(openResultMatch.score)}
-                  </p>
-
-                  <p className="text-sm text-white/70">
-                    {openResultMatch.winner === "A"
-                      ? buildTeamNameFromIds(
-                          openResultMatch.player_1_b,
-                          openResultMatch.player_2_b
-                        )
-                      : buildTeamNameFromIds(
-                          openResultMatch.player_1_a,
-                          openResultMatch.player_2_a
-                        )}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-white/60">{t("dashboard.resultPending")}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <button
-                disabled={!isPlayed(openResultMatch)}
-                onClick={async () => {
-                  if (!isPlayed(openResultMatch)) return;
-                  try {
-                    const result = await generatePngFromShareRef();
-                    if (!result) {
-                      toast.error(t("shareModal.errorCreating"));
-                      return;
-                    }
-
-                    const { blob, url } = result;
-                    const file = new File([blob], "resultado-padelx-qa.png", {
-                      type: "image/png",
-                    });
-
-                    if (navigator.share) {
-                      try {
-                        await navigator.share({
-                          files: [file],
-                          title: t("matches.shareResult"),
-                          text: t("matches.shareResult"),
-                        });
-                        toast.success(t("shareModal.download"));
-                        URL.revokeObjectURL(url);
-                        return;
-                      } catch (err: any) {
-                        if (
-                          err?.name === "AbortError" ||
-                          err?.message === "Share canceled"
-                        ) {
-                          URL.revokeObjectURL(url);
-                          return;
-                        }
-                        // si share falla, caemos al download
-                      }
-                    }
-
-                    // Fallback: descargar
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = "resultado-padelx-qa.png";
-                    a.click();
-                    toast.success(t("shareModal.download"));
-                    URL.revokeObjectURL(url);
-                  } catch (err) {
-                    console.error(err);
-                    toast.error(t("shareModal.errorCreating"));
-                  }
-                }}
-                className={`w-full mt-2 py-2 rounded-xl font-semibold transition ${
-                  isPlayed(openResultMatch)
-                    ? "bg-green-600 hover:bg-green-700 text-white"
-                    : "bg-white/10 text-white/40 cursor-not-allowed"
-                }`}
-              >
-                {t("matches.shareResult")}
-              </button>
-
-              <button
-                disabled={!isPlayed(openResultMatch)}
-                onClick={async () => {
-                  if (!isPlayed(openResultMatch)) return;
-                  try {
-                    const result = await generatePngFromShareRef();
-                    if (!result) {
-                      toast.error("No se pudo generar la imagen");
-                      return;
-                    }
-
-                    const { url } = result;
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = "resultado-padelx-qa.png";
-                    a.click();
-                    toast.success(t("shareModal.download"));
-                    URL.revokeObjectURL(url);
-                  } catch (err) {
-                    console.error(err);
-                    toast.error(t("shareModal.errorCreating"));
-                  }
-                }}
-                className={`w-full py-2 rounded-xl font-semibold transition ${
-                  isPlayed(openResultMatch)
-                    ? "bg-white/10 hover:bg-white/20 text-white"
-                    : "bg-white/5 text-white/30 cursor-not-allowed"
-                }`}
-              >
-                {t("shareModal.download")}
-              </button>
-
-              <p className="text-center text-xs text-white/60">
-                {t("matches.shareResult")}
-              </p>
-            </div>
+            <p className="text-sm text-white/60 text-center">{t("dashboard.resultPending")}</p>
+            <button
+              onClick={() => setOpenResultMatch(null)}
+              className="w-full py-2 rounded-xl font-semibold bg-white/10 hover:bg-white/20 text-white transition"
+            >
+              {t("shareModal.close")}
+            </button>
           </div>
         </div>
       )}

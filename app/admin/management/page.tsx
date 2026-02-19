@@ -7,8 +7,7 @@ import { useRole } from "../../hooks/useRole";
 import Link from "next/link";
 import Card from "../../components/Card";
 import { createUserSchema } from "../../lib/validation";
-import { z } from "zod";
-import { useTranslation } from "../../i18n";
+import { getFirstPasswordError, getPasswordRuleStatuses } from "../../lib/password-policy";
 
 type TabType = "create" | "manage" | "logs";
 
@@ -33,7 +32,6 @@ type AuditLog = {
 };
 
 export default function AdminManagementPage() {
-  const { t } = useTranslation();
   const { isAdmin, isManager, loading: roleLoading } = useRole();
   const [activeTab, setActiveTab] = useState<TabType>("manage");
   const [loading, setLoading] = useState(true);
@@ -64,14 +62,23 @@ export default function AdminManagementPage() {
   const [newPassword, setNewPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
 
+  const createPasswordRuleStatuses = useMemo(
+    () => getPasswordRuleStatuses(createForm.password),
+    [createForm.password]
+  );
+  const changePasswordRuleStatuses = useMemo(
+    () => getPasswordRuleStatuses(newPassword),
+    [newPassword]
+  );
+
   // Protección
   if (!roleLoading && !isAdmin && !isManager) {
     return (
       <main className="flex-1 p-8">
-        <h1 className="text-2xl font-bold text-red-600">{t("admin.logs.accessDenied")}</h1>
-        <p className="text-gray-600 mt-2">{t("admin.users.noPermission")}</p>
+        <h1 className="text-2xl font-bold text-red-600">Acceso denegado</h1>
+        <p className="text-gray-600 mt-2">No tienes permisos para acceder a esta sección.</p>
         <Link href="/" className="text-blue-600 hover:underline mt-4 inline-block">
-          {t("admin.logs.backToDashboard")}
+          ← Volver al dashboard
         </Link>
       </main>
     );
@@ -138,10 +145,10 @@ export default function AdminManagementPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || t("admin.users.errorCreating"));
+        throw new Error(error.error || "Error creando usuario");
       }
 
-      toast.success(t("admin.users.userCreated"));
+      toast.success("¡Usuario creado exitosamente!");
       setCreateForm({ email: "", password: "", role: "user" });
 
       // Recargar usuarios
@@ -151,7 +158,7 @@ export default function AdminManagementPage() {
         .order("created_at", { ascending: false });
       setUsers((usersData as ProfileRow[]) || []);
     } catch (error: any) {
-      toast.error(error.message || t("admin.users.errorCreating"));
+      toast.error(error.message || "Error creando usuario");
     } finally {
       setCreatingUser(false);
     }
@@ -173,7 +180,7 @@ export default function AdminManagementPage() {
 
       if (error) throw error;
 
-      toast.success(t("admin.users.changesSaved"));
+      toast.success("Usuario actualizado");
       setEditingUserId(null);
 
       // Recargar
@@ -183,7 +190,7 @@ export default function AdminManagementPage() {
         .order("created_at", { ascending: false });
       setUsers((usersData as ProfileRow[]) || []);
     } catch (error: any) {
-      toast.error(error.message || t("admin.users.errorSavingChanges"));
+      toast.error(error.message || "Error actualizando usuario");
     } finally {
       setSavingEdit(false);
     }
@@ -192,24 +199,13 @@ export default function AdminManagementPage() {
   // Cambiar contraseña (solo admin)
   const handleChangePassword = async (userId: string, email: string) => {
     if (!isAdmin) {
-      toast.error(t("admin.users.errorChangingPassword"));
+      toast.error("Solo admins pueden cambiar contraseñas");
       return;
     }
 
-    // Validar password
-    try {
-      const schema = z.object({
-        password: z.string()
-          .min(8, "Mínimo 8 caracteres")
-          .regex(/[A-Z]/, "Debe contener una mayúscula")
-          .regex(/[a-z]/, "Debe contener una minúscula")
-          .regex(/[0-9]/, "Debe contener un número")
-          .regex(/[!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]/, "Debe contener un carácter especial"),
-      });
-
-      schema.parse({ password: newPassword });
-    } catch (error: any) {
-      toast.error(error.errors?.[0]?.message || t("admin.users.errorChangingPassword"));
+    const passwordError = getFirstPasswordError(newPassword);
+    if (passwordError) {
+      toast.error(passwordError);
       return;
     }
 
@@ -226,14 +222,14 @@ export default function AdminManagementPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || t("admin.users.errorChangingPassword"));
+        throw new Error(error.error || "Error cambiando contraseña");
       }
 
-      toast.success(t("admin.users.passwordChanged", { email }));
+      toast.success(`Contraseña de ${email} actualizada`);
       setChangingPasswordUserId(null);
       setNewPassword("");
     } catch (error: any) {
-      toast.error(error.message || t("admin.users.errorChangingPassword"));
+      toast.error(error.message || "Error cambiando contraseña");
     } finally {
       setChangingPassword(false);
     }
@@ -241,12 +237,17 @@ export default function AdminManagementPage() {
 
   // Eliminar usuario
   const handleDeleteUser = async (userId: string, email: string) => {
-    if (userId === currentUserId) {
-      toast.error(t("admin.users.cantDeleteSelf"));
+    if (!isAdmin) {
+      toast.error("Solo admins pueden eliminar usuarios");
       return;
     }
 
-    if (!confirm(t("admin.users.confirmDelete", { name: email }))) return;
+    if (userId === currentUserId) {
+      toast.error("No puedes eliminarte a ti mismo");
+      return;
+    }
+
+    if (!confirm(`¿Eliminar a ${email}? Esta acción no se puede deshacer.`)) return;
 
     try {
       const response = await fetch("/api/admin/delete-user", {
@@ -259,10 +260,10 @@ export default function AdminManagementPage() {
       });
 
       if (!response.ok) {
-        throw new Error(t("admin.users.errorDeleting"));
+        throw new Error("Error eliminando usuario");
       }
 
-      toast.success(t("admin.users.userDeleted"));
+      toast.success("Usuario eliminado");
 
       // Recargar
       const { data: usersData } = await supabase
@@ -271,7 +272,7 @@ export default function AdminManagementPage() {
         .order("created_at", { ascending: false });
       setUsers((usersData as ProfileRow[]) || []);
     } catch (error: any) {
-      toast.error(error.message || t("admin.users.errorDeleting"));
+      toast.error(error.message || "Error eliminando usuario");
     }
   };
 
@@ -287,59 +288,63 @@ export default function AdminManagementPage() {
   };
 
   return (
-    <main className="flex-1 p-8 overflow-y-auto">
+    <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">{t("admin.management.title")}</h1>
-        <p className="text-gray-600 mb-6">{t("admin.users.title")}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Administración</h1>
+        <p className="text-sm sm:text-base text-gray-600 mb-6">
+          Gestiona usuarios, crea nuevas cuentas y revisa logs
+        </p>
 
         {/* TABS */}
-        <div className="flex gap-4 mb-6 border-b border-gray-200">
+        <div className="mb-6 -mx-1 px-1 overflow-x-auto border-b border-gray-200">
+          <div className="min-w-max flex gap-2 sm:gap-4">
           <button
             onClick={() => setActiveTab("manage")}
-            className={`px-4 py-3 font-semibold border-b-2 transition ${
+            className={`whitespace-nowrap px-3 sm:px-4 py-3 text-sm sm:text-base font-semibold border-b-2 transition ${
               activeTab === "manage"
                 ? "border-blue-600 text-blue-600"
                 : "border-transparent text-gray-600 hover:text-gray-800"
             }`}
           >
-            👥 {t("admin.management.tabs.all")}
+            👥 Administrar Usuarios
           </button>
           <button
             onClick={() => setActiveTab("create")}
-            className={`px-4 py-3 font-semibold border-b-2 transition ${
+            className={`whitespace-nowrap px-3 sm:px-4 py-3 text-sm sm:text-base font-semibold border-b-2 transition ${
               activeTab === "create"
                 ? "border-blue-600 text-blue-600"
                 : "border-transparent text-gray-600 hover:text-gray-800"
             }`}
           >
-            ➕ {t("admin.users.createButton")}
+            ➕ Crear Usuario
           </button>
           {isAdmin && (
             <button
               onClick={() => setActiveTab("logs")}
-              className={`px-4 py-3 font-semibold border-b-2 transition ${
+              className={`whitespace-nowrap px-3 sm:px-4 py-3 text-sm sm:text-base font-semibold border-b-2 transition ${
                 activeTab === "logs"
                   ? "border-blue-600 text-blue-600"
                   : "border-transparent text-gray-600 hover:text-gray-800"
               }`}
             >
-              📋 {t("admin.logs.title")}
+              📋 Logs
             </button>
           )}
+          </div>
         </div>
 
         {/* CONTENT */}
         {loading ? (
-          <p className="text-gray-500 animate-pulse">{t("common.loading")}</p>
+          <p className="text-gray-500 animate-pulse">Cargando...</p>
         ) : (
           <>
             {/* TAB: CREAR USUARIO */}
             {activeTab === "create" && (
-              <Card className="p-6 max-w-2xl">
-                <h2 className="text-xl font-bold mb-4">{t("admin.users.createButton")}</h2>
+              <Card className="max-w-2xl p-4 sm:p-6">
+                <h2 className="text-lg sm:text-xl font-bold mb-4">Crear nuevo usuario</h2>
                 <form onSubmit={handleCreateUser} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">{t("admin.users.emailField")}</label>
+                    <label className="block text-sm font-medium mb-1">Email</label>
                     <input
                       type="email"
                       value={createForm.email}
@@ -351,7 +356,7 @@ export default function AdminManagementPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">{t("admin.users.passwordField")}</label>
+                    <label className="block text-sm font-medium mb-1">Contraseña</label>
                     <input
                       type="password"
                       value={createForm.password}
@@ -359,12 +364,22 @@ export default function AdminManagementPage() {
                         setCreateForm({ ...createForm, password: e.target.value })
                       }
                       className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder={t("admin.users.passwordPlaceholder")}
+                      placeholder="Mín. 8 caracteres, mayúscula, número, símbolo"
                       required
                     />
+                    <ul className="mt-2 space-y-1">
+                      {createPasswordRuleStatuses.map((rule) => (
+                        <li
+                          key={rule.key}
+                          className={`text-xs ${rule.ok ? "text-green-700" : "text-gray-500"}`}
+                        >
+                          {rule.ok ? "[OK]" : "[ ]"} {rule.label}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">{t("admin.users.roleField")}</label>
+                    <label className="block text-sm font-medium mb-1">Rol</label>
                     <select
                       value={createForm.role}
                       onChange={(e) =>
@@ -384,7 +399,7 @@ export default function AdminManagementPage() {
                     disabled={creatingUser}
                     className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition"
                   >
-                    {creatingUser ? t("common.loading") : t("admin.users.create")}
+                    {creatingUser ? "Creando..." : "Crear Usuario"}
                   </button>
                 </form>
               </Card>
@@ -394,21 +409,21 @@ export default function AdminManagementPage() {
             {activeTab === "manage" && (
               <div className="space-y-4">
                 {users.length === 0 ? (
-                  <p className="text-gray-500">{t("common.noData")}</p>
+                  <p className="text-gray-500">No hay usuarios</p>
                 ) : (
                   users.map((user) => (
-                    <Card key={user.id} className="p-4">
+                    <Card key={user.id} className="p-4 sm:p-5">
                       {editingUserId === user.id ? (
                         // MODO EDICIÓN
                         <div className="space-y-3">
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <input
                               type="text"
                               value={editForm.first_name}
                               onChange={(e) =>
                                 setEditForm({ ...editForm, first_name: e.target.value })
                               }
-                              placeholder={t("auth.firstName")}
+                              placeholder="Nombre"
                               className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                             <input
@@ -417,11 +432,11 @@ export default function AdminManagementPage() {
                               onChange={(e) =>
                                 setEditForm({ ...editForm, last_name: e.target.value })
                               }
-                              placeholder={t("auth.lastName")}
+                              placeholder="Apellido"
                               className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <select
                               value={editForm.role}
                               onChange={(e) =>
@@ -445,73 +460,85 @@ export default function AdminManagementPage() {
                                 }
                                 className="rounded"
                               />
-                              <span className="text-sm">{t("admin.users.active")}</span>
+                              <span className="text-sm">Activo</span>
                             </label>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <button
                               onClick={() => handleEditUser(user.id)}
                               disabled={savingEdit}
-                              className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition"
+                              className="w-full sm:flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition"
                             >
-                              {savingEdit ? t("common.loading") : t("admin.users.save")}
+                              {savingEdit ? "Guardando..." : "Guardar"}
                             </button>
                             <button
                               onClick={() => setEditingUserId(null)}
-                              className="flex-1 bg-gray-300 text-gray-800 py-2 rounded-lg hover:bg-gray-400 transition"
+                              className="w-full sm:flex-1 bg-gray-300 text-gray-800 py-2 rounded-lg hover:bg-gray-400 transition"
                             >
-                              {t("admin.users.cancel")}
+                              Cancelar
                             </button>
                           </div>
                         </div>
                       ) : changingPasswordUserId === user.id ? (
                         // MODO CAMBIAR CONTRASEÑA (solo admin)
                         <div className="space-y-3">
-                          <p className="text-sm font-semibold">{t("admin.users.changePassword")} {user.email}</p>
+                          <p className="text-sm font-semibold break-words">
+                            Cambiar contraseña de {user.email}
+                          </p>
                           <input
                             type="password"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
-                            placeholder={t("admin.users.newPassword")}
+                            placeholder="Nueva contraseña (8+ chars, mayúscula, número, símbolo)"
                             className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
-                          <div className="flex gap-2">
+                          <ul className="space-y-1">
+                            {changePasswordRuleStatuses.map((rule) => (
+                              <li
+                                key={rule.key}
+                                className={`text-xs ${rule.ok ? "text-green-700" : "text-gray-500"}`}
+                              >
+                                {rule.ok ? "[OK]" : "[ ]"} {rule.label}
+                              </li>
+                            ))}
+                          </ul>
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <button
                               onClick={() => handleChangePassword(user.id, user.email || "usuario")}
                               disabled={changingPassword || !newPassword}
-                              className="flex-1 bg-orange-600 text-white py-2 rounded-lg hover:bg-orange-700 disabled:bg-gray-400 transition"
+                              className="w-full sm:flex-1 bg-orange-600 text-white py-2 rounded-lg hover:bg-orange-700 disabled:bg-gray-400 transition"
                             >
-                              {changingPassword ? t("common.loading") : t("admin.users.changePassword")}
+                              {changingPassword ? "Actualizando..." : "Actualizar Contraseña"}
                             </button>
                             <button
                               onClick={() => {
                                 setChangingPasswordUserId(null);
                                 setNewPassword("");
                               }}
-                              className="flex-1 bg-gray-300 text-gray-800 py-2 rounded-lg hover:bg-gray-400 transition"
+                              className="w-full sm:flex-1 bg-gray-300 text-gray-800 py-2 rounded-lg hover:bg-gray-400 transition"
                             >
-                              {t("admin.users.cancel")}
+                              Cancelar
                             </button>
                           </div>
                         </div>
                       ) : (
                         // MODO VISUALIZACIÓN
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="flex-1 min-w-0">
                             <p className="font-semibold">{displayName(user)}</p>
-                            <p className="text-sm text-gray-500">{user.email}</p>
-                            <div className="flex gap-2 mt-2">
+                            <p className="text-sm text-gray-500 break-all">{user.email}</p>
+                            <div className="flex flex-wrap gap-2 mt-2">
                               <span className={`text-xs px-2 py-1 rounded font-bold ${getRoleBadgeColor(user.role as string)}`}>
                                 {(user.role as string).toUpperCase()}
                               </span>
                               {!user.active && (
                                 <span className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-800 font-bold">
-                                  {t("admin.users.inactive").toUpperCase()}
+                                  INACTIVO
                                 </span>
                               )}
                             </div>
                           </div>
-                          <div className="flex gap-2 flex-wrap justify-end">
+                          <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
                             <button
                               onClick={() => {
                                 setEditingUserId(user.id);
@@ -522,26 +549,28 @@ export default function AdminManagementPage() {
                                   active: user.active ?? true,
                                 });
                               }}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
+                              className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
                             >
-                              {t("admin.users.edit")}
+                              Editar
                             </button>
                             {isAdmin && (
                               <button
                                 onClick={() => setChangingPasswordUserId(user.id)}
-                                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition text-sm"
+                                className="w-full sm:w-auto px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition text-sm"
                               >
-                                🔑 {t("admin.users.changePassword")}
+                                🔑 Contraseña
                               </button>
                             )}
-                            <button
-                              onClick={() =>
-                                handleDeleteUser(user.id, user.email || "usuario")
-                              }
-                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
-                            >
-                              {t("admin.users.delete")}
-                            </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() =>
+                                  handleDeleteUser(user.id, user.email || "usuario")
+                                }
+                                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
+                              >
+                                Eliminar
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -555,7 +584,7 @@ export default function AdminManagementPage() {
             {activeTab === "logs" && isAdmin && (
               <div className="space-y-3">
                 {logs.length === 0 ? (
-                  <p className="text-gray-500">{t("admin.logs.empty")}</p>
+                  <p className="text-gray-500">No hay logs registrados</p>
                 ) : (
                   logs.map((log) => (
                     <Card key={log.id} className="p-4">
@@ -563,8 +592,8 @@ export default function AdminManagementPage() {
                         <div className="mt-1 h-2 w-2 rounded-full bg-green-500 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-800">
-                            <span className="font-semibold">{log.user_email ?? t("admin.logs.system")}</span>{" "}
-                            {t("admin.logs.performed")}{" "}
+                            <span className="font-semibold">{log.user_email ?? "Sistema"}</span>{" "}
+                            realizó{" "}
                             <span className="font-semibold">
                               {log.action.replace(/_/g, " ").toLowerCase()}
                             </span>

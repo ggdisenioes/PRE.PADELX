@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import { useRole } from "../../../../app/hooks/useRole";
 import toast from "react-hot-toast";
+import { getFirstPasswordError, getPasswordRuleStatuses } from "../../../lib/password-policy";
 
 type UserProfile = {
   id: string;
@@ -36,6 +37,11 @@ export default function AdminUsersManagePage() {
     password: "",
     role: "user",
   });
+
+  const createPasswordRuleStatuses = useMemo(
+    () => getPasswordRuleStatuses(createForm.password),
+    [createForm.password]
+  );
 
   // Editar nombre/apellido
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -182,8 +188,9 @@ export default function AdminUsersManagePage() {
       toast.error("Completá email y contraseña");
       return;
     }
-    if (password.length < 8) {
-      toast.error("La contraseña debe tener al menos 8 caracteres");
+    const passwordError = getFirstPasswordError(password);
+    if (passwordError) {
+      toast.error(passwordError);
       return;
     }
 
@@ -302,6 +309,16 @@ export default function AdminUsersManagePage() {
                 className="w-full border rounded px-3 py-2"
                 placeholder="Mínimo 8 caracteres"
               />
+              <ul className="mt-2 space-y-1">
+                {createPasswordRuleStatuses.map((rule) => (
+                  <li
+                    key={rule.key}
+                    className={`text-xs ${rule.ok ? "text-green-700" : "text-gray-500"}`}
+                  >
+                    {rule.ok ? "[OK]" : "[ ]"} {rule.label}
+                  </li>
+                ))}
+              </ul>
             </div>
 
             <div>

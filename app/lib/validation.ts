@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PASSWORD_POLICY } from "./password-policy";
 
 // Dominios de email temporales (disposables)
 const DISPOSABLE_DOMAINS = new Set([
@@ -34,11 +35,11 @@ export const emailSchema = z.string()
   );
 
 export const passwordSchema = z.string()
-  .min(8, "Mínimo 8 caracteres")
-  .regex(/[A-Z]/, "Debe contener una mayúscula (A-Z)")
-  .regex(/[a-z]/, "Debe contener una minúscula (a-z)")
-  .regex(/[0-9]/, "Debe contener un número (0-9)")
-  .regex(/[!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]/, "Debe contener un carácter especial");
+  .min(PASSWORD_POLICY.minLength, `Mínimo ${PASSWORD_POLICY.minLength} caracteres`)
+  .regex(PASSWORD_POLICY.uppercaseRegex, "Debe contener una mayúscula (A-Z)")
+  .regex(PASSWORD_POLICY.lowercaseRegex, "Debe contener una minúscula (a-z)")
+  .regex(PASSWORD_POLICY.numberRegex, "Debe contener un número (0-9)")
+  .regex(PASSWORD_POLICY.specialRegex, "Debe contener un carácter especial");
 
 export const tenantIdSchema = z.string()
   .uuid("Tenant ID inválido");

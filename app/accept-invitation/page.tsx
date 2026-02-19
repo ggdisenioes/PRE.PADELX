@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../lib/supabase";
+import { getFirstPasswordError, getPasswordRuleStatuses } from "../lib/password-policy";
 
 type InvitePreview =
   | { valid: false; reason: "not_found" | "expired" }
@@ -31,6 +32,11 @@ export default function AcceptInvitationPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  const passwordRuleStatuses = useMemo(
+    () => getPasswordRuleStatuses(password),
+    [password]
+  );
+
   // Validar token al cargar
   useEffect(() => {
     if (!token) {
@@ -57,8 +63,9 @@ export default function AcceptInvitationPage() {
     e.preventDefault();
     if (!token || !preview || !preview.valid) return;
 
-    if (password.length < 8) {
-      setError("La contraseña debe tener al menos 8 caracteres.");
+    const passwordError = getFirstPasswordError(password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
     if (password !== password2) {
@@ -109,7 +116,7 @@ export default function AcceptInvitationPage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#00b4ff] mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#ccff00] mx-auto mb-4" />
           <p className="text-gray-400 text-sm">Verificando invitación...</p>
         </div>
       </div>
@@ -122,17 +129,17 @@ export default function AcceptInvitationPage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900 relative overflow-hidden p-6">
         <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-          <div className="absolute right-0 top-0 w-64 h-64 bg-[#00b4ff] rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
+          <div className="absolute right-0 top-0 w-64 h-64 bg-[#ccff00] rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
         </div>
 
-        <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md z-10 border-t-4 border-[#00b4ff] text-center">
+        <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md z-10 border-t-4 border-[#ccff00] text-center">
           <div className="text-5xl mb-4">{isExpired ? "\u23F0" : "\u274C"}</div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">
             {isExpired ? "Invitación expirada" : "Invitación no válida"}
           </h1>
           <p className="text-gray-600 text-sm mb-6">
             {isExpired
-              ? "Esta invitación expiró (válida por 72 horas). Contactá al administrador de PadelX QA para que te envíe una nueva."
+              ? "Esta invitación expiró (válida por 72 horas). Contactá al administrador de PadelX para que te envíe una nueva."
               : "Esta invitación no existe o ya fue utilizada."}
           </p>
           <a
@@ -162,15 +169,15 @@ export default function AcceptInvitationPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-900 relative overflow-hidden p-6">
       <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-        <div className="absolute right-0 top-0 w-64 h-64 bg-[#00b4ff] rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
+        <div className="absolute right-0 top-0 w-64 h-64 bg-[#ccff00] rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
       </div>
 
-      <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md z-10 border-t-4 border-[#00b4ff]">
+      <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md z-10 border-t-4 border-[#ccff00]">
         <div className="text-center mb-6">
           <h1 className="text-4xl font-extrabold text-gray-900 italic tracking-tight">
-            PadelX QA
+            PadelX
           </h1>
-          <span className="inline-block bg-gray-900 text-[#00b4ff] px-2 py-0.5 text-xs font-bold tracking-[0.2em] uppercase rounded-sm mt-1">
+          <span className="inline-block bg-gray-900 text-[#ccff00] px-2 py-0.5 text-xs font-bold tracking-[0.2em] uppercase rounded-sm mt-1">
             {preview.tenant_name}
           </span>
           <p className="text-gray-500 text-sm mt-4">
@@ -197,7 +204,7 @@ export default function AcceptInvitationPage() {
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00b4ff] outline-none bg-gray-50 text-sm"
+                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ccff00] outline-none bg-gray-50 text-sm"
                 placeholder="Juan"
               />
             </div>
@@ -209,7 +216,7 @@ export default function AcceptInvitationPage() {
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00b4ff] outline-none bg-gray-50 text-sm"
+                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ccff00] outline-none bg-gray-50 text-sm"
                 placeholder="García"
               />
             </div>
@@ -224,9 +231,19 @@ export default function AcceptInvitationPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00b4ff] outline-none bg-gray-50"
+              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ccff00] outline-none bg-gray-50"
               placeholder="Mínimo 8 caracteres"
             />
+            <ul className="mt-2 space-y-1">
+              {passwordRuleStatuses.map((rule) => (
+                <li
+                  key={rule.key}
+                  className={`text-xs ${rule.ok ? "text-green-700" : "text-gray-500"}`}
+                >
+                  {rule.ok ? "[OK]" : "[ ]"} {rule.label}
+                </li>
+              ))}
+            </ul>
           </div>
 
           <div>
@@ -238,7 +255,7 @@ export default function AcceptInvitationPage() {
               required
               value={password2}
               onChange={(e) => setPassword2(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00b4ff] outline-none bg-gray-50"
+              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ccff00] outline-none bg-gray-50"
               placeholder="Repetir contraseña"
             />
           </div>

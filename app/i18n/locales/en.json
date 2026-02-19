@@ -144,7 +144,18 @@
     "resultPending": "Result not loaded yet",
     "won": "Won",
     "viewMore": "View more",
-    "noPermission": "You don't have permission to access the dashboard."
+    "noPermission": "You don't have permission to access the dashboard.",
+    "taskCenter": "Task Center",
+    "pendingUserRequests": "Pending requests",
+    "pendingMatchesTitle": "Pending matches",
+    "overdueMatches": "Overdue matches",
+    "managePendingUsers": "Manage users",
+    "noPendingUserRequests": "There are no pending requests.",
+    "readyToScore": "Matches ready to score",
+    "noPendingMatches": "There are no pending matches.",
+    "userApproved": "User approved.",
+    "userRejected": "User rejected.",
+    "userActionError": "Could not update the user."
   },
   "tournaments": {
     "title": "Tournaments",

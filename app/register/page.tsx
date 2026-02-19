@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { supabase } from "../lib/supabase";
-import { useTranslation } from "../i18n";
+import { getFirstPasswordError, getPasswordRuleStatuses } from "../lib/password-policy";
 
 type Tenant = {
   id: string;
@@ -16,7 +16,6 @@ type Tenant = {
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { t } = useTranslation();
 
   const [loading, setLoading] = useState(false);
   const [tenantsLoading, setTenantsLoading] = useState(true);
@@ -35,7 +34,7 @@ export default function RegisterPage() {
     // Reglas:
     // - Mostrar solo tenants activos (si existe is_active)
     // - Excluir tenants de pruebas (por slug)
-    // Para este momento (según tu consigna), debería quedar solo PadelX.
+    // Para este momento (según tu consigna), debería quedar solo TWINCO.
     return tenants
       .filter((t) => (t.is_active ?? true) === true)
       .filter((t) => {
@@ -44,6 +43,11 @@ export default function RegisterPage() {
         return true;
       });
   }, [tenants]);
+
+  const passwordRuleStatuses = useMemo(
+    () => getPasswordRuleStatuses(password),
+    [password]
+  );
 
   useEffect(() => {
     const loadTenants = async () => {
@@ -56,7 +60,7 @@ export default function RegisterPage() {
 
       if (error) {
         console.error(error);
-        toast.error(t("auth.registerError"));
+        toast.error("No se pudieron cargar los clubes.");
         setTenants([]);
         setTenantsLoading(false);
         return;
@@ -65,7 +69,7 @@ export default function RegisterPage() {
       const list = (data as Tenant[]) || [];
       setTenants(list);
 
-      // Auto-seleccionar si solo hay 1 visible (por ejemplo, PadelX)
+      // Auto-seleccionar si solo hay 1 visible (por ejemplo, Twinco)
       const filtered = (list as Tenant[])
         .filter((t) => (t.is_active ?? true) === true)
         .filter((t) => {
@@ -88,22 +92,23 @@ export default function RegisterPage() {
     e.preventDefault();
 
     if (!tenantId) {
-      toast.error(t("auth.emailAndPasswordRequired"));
+      toast.error("Seleccioná un club.");
       return;
     }
 
     if (!email.trim()) {
-      toast.error(t("auth.emailAndPasswordRequired"));
+      toast.error("Ingresá un email.");
       return;
     }
 
-    if (password.length < 8) {
-      toast.error(t("auth.passwordTooShort"));
+    const passwordError = getFirstPasswordError(password);
+    if (passwordError) {
+      toast.error(passwordError);
       return;
     }
 
     if (password !== password2) {
-      toast.error(t("auth.passwordsDoNotMatch"));
+      toast.error("Las contraseñas no coinciden.");
       return;
     }
 
@@ -126,12 +131,14 @@ export default function RegisterPage() {
 
     if (error) {
       console.error(error);
-      toast.error(error.message || t("auth.registerError"));
+      toast.error(error.message || "No se pudo crear la cuenta.");
       setLoading(false);
       return;
     }
 
-    toast.success(t("auth.registrationSuccess"));
+    toast.success(
+      "Solicitud enviada. Tu acceso quedará pendiente de aprobación por el administrador del club."
+    );
     router.push("/login?error=aprobacion_en_curso");
   };
 
@@ -139,9 +146,9 @@ export default function RegisterPage() {
     <main className="min-h-[calc(100vh-64px)] flex items-center justify-center p-6">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <div className="space-y-1 mb-6">
-          <h1 className="text-2xl font-bold">{t("auth.register")}</h1>
+          <h1 className="text-2xl font-bold">Crear cuenta</h1>
           <p className="text-sm text-gray-600">
-            {t("auth.registerSubtitle")}
+            Registrate para solicitar acceso a un club. Un administrador debe aprobar tu solicitud.
           </p>
         </div>
 
@@ -155,7 +162,7 @@ export default function RegisterPage() {
               className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-50"
             >
               <option value="">
-                {tenantsLoading ? t("common.loading") : t("common.selectOption")}
+                {tenantsLoading ? "Cargando clubes…" : "Seleccionar club"}
               </option>
               {visibleTenants.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -164,13 +171,13 @@ export default function RegisterPage() {
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-500">
-              {t("auth.noClubHint")}
+              Si no ves tu club, contactá al administrador.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">{t("auth.firstName")}</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre</label>
               <input
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
@@ -180,7 +187,7 @@ export default function RegisterPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">{t("auth.lastName")}</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Apellido</label>
               <input
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
@@ -192,7 +199,7 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">{t("auth.email")}</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Email</label>
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -204,27 +211,37 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">{t("auth.password")}</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Contraseña</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder={t("auth.password")}
+              placeholder="Mínimo 8 caracteres"
               autoComplete="new-password"
             />
+            <ul className="mt-2 space-y-1">
+              {passwordRuleStatuses.map((rule) => (
+                <li
+                  key={rule.key}
+                  className={`text-xs ${rule.ok ? "text-green-700" : "text-gray-500"}`}
+                >
+                  {rule.ok ? "[OK]" : "[ ]"} {rule.label}
+                </li>
+              ))}
+            </ul>
           </div>
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">
-              {t("auth.confirmPassword")}
+              Repetir contraseña
             </label>
             <input
               type="password"
               value={password2}
               onChange={(e) => setPassword2(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder={t("auth.confirmPassword")}
+              placeholder="Repetí tu contraseña"
               autoComplete="new-password"
             />
           </div>
@@ -234,7 +251,7 @@ export default function RegisterPage() {
             disabled={loading || tenantsLoading}
             className="w-full bg-green-600 text-white px-4 py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:opacity-50"
           >
-            {loading ? t("auth.registering") : t("auth.register")}
+            {loading ? "Enviando…" : "Enviar solicitud"}
           </button>
 
           <button
@@ -242,7 +259,7 @@ export default function RegisterPage() {
             onClick={() => router.push("/login")}
             className="w-full bg-gray-100 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-200 transition"
           >
-            {t("auth.hasAccount")}
+            Ya tengo cuenta
           </button>
         </form>
       </div>

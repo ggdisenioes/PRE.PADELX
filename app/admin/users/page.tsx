@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { supabase } from "../../lib/supabase";
-import { useTranslation } from "../../i18n";
 
 type ApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -41,7 +40,6 @@ function statusFromRow(u: ProfileRow): "pending" | "approved" | "rejected" | "de
 }
 
 export default function AdminUsersPage() {
-  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [canAccess, setCanAccess] = useState(false);
   const [meId, setMeId] = useState<string | null>(null);
@@ -49,6 +47,7 @@ export default function AdminUsersPage() {
   const [rows, setRows] = useState<ProfileRow[]>([]);
   const [tab, setTab] = useState<TabKey>("pending");
   const [players, setPlayers] = useState<PlayerOption[]>([]);
+  const [canDeleteUsers, setCanDeleteUsers] = useState(false);
 
   const filtered = useMemo(() => {
     if (tab === "all") return rows;
@@ -82,7 +81,8 @@ export default function AdminUsersPage() {
     if (userErr || !user) {
       setLoading(false);
       setCanAccess(false);
-      toast.error(t("admin.users.errorLoadingUsers"));
+      setCanDeleteUsers(false);
+      toast.error("No se pudo leer tu sesión.");
       return;
     }
 
@@ -98,26 +98,32 @@ export default function AdminUsersPage() {
       console.warn("[admin/users] could not read my profile", { meErr, userId: user.id });
       setLoading(false);
       setCanAccess(false);
-      toast.error(t("admin.users.errorLoadingUsers"));
+      setCanDeleteUsers(false);
+      toast.error(
+        "No se pudo determinar tu club (tenant). Verificá que exista tu fila en public.profiles y que tenga tenant_id asignado."
+      );
       return;
     }
 
     const role = (me.role ?? "").toString().toLowerCase();
     const allowed = role === "admin" || role === "manager";
+    setCanDeleteUsers(role === "admin");
 
     setTenantId(me.tenant_id ?? null);
     setCanAccess(allowed);
 
     if (!allowed) {
       setRows([]);
+      setCanDeleteUsers(false);
       setLoading(false);
       return;
     }
 
     if (!me.tenant_id) {
       setRows([]);
+      setCanDeleteUsers(false);
       setLoading(false);
-      toast.error(t("admin.users.errorLoadingUsers"));
+      toast.error("Tu perfil no tiene tenant_id asignado.");
       return;
     }
 
@@ -137,7 +143,7 @@ export default function AdminUsersPage() {
 
     if (usersRes.error) {
       console.error(usersRes.error);
-      toast.error(t("admin.users.errorLoadingUsers"));
+      toast.error("No se pudieron cargar los usuarios.");
       setRows([]);
       setLoading(false);
       return;
@@ -152,10 +158,10 @@ export default function AdminUsersPage() {
     const { error } = await supabase.rpc("approve_user", { p_user_id: userId });
     if (error) {
       console.error(error);
-      toast.error(t("admin.users.errorUpdatingStatus"));
+      toast.error("No se pudo aprobar el usuario.");
       return;
     }
-    toast.success(t("admin.users.userActivated"));
+    toast.success("Usuario aprobado.");
     void load();
   };
 
@@ -163,14 +169,19 @@ export default function AdminUsersPage() {
     const { error } = await supabase.rpc("reject_user", { p_user_id: userId });
     if (error) {
       console.error(error);
-      toast.error(t("admin.users.errorUpdatingStatus"));
+      toast.error("No se pudo rechazar el usuario.");
       return;
     }
-    toast.success(t("admin.users.userDeactivated"));
+    toast.success("Usuario rechazado.");
     void load();
   };
 
   const softDelete = async (userId: string) => {
+    if (!canDeleteUsers) {
+      toast.error("Solo admins pueden eliminar usuarios.");
+      return;
+    }
+
     const { error } = await supabase
       .from("profiles")
       .update({ active: false, deleted_at: new Date().toISOString() })
@@ -178,11 +189,11 @@ export default function AdminUsersPage() {
 
     if (error) {
       console.error("[admin/users] softDelete error", error);
-      toast.error(t("admin.users.errorDeleting"));
+      toast.error(`No se pudo eliminar (deshabilitar) el usuario. ${error.message ?? ""}`.trim());
       return;
     }
 
-    toast.success(t("admin.users.userDeleted"));
+    toast.success("Usuario eliminado (deshabilitado).");
     void load();
   };
 
@@ -195,11 +206,11 @@ export default function AdminUsersPage() {
 
     if (error) {
       console.error("[admin/users] setActive error", error);
-      toast.error(t("admin.users.errorUpdatingStatus"));
+      toast.error(active ? "No se pudo habilitar el usuario." : "No se pudo deshabilitar el usuario.");
       return;
     }
 
-    toast.success(active ? t("admin.users.userActivated") : t("admin.users.userDeactivated"));
+    toast.success(active ? "Usuario habilitado." : "Usuario deshabilitado.");
     void load();
   };
 
@@ -207,10 +218,10 @@ export default function AdminUsersPage() {
     const { error } = await supabase.from("profiles").update({ role: newRole }).eq("id", userId);
     if (error) {
       console.error(error);
-      toast.error(t("admin.users.errorUpdatingRole"));
+      toast.error("No se pudo actualizar el rol.");
       return;
     }
-    toast.success(t("admin.users.roleUpdated"));
+    toast.success("Rol actualizado.");
     void load();
   };
 
@@ -223,7 +234,7 @@ export default function AdminUsersPage() {
 
     if (unlinkErr) {
       console.error("[admin/users] unlink error", unlinkErr);
-      toast.error(t("admin.users.errorSavingChanges"));
+      toast.error("Error al desvincular el jugador anterior.");
       return;
     }
 
@@ -236,12 +247,12 @@ export default function AdminUsersPage() {
 
       if (linkErr) {
         console.error("[admin/users] link error", linkErr);
-        toast.error(t("admin.users.errorSavingChanges"));
+        toast.error("Error al vincular el jugador.");
         return;
       }
-      toast.success(t("admin.users.changesSaved"));
+      toast.success("Jugador vinculado correctamente.");
     } else {
-      toast.success(t("admin.users.changesSaved"));
+      toast.success("Jugador desvinculado.");
     }
 
     void load();
@@ -253,13 +264,13 @@ export default function AdminUsersPage() {
   }, []);
 
   if (loading) {
-    return <p className="p-6 text-gray-500">{t("admin.users.loading")}</p>;
+    return <p className="p-6 text-gray-500">Cargando…</p>;
   }
 
   if (!canAccess) {
     return (
       <p className="p-6 text-red-600 font-semibold">
-        {t("admin.users.noPermission")}
+        No tenés permisos para gestionar usuarios.
       </p>
     );
   }
@@ -268,26 +279,26 @@ export default function AdminUsersPage() {
     <main className="max-w-6xl mx-auto p-6 space-y-6">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">{t("admin.users.title")}</h1>
+          <h1 className="text-2xl font-bold">Gestión de usuarios</h1>
           <p className="text-sm text-gray-600">
-            {t("admin.users.title")}
+            Administrá usuarios del club (aprobar/rechazar, habilitar/deshabilitar, rol, vincular jugador).
           </p>
         </div>
         <button
           onClick={() => void load()}
           className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-semibold hover:bg-gray-200 transition"
         >
-          {t("common.save")}
+          Actualizar
         </button>
       </header>
 
       <div className="flex flex-wrap gap-2">
         {([
-          ["pending", t("admin.management.tabs.pending")],
-          ["approved", t("admin.management.tabs.approved")],
-          ["rejected", t("admin.management.tabs.rejected")],
-          ["deleted", t("admin.management.tabs.deleted")],
-          ["all", t("admin.management.tabs.all")],
+          ["pending", "Pendientes"],
+          ["approved", "Aprobados"],
+          ["rejected", "Rechazados"],
+          ["deleted", "Eliminados"],
+          ["all", "Todos"],
         ] as const).map(([k, label]) => (
           <button
             key={k}
@@ -304,22 +315,22 @@ export default function AdminUsersPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="grid grid-cols-12 px-4 py-3 text-xs font-bold text-gray-500 uppercase bg-gray-50 border-b border-gray-100">
-          <div className="col-span-3">{t("admin.users.colUser")}</div>
-          <div className="col-span-2">{t("common.email")}</div>
-          <div className="col-span-1">{t("admin.users.colRole")}</div>
-          <div className="col-span-1">{t("admin.users.colStatus")}</div>
-          <div className="col-span-3">{t("admin.users.linkPlayer")}</div>
-          <div className="col-span-2 text-right">{t("admin.users.colActions")}</div>
+        <div className="hidden md:grid grid-cols-12 px-4 py-3 text-xs font-bold text-gray-500 uppercase bg-gray-50 border-b border-gray-100">
+          <div className="col-span-3">Usuario</div>
+          <div className="col-span-2">Email</div>
+          <div className="col-span-1">Rol</div>
+          <div className="col-span-1">Estado</div>
+          <div className="col-span-3">Jugador vinculado</div>
+          <div className="col-span-2 text-right">Acciones</div>
         </div>
 
         {filtered.length === 0 ? (
-          <div className="p-6 text-gray-500">{t("common.noResults")}</div>
+          <div className="p-6 text-gray-500">No hay usuarios en esta sección.</div>
         ) : (
           filtered.map((u) => {
             const status = statusFromRow(u);
             const isMe = meId === u.id;
-            const isAdmin = (u.role ?? "").toString().toLowerCase() === "admin";
+            const isTargetAdmin = (u.role ?? "").toString().toLowerCase() === "admin";
             const linkedPlayerId = userPlayerMap[u.id] ?? null;
 
             // Jugadores disponibles: sin vincular + el actual
@@ -330,9 +341,9 @@ export default function AdminUsersPage() {
             return (
               <div
                 key={u.id}
-                className="grid grid-cols-12 px-4 py-4 border-b border-gray-100 items-center gap-2"
+                className="grid grid-cols-1 md:grid-cols-12 px-4 py-4 border-b border-gray-100 items-start md:items-center gap-3"
               >
-                <div className="col-span-3">
+                <div className="md:col-span-3">
                   <p className="font-semibold text-gray-900 flex items-center gap-2 flex-wrap">
                     {displayName(u)}
                     {isMe && (
@@ -340,24 +351,28 @@ export default function AdminUsersPage() {
                         Vos
                       </span>
                     )}
-                    {isAdmin && (
+                    {isTargetAdmin && (
                       <span className="text-[10px] px-2 py-1 rounded-full bg-purple-100 text-purple-700">
                         Admin
                       </span>
                     )}
                     {u.active === false && (
                       <span className="text-[10px] px-2 py-1 rounded-full bg-red-100 text-red-700">
-                        {u.deleted_at ? t("admin.management.tabs.deleted") : t("admin.users.inactive")}
+                        {u.deleted_at ? "Eliminado" : "Deshabilitado"}
                       </span>
                     )}
                   </p>
                   <p className="text-xs text-gray-500 truncate">{u.id}</p>
                 </div>
 
-                <div className="col-span-2 text-sm text-gray-700 truncate">{u.email ?? "—"}</div>
+                <div className="md:col-span-2 text-sm text-gray-700 min-w-0">
+                  <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Email</p>
+                  <p className="break-all">{u.email ?? "—"}</p>
+                </div>
 
-                <div className="col-span-1">
-                  {isAdmin ? (
+                <div className="md:col-span-1">
+                  <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Rol</p>
+                  {isTargetAdmin ? (
                     <span className="text-sm text-gray-700">admin</span>
                   ) : (
                     <select
@@ -374,7 +389,8 @@ export default function AdminUsersPage() {
                   )}
                 </div>
 
-                <div className="col-span-1">
+                <div className="md:col-span-1">
+                  <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Estado</p>
                   <span
                     className={`text-xs font-semibold px-2 py-1 rounded-full ${
                       status === "pending"
@@ -387,17 +403,20 @@ export default function AdminUsersPage() {
                     }`}
                   >
                     {status === "pending"
-                      ? t("common.pending")
+                      ? "Pendiente"
                       : status === "approved"
-                      ? t("common.approved")
+                      ? "Aprobado"
                       : status === "rejected"
-                      ? t("common.rejected")
-                      : t("admin.management.tabs.deleted")}
+                      ? "Rechazado"
+                      : "Eliminado"}
                   </span>
                 </div>
 
                 {/* Columna: Vincular Jugador */}
-                <div className="col-span-3">
+                <div className="md:col-span-3">
+                  <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">
+                    Jugador vinculado
+                  </p>
                   {status === "approved" || status === "pending" ? (
                     <select
                       value={linkedPlayerId ?? ""}
@@ -421,20 +440,21 @@ export default function AdminUsersPage() {
                   )}
                 </div>
 
-                <div className="col-span-2 flex justify-end gap-2 flex-wrap">
+                <div className="md:col-span-2 flex flex-col sm:flex-row md:justify-end gap-2 flex-wrap">
+                  <p className="md:hidden text-[11px] font-bold uppercase text-gray-500">Acciones</p>
                   {status === "pending" && (
                     <>
                       <button
                         onClick={() => approve(u.id)}
-                        className="bg-green-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-green-700 transition"
+                        className="w-full sm:w-auto bg-green-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-green-700 transition"
                       >
-                        {t("admin.playersApproval.approve")}
+                        Aprobar
                       </button>
                       <button
                         onClick={() => reject(u.id)}
-                        className="bg-red-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-red-700 transition"
+                        className="w-full sm:w-auto bg-red-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-red-700 transition"
                       >
-                        {t("admin.playersApproval.reject")}
+                        Rechazar
                       </button>
                     </>
                   )}
@@ -442,9 +462,9 @@ export default function AdminUsersPage() {
                   {status === "deleted" && (
                     <button
                       onClick={() => setActive(u.id, true)}
-                      className="bg-green-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-green-700 transition"
+                      className="w-full sm:w-auto bg-green-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-green-700 transition"
                     >
-                      {t("admin.users.activate")}
+                      Rehabilitar
                     </button>
                   )}
 
@@ -453,50 +473,50 @@ export default function AdminUsersPage() {
                       {u.active === false ? (
                         <button
                           onClick={() => setActive(u.id, true)}
-                          className="bg-green-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-green-700 transition"
+                          className="w-full sm:w-auto bg-green-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-green-700 transition"
                         >
-                          {t("admin.users.activate")}
+                          Habilitar
                         </button>
                       ) : (
                         <button
                           onClick={() => setActive(u.id, false)}
-                          disabled={isMe || isAdmin}
+                          disabled={isMe || isTargetAdmin}
                           title={
                             isMe
-                              ? t("admin.users.cantDeleteSelf")
-                              : isAdmin
-                              ? t("admin.users.cantDeleteAdmin")
+                              ? "No podés deshabilitarte a vos mismo"
+                              : isTargetAdmin
+                              ? "No se deshabilita el admin principal desde aquí"
                               : ""
                           }
-                          className="bg-gray-900 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-black transition disabled:opacity-40"
+                          className="w-full sm:w-auto bg-gray-900 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-black transition disabled:opacity-40"
                         >
-                          {t("admin.users.deactivate")}
+                          Deshabilitar
                         </button>
                       )}
 
-                      {!u.deleted_at && u.active !== false && (
+                      {canDeleteUsers && !u.deleted_at && u.active !== false && (
                         <button
                           onClick={() => softDelete(u.id)}
-                          disabled={isMe || isAdmin}
+                          disabled={isMe || isTargetAdmin}
                           title={
                             isMe
-                              ? t("admin.users.cantDeleteSelf")
-                              : isAdmin
-                              ? t("admin.users.cantDeleteAdmin")
-                              : ""
+                              ? "No podés eliminarte a vos mismo"
+                              : isTargetAdmin
+                              ? "No se elimina el admin principal desde aquí"
+                              : "Eliminar = deshabilitar (reversible)"
                           }
-                          className="bg-red-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-red-700 transition disabled:opacity-40"
+                          className="w-full sm:w-auto bg-red-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-red-700 transition disabled:opacity-40"
                         >
-                          {t("admin.users.delete")}
+                          Eliminar
                         </button>
                       )}
 
                       {status === "rejected" && (
                         <button
                           onClick={() => approve(u.id)}
-                          className="bg-green-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-green-700 transition"
+                          className="w-full sm:w-auto bg-green-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-green-700 transition"
                         >
-                          {t("admin.playersApproval.approve")}
+                          Aprobar
                         </button>
                       )}
                     </>
@@ -509,7 +529,7 @@ export default function AdminUsersPage() {
       </div>
 
       <p className="text-xs text-gray-500">
-        Nota: &quot;Eliminar&quot; es una baja lógica (reversible). El usuario pasa a la pestaña &quot;Eliminados&quot; y puede ser rehabilitado.
+        Nota: "Eliminar" es una baja lógica (reversible). El usuario pasa a la pestaña "Eliminados" y puede ser rehabilitado.
       </p>
     </main>
   );
