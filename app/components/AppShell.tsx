@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
+import LanguageSelector from "./LanguageSelector";
 import { Toaster } from "react-hot-toast";
 import toast from "react-hot-toast";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -50,12 +51,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // Evita duplicar toasts en re-renders
   const lastToastKeyRef = useRef<string>("");
 
-  // 1) Session guard (lo que ya tenías)
   useEffect(() => {
     setMobileOpen(false);
+  }, [pathname]);
 
-    const isAuthPublic = pathname === "/login" || pathname === "/register";
-    if (isAuthPublic) {
+  // 1) Session guard
+  useEffect(() => {
+    if (isAuthPage) {
       sessionStorage.removeItem("unauthorized_redirect");
       setCheckingSession(false);
       return;
@@ -79,15 +81,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       } = await supabaseRef.current.auth.getSession();
 
       if (!session) {
-        router.replace("/login");
-        return;
+        // Retry corto para evitar falsos negativos de sesión en mobile.
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        const {
+          data: { session: retriedSession },
+        } = await supabaseRef.current.auth.getSession();
+
+        if (!retriedSession) {
+          router.replace("/login");
+          return;
+        }
       }
 
       setCheckingSession(false);
     };
 
     checkSession();
-  }, [pathname, router]);
+  }, [isAuthPage, router]);
 
   // 2) Sidebar slide-in transition after login
   useEffect(() => {
@@ -157,12 +167,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* COLUMNA PRINCIPAL */}
         <div className="flex-1 flex flex-col">
           {/* HEADER MOBILE */}
-          <header className="md:hidden relative flex items-center justify-center px-4 py-4 bg-[#05070b] border-b border-gray-800">
+          <header className="md:hidden fixed inset-x-0 top-0 z-30 relative flex items-center justify-center px-4 py-4 bg-[#05070b]/95 backdrop-blur border-b border-gray-800">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2">
+              <div className="rounded-md border border-white/25 bg-black/30 px-1 py-1">
+                <LanguageSelector />
+              </div>
+            </div>
+
             <div className="text-center">
               <p className="text-[11px] font-extrabold tracking-[0.26em] text-white uppercase">
-                PadelX QA
+                TWINCO
               </p>
-              <p className="text-[9px] font-semibold tracking-[0.32em] text-[#00b4ff] uppercase mt-1">
+              <p className="text-[9px] font-semibold tracking-[0.32em] text-[#ccff00] uppercase mt-1">
                 Pádel Manager
               </p>
             </div>
@@ -170,7 +186,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               aria-label={mobileOpen ? t("shell.closeMenu") : t("shell.openMenu")}
-              className="absolute right-4 inline-flex items-center gap-2 rounded-md border border-white/40 bg-black/30 px-3 py-2 shadow-sm hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#05070b] focus:ring-[#00b4ff]"
+              data-testid="mobile-menu-toggle"
+              className="absolute right-4 inline-flex items-center gap-2 rounded-md border border-white/40 bg-black/30 px-3 py-2 shadow-sm hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#05070b] focus:ring-[#ccff00]"
               style={{ color: "#ffffff" }}
               onClick={() => setMobileOpen((o) => !o)}
             >
@@ -200,14 +217,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </header>
 
           {/* CONTENIDO */}
-          <div className="flex-1 bg-gray-50">{children}</div>
+          <div className="flex-1 bg-gray-50 pt-[72px] md:pt-0">{children}</div>
         </div>
 
         {/* OVERLAY MOBILE — slide-in transition */}
         {mobileOpen && (
           <div className="fixed inset-0 z-40 md:hidden">
             <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
-            <div className="absolute inset-y-0 left-0 w-64 max-w-[80%] animate-slide-in-left">
+            <div className="absolute inset-y-0 left-0 w-64 max-w-[80%] overflow-hidden animate-slide-in-left">
               <Sidebar onLinkClick={() => setMobileOpen(false)} />
             </div>
           </div>

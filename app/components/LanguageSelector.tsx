@@ -17,6 +17,7 @@ export default function LanguageSelector() {
         <button
           key={lang.code}
           onClick={() => setLocale(lang.code)}
+          data-testid={`lang-${lang.code}`}
           className={`px-2 py-1 rounded text-sm transition ${
             locale === lang.code
               ? "bg-[#00b4ff]/20 text-[#00b4ff] ring-1 ring-[#00b4ff]/40"

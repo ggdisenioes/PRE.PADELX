@@ -11,29 +11,29 @@ function getBaseDomain(hostname: string) {
   return parts.slice(-2).join(".");
 }
 
+function getLoginMessage(errorCode: string | null, t: (key: string) => string) {
+  switch (errorCode) {
+    case "tenant_incorrecto":
+      return t("errors.tenantIncorrecto");
+    case "usuario_deshabilitado":
+      return t("auth.userDisabled");
+    case "tenant_no_asignado":
+      return t("errors.tenantNoAsignado");
+    case "perfil_no_encontrado":
+      return t("errors.perfilNoEncontrado");
+    case "tenant_invalido":
+      return t("errors.tenantInvalido");
+    case "aprobacion_en_curso":
+      return t("auth.pendingApproval");
+    default:
+      return null;
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useTranslation();
-
-  function getLoginMessage(errorCode: string | null) {
-    switch (errorCode) {
-      case "tenant_incorrecto":
-        return t("errors.tenantIncorrecto");
-      case "usuario_deshabilitado":
-        return t("errors.usuarioDeshabilitado");
-      case "tenant_no_asignado":
-        return t("errors.tenantNoAsignado");
-      case "perfil_no_encontrado":
-        return t("errors.perfilNoEncontrado");
-      case "tenant_invalido":
-        return t("errors.tenantInvalido");
-      case "aprobacion_en_curso":
-        return t("auth.pendingApproval");
-      default:
-        return null;
-    }
-  }
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -52,7 +52,7 @@ export default function LoginPage() {
   }, [tenantSlug]);
 
   useEffect(() => {
-    const msg = getLoginMessage(errorCode);
+    const msg = getLoginMessage(errorCode, t);
     if (msg) setErrorMsg(msg);
   }, [errorCode]);
 
@@ -100,24 +100,24 @@ export default function LoginPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-900 relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-        <div className="absolute right-0 top-0 w-64 h-64 bg-[#00b4ff] rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
+        <div className="absolute right-0 top-0 w-64 h-64 bg-[#ccff00] rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
       </div>
 
-      <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md z-10 border-t-4 border-[#00b4ff]">
+      <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md z-10 border-t-4 border-[#ccff00]">
         <div className="text-center mb-6">
-          <h1 className="text-4xl font-extrabold text-gray-900 italic tracking-tight">PadelX QA</h1>
-          <span className="inline-block bg-gray-900 text-[#00b4ff] px-2 py-0.5 text-xs font-bold tracking-[0.2em] uppercase rounded-sm mt-1">
+          <h1 className="text-4xl font-extrabold text-gray-900 italic tracking-tight">PadelX</h1>
+          <span className="inline-block bg-gray-900 text-[#ccff00] px-2 py-0.5 text-xs font-bold tracking-[0.2em] uppercase rounded-sm mt-1">
             Dashboard
           </span>
-          <p className="text-gray-400 text-sm mt-4">{t("auth.welcome")}</p>
+          <p className="text-gray-400 text-sm mt-4">Bienvenido</p>
         </div>
 
         {/* Banner PRO para tenant incorrecto */}
         {errorCode === "tenant_incorrecto" && (
           <div className="bg-amber-50 border-l-4 border-amber-500 text-amber-900 p-3 mb-4 text-sm rounded-r">
-            <p className="font-semibold">{t("auth.loginSubtitle")}</p>
+            <p className="font-semibold">Acceso por subdominio incorrecto</p>
             <p className="mt-1">
-              {t("errors.tenantIncorrecto")}
+              Este usuario pertenece a otro club. Para evitar errores, ingresá desde el subdominio correcto.
             </p>
 
             {tenantRedirectUrl && (
@@ -125,7 +125,7 @@ export default function LoginPage() {
                 href={tenantRedirectUrl}
                 className="inline-flex mt-3 items-center justify-center rounded-lg bg-gray-900 text-white font-bold px-4 py-2 hover:bg-black transition"
               >
-                {t("auth.loginHere")}
+                Ir al club correcto
               </a>
             )}
           </div>
@@ -139,23 +139,25 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">{t("auth.email")}</label>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Email</label>
             <input
               type="email"
               required
-              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00b4ff] focus:border-transparent outline-none transition bg-gray-50"
-              placeholder="usuario@padelx.es"
+              data-testid="login-email"
+              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ccff00] focus:border-transparent outline-none transition bg-gray-50"
+              placeholder="usuario@twinco.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">{t("auth.password")}</label>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Contraseña</label>
             <input
               type="password"
               required
-              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00b4ff] focus:border-transparent outline-none transition bg-gray-50"
+              data-testid="login-password"
+              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ccff00] focus:border-transparent outline-none transition bg-gray-50"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -165,29 +167,30 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
+            data-testid="login-submit"
             className="w-full bg-gray-900 text-white font-bold py-3.5 rounded-lg hover:bg-black transition duration-200 disabled:opacity-70 shadow-lg"
           >
-            {loading ? t("auth.loggingIn") : t("auth.login")}
+            {loading ? "Accediendo..." : "Iniciar Sesión"}
           </button>
           <button
             type="button"
             onClick={() => router.push("/register")}
             className="w-full bg-white text-gray-900 font-bold py-3.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-200 shadow-sm"
           >
-            {t("auth.register")}
+            Registrarme
           </button>
           <p className="text-xs text-gray-500 text-center">
-            {t("auth.noClubHint")}
+            Si no ves tu club en el registro, contactá al administrador.
           </p>
         </form>
 
         <div className="mt-8 pt-6 border-t border-gray-100 text-center">
           <p className="text-xs text-gray-400">
-            {t("common.developedBy")}{" "}
+            Desarrollado por{" "}
             <a
               href="https://ggdisenio.es"
               target="_blank"
-              className="text-gray-600 hover:text-[#0099dd] font-bold transition"
+              className="text-gray-600 hover:text-[#aacc00] font-bold transition"
             >
               GGDisenio.es
             </a>

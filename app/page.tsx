@@ -1141,7 +1141,10 @@ export default function DashboardPage() {
           <aside className="lg:col-span-4 space-y-6">
             {/* CENTRO DE TAREAS */}
             {canManageUsers && (
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+              <div
+                data-testid="task-center"
+                className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5"
+              >
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
                     {t("dashboard.taskCenter")}

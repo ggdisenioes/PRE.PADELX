@@ -35,3 +35,29 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 # padel-manager
+
+## E2E Regression
+
+This project includes Playwright regression tests for:
+
+- Public smoke pages (`/login`, `/register`)
+- Role permissions (`admin`, `manager`, `user`)
+- Mobile menu/session navigation
+- Dashboard i18n checks (ES/EN)
+
+### Local run
+
+```bash
+npm run test:e2e:install
+npm run test:e2e
+```
+
+For role-based tests, define these env vars:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `E2E_ADMIN_EMAIL` / `E2E_ADMIN_PASSWORD`
+- `E2E_MANAGER_EMAIL` / `E2E_MANAGER_PASSWORD`
+- `E2E_USER_EMAIL` / `E2E_USER_PASSWORD`
+
+If credentials are missing, authenticated suites are skipped and only public smoke tests run.
