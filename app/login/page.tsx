@@ -227,16 +227,16 @@ export default function LoginPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-900 relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-        <div className="absolute right-0 top-0 w-64 h-64 bg-[#ccff00] rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
+        <div className="absolute right-0 top-0 w-64 h-64 bg-[#00b4ff] rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
       </div>
 
-      <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md z-10 border-t-4 border-[#ccff00]">
+      <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md z-10 border-t-4 border-[#00b4ff]">
         <div className="text-center mb-6">
-          <h1 className="text-4xl font-extrabold text-gray-900 italic tracking-tight">PadelX</h1>
-          <span className="inline-block bg-gray-900 text-[#ccff00] px-2 py-0.5 text-xs font-bold tracking-[0.2em] uppercase rounded-sm mt-1">
-            Dashboard
+          <h1 className="text-4xl font-extrabold text-gray-900 italic tracking-tight">PadelX QA</h1>
+          <span className="inline-block bg-[#00b4ff]/10 text-[#00b4ff] px-2 py-0.5 text-xs font-bold tracking-[0.2em] uppercase rounded-sm mt-1">
+            QA
           </span>
-          <p className="text-gray-400 text-sm mt-4">Bienvenido</p>
+          <p className="text-gray-400 text-sm mt-4">Bienvenido a PadelX QA</p>
         </div>
 
         {/* Banner PRO para tenant incorrecto */}
@@ -271,7 +271,7 @@ export default function LoginPage() {
               type="email"
               required
               data-testid="login-email"
-              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ccff00] focus:border-transparent outline-none transition bg-gray-50"
+              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00b4ff] focus:border-transparent outline-none transition bg-gray-50"
               placeholder="usuario@twinco.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -284,7 +284,7 @@ export default function LoginPage() {
               type="password"
               required
               data-testid="login-password"
-              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ccff00] focus:border-transparent outline-none transition bg-gray-50"
+              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#00b4ff] focus:border-transparent outline-none transition bg-gray-50"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -331,7 +331,7 @@ export default function LoginPage() {
             <a
               href="https://ggdisenio.es"
               target="_blank"
-              className="text-gray-600 hover:text-[#aacc00] font-bold transition"
+              className="text-gray-600 hover:text-[#00b4ff] font-bold transition"
             >
               GGDisenio.es
             </a>
