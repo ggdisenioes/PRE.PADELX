@@ -91,7 +91,22 @@
     "userDisabled": "Usuario deshabilitado, contacte su administrador.",
     "noClubHint": "Si no ves tu club en el registro, contactá al administrador.",
     "accountDeactivated": "Tu cuenta fue desactivada. Contactá al administrador.",
-    "sessionInvalid": "Sesión inválida"
+    "sessionInvalid": "Sesión inválida",
+    "passkeySignIn": "Ingresar con biometría",
+    "passkeyNeedEmail": "Ingresá tu email para usar biometría.",
+    "passkeyUnavailable": "Tu navegador o dispositivo no soporta biometría web.",
+    "passkeyNoRegistered": "No hay biometría registrada para este email.",
+    "passkeyLoginError": "No se pudo iniciar sesión con biometría.",
+    "passkeyVerifying": "Verificando biometría...",
+    "passkeySetupTitle": "Acceso biométrico",
+    "passkeySetupDescription": "Activá Face ID / huella en este dispositivo para ingresar más rápido.",
+    "passkeySetupButton": "Activar en este dispositivo",
+    "passkeySetupSuccess": "Biometría activada correctamente.",
+    "passkeySetupError": "No se pudo activar biometría.",
+    "passkeyListTitle": "Dispositivos biométricos",
+    "passkeyListEmpty": "Aún no tenés dispositivos registrados.",
+    "passkeyRemove": "Quitar",
+    "passkeyRemoved": "Dispositivo biométrico eliminado."
   },
   "errors": {
     "tenantIncorrecto": "Este usuario pertenece a otro club. Te redirigimos al subdominio correcto.",

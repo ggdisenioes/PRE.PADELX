@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "../i18n";
+import {
+  browserSupportsWebAuthn,
+  startAuthentication,
+} from "@simplewebauthn/browser";
 
 function getBaseDomain(hostname: string) {
   const parts = hostname.split(".");
@@ -30,6 +34,14 @@ function getLoginMessage(errorCode: string | null, t: (key: string) => string) {
   }
 }
 
+async function safeReadJson(response: Response): Promise<Record<string, unknown>> {
+  try {
+    return (await response.json()) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,7 +50,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [passkeySupported, setPasskeySupported] = useState(false);
 
   const errorCode = searchParams.get("error");
   const tenantSlug = searchParams.get("tenant");
@@ -52,9 +66,53 @@ export default function LoginPage() {
   }, [tenantSlug]);
 
   useEffect(() => {
+    let active = true;
+
+    const checkPasskeySupport = async () => {
+      try {
+        const browserSupport = browserSupportsWebAuthn();
+        if (!browserSupport) {
+          if (active) setPasskeySupported(false);
+          return;
+        }
+        if (active) setPasskeySupported(true);
+      } catch {
+        if (active) setPasskeySupported(false);
+      }
+    };
+
+    checkPasskeySupport();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const msg = getLoginMessage(errorCode, t);
     if (msg) setErrorMsg(msg);
-  }, [errorCode]);
+  }, [errorCode, t]);
+
+  const validateProfileAndRedirect = async (userId: string, fallbackError: string) => {
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("active, role")
+      .eq("id", userId)
+      .single();
+
+    if (profileError || !profile || profile.active === false) {
+      await supabase.auth.signOut();
+      setErrorMsg(
+        profile && profile.active === false
+          ? t("auth.pendingApproval")
+          : fallbackError
+      );
+      return;
+    }
+
+    router.push(profile?.role === "super_admin" ? "/super-admin" : "/");
+    router.refresh();
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,25 +134,94 @@ export default function LoginPage() {
       return;
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("active, role")
-      .eq("id", data.user.id)
-      .single();
+    await validateProfileAndRedirect(data.user.id, t("auth.userDisabled"));
+    setLoading(false);
+  };
 
-    if (profileError || !profile || profile.active === false) {
-      await supabase.auth.signOut();
-      setErrorMsg(
-        profile && profile.active === false
-          ? t("auth.pendingApproval")
-          : t("auth.userDisabled")
-      );
-      setLoading(false);
+  const handlePasskeyLogin = async () => {
+    if (!passkeySupported) {
+      setErrorMsg(t("auth.passkeyUnavailable"));
       return;
     }
 
-    router.push(profile?.role === "super_admin" ? "/super-admin" : "/");
-    router.refresh();
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setErrorMsg(t("auth.passkeyNeedEmail"));
+      return;
+    }
+
+    setPasskeyLoading(true);
+    setErrorMsg(null);
+
+    try {
+      const optionsRes = await fetch("/api/auth/passkeys/authenticate/options", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail }),
+      });
+
+      const optionsPayload = await safeReadJson(optionsRes);
+      if (!optionsRes.ok || !optionsPayload.options) {
+        const errCode = String(optionsPayload.error || "");
+        if (errCode === "no_passkeys_registered" || optionsRes.status === 404) {
+          setErrorMsg(t("auth.passkeyNoRegistered"));
+        } else {
+          setErrorMsg(t("auth.passkeyLoginError"));
+        }
+        return;
+      }
+
+      const credential = await startAuthentication({
+        optionsJSON: optionsPayload.options as Parameters<typeof startAuthentication>[0]["optionsJSON"],
+      });
+
+      const verifyRes = await fetch("/api/auth/passkeys/authenticate/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          credential,
+        }),
+      });
+
+      const verifyPayload = await safeReadJson(verifyRes);
+      if (!verifyRes.ok) {
+        setErrorMsg(t("auth.passkeyLoginError"));
+        return;
+      }
+
+      const otpToken =
+        typeof verifyPayload.otpToken === "string" ? verifyPayload.otpToken : null;
+      const otpType =
+        typeof verifyPayload.otpType === "string" ? verifyPayload.otpType : "magiclink";
+      const verifiedEmail =
+        typeof verifyPayload.email === "string"
+          ? verifyPayload.email
+          : normalizedEmail;
+
+      if (!otpToken) {
+        setErrorMsg(t("auth.passkeyLoginError"));
+        return;
+      }
+
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: verifiedEmail,
+        token: otpToken,
+        type: otpType as "magiclink",
+      });
+
+      if (error || !data.session || !data.user) {
+        setErrorMsg(error?.message || t("auth.passkeyLoginError"));
+        return;
+      }
+
+      await validateProfileAndRedirect(data.user.id, t("auth.userDisabled"));
+    } catch (error) {
+      console.error("passkey login error", error);
+      setErrorMsg(t("auth.passkeyLoginError"));
+    } finally {
+      setPasskeyLoading(false);
+    }
   };
 
   return (
@@ -166,12 +293,26 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || passkeyLoading}
             data-testid="login-submit"
             className="w-full bg-gray-900 text-white font-bold py-3.5 rounded-lg hover:bg-black transition duration-200 disabled:opacity-70 shadow-lg"
           >
             {loading ? "Accediendo..." : "Iniciar Sesión"}
           </button>
+
+          <button
+            type="button"
+            disabled={passkeyLoading || loading}
+            onClick={() => void handlePasskeyLogin()}
+            className="w-full bg-white text-gray-900 font-bold py-3.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-200 shadow-sm disabled:opacity-60"
+          >
+            {passkeyLoading ? t("auth.passkeyVerifying") : t("auth.passkeySignIn")}
+          </button>
+
+          {!passkeySupported && (
+            <p className="text-xs text-amber-600 text-center">{t("auth.passkeyUnavailable")}</p>
+          )}
+
           <button
             type="button"
             onClick={() => router.push("/register")}

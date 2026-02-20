@@ -4,6 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import toast from "react-hot-toast";
 import { formatDateMadrid } from "@/lib/dates";
+import {
+  browserSupportsWebAuthn,
+  startRegistration,
+} from "@simplewebauthn/browser";
+import { useTranslation } from "@/i18n";
 
 type PlayerData = {
   id: number;
@@ -39,7 +44,15 @@ type HistoryItem = {
   dateLabel: string;
 };
 
+type PasskeyDevice = {
+  id: number;
+  device_name: string | null;
+  created_at: string | null;
+  last_used_at: string | null;
+};
+
 export default function MiCuentaPage() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [player, setPlayer] = useState<PlayerData | null>(null);
   const [stats, setStats] = useState({ wins: 0, losses: 0, total: 0 });
@@ -55,12 +68,58 @@ export default function MiCuentaPage() {
   const [name, setName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [passkeySupported, setPasskeySupported] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [passkeyDevices, setPasskeyDevices] = useState<PasskeyDevice[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const winRate = useMemo(() => {
     if (!stats.total) return 0;
     return Math.round((stats.wins / stats.total) * 100);
   }, [stats]);
+
+  useEffect(() => {
+    let active = true;
+
+    const checkSupport = async () => {
+      try {
+        const browserSupport = browserSupportsWebAuthn();
+        if (!browserSupport) {
+          if (active) setPasskeySupported(false);
+          return;
+        }
+        if (active) setPasskeySupported(true);
+      } catch {
+        if (active) setPasskeySupported(false);
+      }
+    };
+
+    checkSupport();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const getAccessToken = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    return session?.access_token ?? null;
+  };
+
+  const loadPasskeyDevices = async () => {
+    const token = await getAccessToken();
+    if (!token) return;
+
+    const response = await fetch("/api/auth/passkeys/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) return;
+    const payload = (await response.json()) as { credentials?: PasskeyDevice[] };
+    setPasskeyDevices(payload.credentials || []);
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -153,11 +212,111 @@ export default function MiCuentaPage() {
       setStats({ wins, losses, total: wins + losses });
       historyData.sort((a, b) => b.ts - a.ts);
       setHistory(historyData.slice(0, 20));
+      await loadPasskeyDevices();
       setLoading(false);
     };
 
     load();
   }, []);
+
+  const handleEnablePasskey = async () => {
+    if (!passkeySupported) {
+      toast.error(t("auth.passkeyUnavailable"));
+      return;
+    }
+
+    const token = await getAccessToken();
+    if (!token) {
+      toast.error(t("auth.loginRequired"));
+      return;
+    }
+
+    setPasskeyBusy(true);
+
+    try {
+      const optionsResponse = await fetch("/api/auth/passkeys/register/options", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const optionsPayload = (await optionsResponse.json().catch(() => ({}))) as {
+        options?: Parameters<typeof startRegistration>[0]["optionsJSON"];
+      };
+
+      if (!optionsResponse.ok || !optionsPayload.options) {
+        toast.error(t("auth.passkeySetupError"));
+        return;
+      }
+
+      const credential = await startRegistration({
+        optionsJSON: optionsPayload.options,
+      });
+
+      const verifyResponse = await fetch("/api/auth/passkeys/register/verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          credential,
+          deviceName:
+            typeof navigator !== "undefined"
+              ? navigator.userAgent.slice(0, 120)
+              : null,
+        }),
+      });
+
+      if (!verifyResponse.ok) {
+        toast.error(t("auth.passkeySetupError"));
+        return;
+      }
+
+      toast.success(t("auth.passkeySetupSuccess"));
+      await loadPasskeyDevices();
+    } catch (error) {
+      console.error("passkey setup error", error);
+      toast.error(t("auth.passkeySetupError"));
+    } finally {
+      setPasskeyBusy(false);
+    }
+  };
+
+  const handleRemovePasskey = async (id: number) => {
+    const token = await getAccessToken();
+    if (!token) {
+      toast.error(t("auth.loginRequired"));
+      return;
+    }
+
+    setPasskeyBusy(true);
+    try {
+      const response = await fetch("/api/auth/passkeys/me", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id }),
+      });
+
+      if (!response.ok) {
+        toast.error(t("auth.passkeySetupError"));
+        return;
+      }
+
+      toast.success(t("auth.passkeyRemoved"));
+      await loadPasskeyDevices();
+    } catch (error) {
+      console.error("passkey remove error", error);
+      toast.error(t("auth.passkeySetupError"));
+    } finally {
+      setPasskeyBusy(false);
+    }
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -389,6 +548,67 @@ export default function MiCuentaPage() {
               </p>
             )}
           </div>
+        </div>
+      </section>
+
+      {/* Biometrics / Passkeys */}
+      <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">{t("auth.passkeySetupTitle")}</h2>
+            <p className="text-sm text-gray-500 mt-1">{t("auth.passkeySetupDescription")}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleEnablePasskey()}
+            disabled={!passkeySupported || passkeyBusy}
+            className="rounded-xl bg-gray-900 text-white px-4 py-2 text-sm font-semibold hover:bg-black transition disabled:opacity-50"
+          >
+            {passkeyBusy ? t("auth.passkeyVerifying") : t("auth.passkeySetupButton")}
+          </button>
+        </div>
+
+        {!passkeySupported && (
+          <p className="text-xs text-amber-600">{t("auth.passkeyUnavailable")}</p>
+        )}
+
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            {t("auth.passkeyListTitle")}
+          </p>
+          {passkeyDevices.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-gray-200 p-3 text-sm text-gray-500">
+              {t("auth.passkeyListEmpty")}
+            </p>
+          ) : (
+            passkeyDevices.map((device) => (
+              <div
+                key={device.id}
+                className="rounded-lg border border-gray-200 p-3 flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">
+                    {device.device_name || `Device #${device.id}`}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {device.last_used_at
+                      ? `Último uso: ${formatDateMadrid(device.last_used_at)}`
+                      : `Registrado: ${
+                          device.created_at ? formatDateMadrid(device.created_at) : "—"
+                        }`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleRemovePasskey(device.id)}
+                  disabled={passkeyBusy}
+                  className="shrink-0 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+                >
+                  {t("auth.passkeyRemove")}
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </section>
 

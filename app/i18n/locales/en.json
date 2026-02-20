@@ -91,7 +91,22 @@
     "userDisabled": "User disabled, contact your administrator.",
     "noClubHint": "If you don't see your club in registration, contact the administrator.",
     "accountDeactivated": "Your account has been deactivated. Contact the administrator.",
-    "sessionInvalid": "Invalid session"
+    "sessionInvalid": "Invalid session",
+    "passkeySignIn": "Sign in with biometrics",
+    "passkeyNeedEmail": "Enter your email to use biometrics.",
+    "passkeyUnavailable": "Your browser or device does not support WebAuthn biometrics.",
+    "passkeyNoRegistered": "No biometric passkeys are registered for this email.",
+    "passkeyLoginError": "Could not sign in with biometrics.",
+    "passkeyVerifying": "Verifying biometrics...",
+    "passkeySetupTitle": "Biometric access",
+    "passkeySetupDescription": "Enable Face ID / fingerprint on this device for faster sign-in.",
+    "passkeySetupButton": "Enable on this device",
+    "passkeySetupSuccess": "Biometrics enabled successfully.",
+    "passkeySetupError": "Could not enable biometrics.",
+    "passkeyListTitle": "Biometric devices",
+    "passkeyListEmpty": "You have no registered devices yet.",
+    "passkeyRemove": "Remove",
+    "passkeyRemoved": "Biometric device removed."
   },
   "errors": {
     "tenantIncorrecto": "This user belongs to another club. We're redirecting you to the correct subdomain.",
