@@ -95,7 +95,7 @@
     "passkeySignIn": "Ingresar con biometría",
     "passkeyNeedEmail": "Ingresá tu email para usar biometría.",
     "passkeyUnavailable": "Tu navegador o dispositivo no soporta biometría web.",
-    "passkeyNoRegistered": "No hay biometría registrada para este email.",
+    "passkeyNoRegistered": "Para activar el acceso biométrico, registrá este dispositivo desde Mi Cuenta.",
     "passkeyLoginError": "No se pudo iniciar sesión con biometría.",
     "passkeyVerifying": "Verificando biometría...",
     "passkeySetupTitle": "Acceso biométrico",

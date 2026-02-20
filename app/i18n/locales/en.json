@@ -95,7 +95,7 @@
     "passkeySignIn": "Sign in with biometrics",
     "passkeyNeedEmail": "Enter your email to use biometrics.",
     "passkeyUnavailable": "Your browser or device does not support WebAuthn biometrics.",
-    "passkeyNoRegistered": "No biometric passkeys are registered for this email.",
+    "passkeyNoRegistered": "To enable biometric access, register this device from My Account.",
     "passkeyLoginError": "Could not sign in with biometrics.",
     "passkeyVerifying": "Verifying biometrics...",
     "passkeySetupTitle": "Biometric access",

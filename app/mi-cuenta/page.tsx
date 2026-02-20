@@ -51,6 +51,34 @@ type PasskeyDevice = {
   last_used_at: string | null;
 };
 
+function detectDevicePlatform(userAgent: string) {
+  const ua = userAgent.toLowerCase();
+  if (ua.includes("iphone")) return "iPhone";
+  if (ua.includes("ipad")) return "iPad";
+  if (ua.includes("android")) return "Android";
+  if (ua.includes("mac os") || ua.includes("macintosh")) return "Mac";
+  if (ua.includes("windows")) return "Windows";
+  if (ua.includes("linux")) return "Linux";
+  return "Device";
+}
+
+function detectBrowserName(userAgent: string) {
+  const ua = userAgent.toLowerCase();
+  if (ua.includes("edg/")) return "Edge";
+  if (ua.includes("chrome/") && !ua.includes("edg/")) return "Chrome";
+  if (ua.includes("safari/") && !ua.includes("chrome/")) return "Safari";
+  if (ua.includes("firefox/")) return "Firefox";
+  return "Browser";
+}
+
+function buildPasskeyDeviceName() {
+  if (typeof navigator === "undefined") return "This device";
+  const ua = navigator.userAgent || "";
+  const platform = detectDevicePlatform(ua);
+  const browser = detectBrowserName(ua);
+  return `${platform} · ${browser}`;
+}
+
 export default function MiCuentaPage() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
@@ -263,10 +291,7 @@ export default function MiCuentaPage() {
         },
         body: JSON.stringify({
           credential,
-          deviceName:
-            typeof navigator !== "undefined"
-              ? navigator.userAgent.slice(0, 120)
-              : null,
+          deviceName: buildPasskeyDeviceName(),
         }),
       });
 
@@ -584,13 +609,13 @@ export default function MiCuentaPage() {
             passkeyDevices.map((device) => (
               <div
                 key={device.id}
-                className="rounded-lg border border-gray-200 p-3 flex items-center justify-between gap-3"
+                className="rounded-lg border border-gray-200 p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
               >
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-900 break-words">
                     {device.device_name || `Device #${device.id}`}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 break-words">
                     {device.last_used_at
                       ? `Último uso: ${formatDateMadrid(device.last_used_at)}`
                       : `Registrado: ${
