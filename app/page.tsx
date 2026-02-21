@@ -1452,7 +1452,7 @@ export default function DashboardPage() {
                   <div style={{ textAlign: "center" }}>
                     <img
                       src="/logo.svg"
-                      alt="TWINCO"
+                      alt="PadelX QA"
                       style={{ height: 44, width: "auto", margin: "0 auto", objectFit: "contain" }}
                     />
                   </div>
@@ -1536,7 +1536,7 @@ export default function DashboardPage() {
                         height: 520,
                       });
                       const link = document.createElement("a");
-                      link.download = `Twinco_Partido_${match.id}.png`;
+                      link.download = `PadelX_QA_Partido_${match.id}.png`;
                       link.href = dataUrl;
                       link.click();
                       toast.success(t("matches.imageDownloaded"));

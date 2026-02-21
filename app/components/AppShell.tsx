@@ -167,7 +167,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* COLUMNA PRINCIPAL */}
         <div className="flex-1 flex flex-col">
           {/* HEADER MOBILE */}
-          <header className="md:hidden fixed inset-x-0 top-0 z-30 relative flex items-center justify-center px-4 py-4 bg-[#05070b]/95 backdrop-blur border-b border-gray-800">
+          <header className="md:hidden fixed inset-x-0 top-0 z-[70] flex items-center justify-center px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] bg-[#05070b]/95 backdrop-blur border-b border-gray-800 shadow-[0_8px_20px_rgba(0,0,0,0.35)]">
             <div className="absolute left-3 top-1/2 -translate-y-1/2">
               <div className="rounded-md border border-white/25 bg-black/30 px-1 py-1">
                 <LanguageSelector />
@@ -176,7 +176,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
             <div className="text-center">
               <p className="text-[11px] font-extrabold tracking-[0.26em] text-white uppercase">
-                TWINCO
+                PADELX QA
               </p>
               <p className="text-[9px] font-semibold tracking-[0.32em] text-[#ccff00] uppercase mt-1">
                 Pádel Manager
@@ -217,7 +217,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </header>
 
           {/* CONTENIDO */}
-          <div className="flex-1 bg-gray-50 pt-[72px] md:pt-0">{children}</div>
+          <div className="flex-1 bg-gray-50 pt-[88px] md:pt-0">{children}</div>
         </div>
 
         {/* OVERLAY MOBILE — slide-in transition */}

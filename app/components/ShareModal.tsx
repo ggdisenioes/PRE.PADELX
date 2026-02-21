@@ -29,7 +29,7 @@ export default function ShareModal({ match, onClose }: ShareModalProps) {
       // Truco para descargar el archivo
       const link = document.createElement('a');
       link.href = image;
-      link.download = `Partido-Demo-${match.id}.jpg`;
+      link.download = `Partido-QA-${match.id}.jpg`;
       link.click();
     } catch (err) {
       console.error("Error generando imagen", err);
@@ -57,7 +57,7 @@ export default function ShareModal({ match, onClose }: ShareModalProps) {
 
                 {/* Header */}
                 <div className="p-6 text-center border-b border-gray-800 z-10">
-                    <h1 className="text-3xl font-black italic tracking-tighter mb-1">DEMO</h1>
+                    <h1 className="text-3xl font-black italic tracking-tighter mb-1">QA</h1>
                     <p className="text-[#00b4ff] text-[10px] font-bold tracking-[0.3em] uppercase">PÁDEL MANAGER</p>
                 </div>
 

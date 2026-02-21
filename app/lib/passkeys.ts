@@ -91,7 +91,7 @@ export function resolvePasskeyOrigin(req: Request): string {
 }
 
 export function getPasskeyRPName() {
-  return process.env.PASSKEY_RP_NAME?.trim() || "Twinco PadelX";
+  return process.env.PASSKEY_RP_NAME?.trim() || "PadelX QA";
 }
 
 export function encodeBase64Url(data: string) {

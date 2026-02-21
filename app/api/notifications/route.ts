@@ -153,7 +153,7 @@ export async function POST(req: Request) {
           teamB,
           matchDate,
           court: courtText,
-          clubName: tenant?.name || "TWINCO",
+          clubName: tenant?.name || "PadelX QA",
         });
         totalSent += playerEmails.length;
       }

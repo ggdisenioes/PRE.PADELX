@@ -34,7 +34,7 @@ export default function RegisterPage() {
     // Reglas:
     // - Mostrar solo tenants activos (si existe is_active)
     // - Excluir tenants de pruebas (por slug)
-    // Para este momento (según tu consigna), debería quedar solo TWINCO.
+    // Para este entorno, debería quedar solo QA.
     return tenants
       .filter((t) => (t.is_active ?? true) === true)
       .filter((t) => {
@@ -69,7 +69,7 @@ export default function RegisterPage() {
       const list = (data as Tenant[]) || [];
       setTenants(list);
 
-      // Auto-seleccionar si solo hay 1 visible (por ejemplo, Twinco)
+      // Auto-seleccionar si solo hay 1 visible (por ejemplo, QA)
       const filtered = (list as Tenant[])
         .filter((t) => (t.is_active ?? true) === true)
         .filter((t) => {
