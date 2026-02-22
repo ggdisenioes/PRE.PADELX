@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { supabase } from "../lib/supabase";
 
-export type UserRole = "admin" | "manager" | "user";
+export type UserRole = "admin" | "manager" | "super_admin" | "user";
 
 type TokenClaims = {
   // Compatibilidad: hay proyectos que usan role/active y otros user_role/user_active
@@ -34,6 +34,18 @@ function decodeJwtPayload<T = unknown>(token: string): T | null {
   } catch {
     return null;
   }
+}
+
+function normalizeRole(value: unknown): UserRole | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "admin" || normalized === "manager" || normalized === "user") {
+    return normalized as UserRole;
+  }
+  if (normalized === "super_admin" || normalized === "super-admin" || normalized === "superadmin") {
+    return "super_admin";
+  }
+  return null;
 }
 
 export function useRole() {
@@ -85,9 +97,9 @@ export function useRole() {
           return;
         }
 
-        const validRoles: UserRole[] = ["admin", "manager", "user"];
-        if (typeof roleFromToken === "string" && validRoles.includes(roleFromToken as UserRole)) {
-          if (active) setRole(roleFromToken as UserRole);
+        const normalizedTokenRole = normalizeRole(roleFromToken);
+        if (normalizedTokenRole) {
+          if (active) setRole(normalizedTokenRole);
           // Si ya tenemos el rol del token, evitamos pegarle a la DB.
           return;
         }
@@ -118,8 +130,9 @@ export function useRole() {
           return;
         }
 
-        if (validRoles.includes(data.role)) {
-          if (active) setRole(data.role);
+        const normalizedDbRole = normalizeRole(data.role);
+        if (normalizedDbRole) {
+          if (active) setRole(normalizedDbRole);
         } else {
           console.warn("[useRole] invalid role value", data.role);
           if (active) setRole("user");
@@ -141,7 +154,8 @@ export function useRole() {
 
   return {
     role,
-    isAdmin: role === "admin",
+    isAdmin: role === "admin" || role === "super_admin",
+    isSuperAdmin: role === "super_admin",
     isManager: role === "manager",
     isUser: role === "user",
     loading,

@@ -3,7 +3,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useState, useEffect, useCallback } from 'react'; // ✅ CORRECCIÓN: Se cambió '=>' por 'from'
+import { useState, useEffect, useCallback, useMemo } from 'react'; // ✅ CORRECCIÓN: Se cambió '=>' por 'from'
 import { supabase } from '../lib/supabase'; // Asegúrate de la ruta correcta
 import { useRole } from '../hooks/useRole';
 import Card from '../components/Card';
@@ -45,6 +45,7 @@ export default function PlayersPage() {
     const { t } = useTranslation();
     const [players, setPlayers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState("");
 
     const { role, isAdmin, isManager, loading: roleLoading } = useRole();
 
@@ -201,9 +202,22 @@ export default function PlayersPage() {
         router.push(`/players/edit/${playerId}`); 
     };
 
+    const normalizeForSearch = (value: string) =>
+      value
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
 
-    const approvedPlayers = players.filter(p => p.is_approved);
-    const pendingPlayers = players.filter(p => !p.is_approved);
+    const filteredPlayers = useMemo(() => {
+      const term = normalizeForSearch(search.trim());
+      if (!term) return players;
+      return players.filter((p) =>
+        normalizeForSearch(String(p?.name || "")).includes(term)
+      );
+    }, [players, search]);
+
+    const approvedPlayers = filteredPlayers.filter(p => p.is_approved);
+    const pendingPlayers = filteredPlayers.filter(p => !p.is_approved);
 
     if (roleLoading) {
       return (
@@ -222,11 +236,18 @@ export default function PlayersPage() {
                     {t("players.title")}
                 </h2>
                 
-                <div className="flex w-full md:w-auto gap-3 items-stretch sm:items-center">
+                <div className="flex w-full md:w-auto gap-3 items-stretch sm:items-center flex-col sm:flex-row">
+                    <input
+                        type="search"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder={t("players.searchPlaceholder")}
+                        className="w-full sm:w-64 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#007bff]"
+                    />
                     {/* Botón + Nuevo Jugador */}
                     <Link 
                         href="/players/create" 
-                        className="bg-[#007bff] text-white px-4 py-2 rounded-lg hover:bg-[#0056b3] transition shadow-sm font-bold flex justify-center items-center gap-2"
+                        className="bg-[#007bff] text-white px-4 py-2 rounded-lg hover:bg-[#0056b3] transition shadow-sm font-bold flex justify-center items-center gap-2 whitespace-nowrap"
                     >
                         <span>+</span> {t("players.create")}
                     </Link>
