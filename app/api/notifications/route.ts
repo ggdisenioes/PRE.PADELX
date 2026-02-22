@@ -106,6 +106,7 @@ export async function POST(req: Request) {
       .single();
 
     let totalSent = 0;
+    let totalAttempted = 0;
 
     // Send notifications for each match
     for (const match of matches) {
@@ -135,14 +136,36 @@ export async function POST(req: Request) {
       const matchPlayerIds = [match.player_1_a, match.player_2_a, match.player_1_b, match.player_2_b]
         .filter((id): id is number => id != null);
 
+      const matchPlayers = players.filter((p: any) => matchPlayerIds.includes(p.id));
+      const skipped = matchPlayers.filter(
+        (p: any) => p.notify_email === false || !p.email
+      );
+      if (skipped.length > 0) {
+        console.warn(
+          `[notifications] Match ${match.id}: skipped recipients`,
+          skipped.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            email: p.email || "(vacío)",
+            reason: !p.email ? "sin email" : "notify_email=false",
+          }))
+        );
+      }
+
       // Send to ALL eligible players (one email per player, even if same email address)
-      const playerEmails = players
-        .filter((p: any) => matchPlayerIds.includes(p.id) && p.notify_email !== false && p.email)
+      const playerEmails = matchPlayers
+        .filter((p: any) => p.notify_email !== false && p.email)
         .map((p: any) => ({ name: p.name, email: p.email as string }));
 
+      console.log(
+        `[notifications] Match ${match.id}: recipients`,
+        playerEmails.map((p, i) => `${i + 1}. ${p.name} <${p.email}>`)
+      );
+
       if (playerEmails.length > 0) {
+        let delivery = { sent: 0, attempted: 0 };
         if (type === "match_created") {
-          await sendMatchNotification({
+          delivery = await sendMatchNotification({
             playerEmails,
             teamA,
             teamB,
@@ -151,7 +174,7 @@ export async function POST(req: Request) {
             clubName: tenant?.name || "PadelX QA",
           });
         } else if (type === "match_reminder") {
-          await sendMatchReminderNotification({
+          delivery = await sendMatchReminderNotification({
             playerEmails,
             teamA,
             teamB,
@@ -165,7 +188,7 @@ export async function POST(req: Request) {
             continue;
           }
 
-          await sendMatchFinishedNotification({
+          delivery = await sendMatchFinishedNotification({
             playerEmails,
             winners,
             losers,
@@ -176,11 +199,15 @@ export async function POST(req: Request) {
             clubName: tenant?.name || "PadelX QA",
           });
         }
-        totalSent += playerEmails.length;
+        totalSent += delivery.sent;
+        totalAttempted += delivery.attempted;
+        console.log(
+          `[notifications] Match ${match.id}: delivery summary sent=${delivery.sent} attempted=${delivery.attempted}`
+        );
       }
     }
 
-    return NextResponse.json({ ok: true, sent: totalSent });
+    return NextResponse.json({ ok: true, sent: totalSent, attempted: totalAttempted });
   } catch (error) {
     console.error("Notification error:", error);
     return NextResponse.json({ error: "Error sending notifications" }, { status: 500 });

@@ -8,6 +8,16 @@ function getResend() {
 const FROM_EMAIL = process.env.EMAIL_FROM || "PadelX <noreply@padelx.es>";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://qa.padelx.es";
 
+function makeDispatchId(prefix: string, index: number) {
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `${prefix}-${Date.now()}-${index}-${rand}`;
+}
+
+function sanitizeHeaderValue(value: string | undefined, fallback: string) {
+  const raw = value || fallback;
+  return raw.replace(/[^\x20-\x7E]+/g, " ").slice(0, 120);
+}
+
 function esc(str: string | null | undefined): string {
   if (!str) return "";
   return str
@@ -61,25 +71,39 @@ function baseLayout(title: string, bodyHtml: string) {
 </html>`;
 }
 
-export async function sendEmail(to: string, subject: string, htmlBody: string) {
+export async function sendEmail(
+  to: string,
+  subject: string,
+  htmlBody: string,
+  meta?: { dispatchId?: string; recipientName?: string }
+) {
   if (!process.env.RESEND_API_KEY) {
     console.warn("[email] RESEND_API_KEY not configured, skipping email to:", to);
-    return;
+    return false;
   }
 
   try {
-    const { error } = await getResend().emails.send({
+    const dispatchId = meta?.dispatchId || makeDispatchId("email", 0);
+    const { data, error } = await getResend().emails.send({
       from: FROM_EMAIL,
       to,
       subject,
       html: htmlBody,
+      headers: {
+        "X-PadelX-Dispatch-ID": dispatchId,
+        "X-PadelX-Recipient": sanitizeHeaderValue(meta?.recipientName, to),
+      },
     });
 
     if (error) {
-      console.error("[email] Resend error:", error);
+      console.error(`[email] Resend error (${dispatchId}) to ${to}:`, error);
+      return false;
     }
+    console.log(`[email] Sent (${dispatchId}) to ${to} id=${data?.id || "n/a"}`);
+    return true;
   } catch (err) {
     console.error("[email] Failed to send email:", err);
+    return false;
   }
 }
 
@@ -133,7 +157,10 @@ export async function sendChallengeNotification(opts: {
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
       <a class="btn" href="${APP_URL}/challenges">Ver desafío</a>`
     );
-    await sendEmail(challengerEmail, subjectChallenger, body);
+    await sendEmail(challengerEmail, subjectChallenger, body, {
+      dispatchId: makeDispatchId("challenge-challenger", 0),
+      recipientName: challengerName,
+    });
   }
 
   // Email al compañero del retador
@@ -146,7 +173,10 @@ export async function sendChallengeNotification(opts: {
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
       <a class="btn" href="${APP_URL}/challenges">Ver desafío</a>`
     );
-    await sendEmail(challengerPartnerEmail, subjectPartner, body);
+    await sendEmail(challengerPartnerEmail, subjectPartner, body, {
+      dispatchId: makeDispatchId("challenge-partner", 0),
+      recipientName: challengerPartnerName || challengerName,
+    });
   }
 
   // Email al desafiado principal
@@ -161,7 +191,10 @@ export async function sendChallengeNotification(opts: {
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
       <a class="btn" href="${APP_URL}/challenges">Ver desafío</a>`
     );
-    await sendEmail(challengedEmail, subjectChallenged, body);
+    await sendEmail(challengedEmail, subjectChallenged, body, {
+      dispatchId: makeDispatchId("challenge-challenged", 0),
+      recipientName: challengedName,
+    });
   }
 
   // Email al compañero del desafiado
@@ -176,7 +209,10 @@ export async function sendChallengeNotification(opts: {
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
       <a class="btn" href="${APP_URL}/challenges">Ver desafío</a>`
     );
-    await sendEmail(challengedPartnerEmail, subjectPartner, body);
+    await sendEmail(challengedPartnerEmail, subjectPartner, body, {
+      dispatchId: makeDispatchId("challenge-challenged-partner", 0),
+      recipientName: challengedPartnerName,
+    });
   }
 }
 
@@ -197,7 +233,11 @@ export async function sendMatchNotification(opts: {
   const safeCourt = esc(court);
   const subject = `Nuevo partido programado en ${safeClub}`;
 
-  for (const player of playerEmails) {
+  let sent = 0;
+  const attempted = playerEmails.filter((p) => !!p.email).length;
+
+  for (let i = 0; i < playerEmails.length; i++) {
+    const player = playerEmails[i];
     if (!player.email) continue;
 
     const safeName = esc(player.name);
@@ -214,8 +254,14 @@ export async function sendMatchNotification(opts: {
       <a class="btn" href="${APP_URL}/matches">Ver partido</a>`
     );
 
-    await sendEmail(player.email, subject, body);
+    const ok = await sendEmail(player.email, subject, body, {
+      dispatchId: makeDispatchId("match-created", i),
+      recipientName: player.name,
+    });
+    if (ok) sent += 1;
   }
+
+  return { sent, attempted };
 }
 
 export async function sendMatchReminderNotification(opts: {
@@ -235,7 +281,11 @@ export async function sendMatchReminderNotification(opts: {
   const safeCourt = esc(court);
   const subject = `Recordatorio de partido en ${safeClub}`;
 
-  for (const player of playerEmails) {
+  let sent = 0;
+  const attempted = playerEmails.filter((p) => !!p.email).length;
+
+  for (let i = 0; i < playerEmails.length; i++) {
+    const player = playerEmails[i];
     if (!player.email) continue;
 
     const safeName = esc(player.name);
@@ -252,8 +302,14 @@ export async function sendMatchReminderNotification(opts: {
       <a class="btn" href="${APP_URL}/matches">Ver partido</a>`
     );
 
-    await sendEmail(player.email, subject, body);
+    const ok = await sendEmail(player.email, subject, body, {
+      dispatchId: makeDispatchId("match-reminder", i),
+      recipientName: player.name,
+    });
+    if (ok) sent += 1;
   }
+
+  return { sent, attempted };
 }
 
 export async function sendMatchFinishedNotification(opts: {
@@ -286,7 +342,11 @@ export async function sendMatchFinishedNotification(opts: {
   const safeRound = esc(roundName);
   const subject = `Partido finalizado en ${safeClub}`;
 
-  for (const player of playerEmails) {
+  let sent = 0;
+  const attempted = playerEmails.filter((p) => !!p.email).length;
+
+  for (let i = 0; i < playerEmails.length; i++) {
+    const player = playerEmails[i];
     if (!player.email) continue;
 
     const safeName = esc(player.name);
@@ -306,8 +366,14 @@ export async function sendMatchFinishedNotification(opts: {
       <a class="btn" href="${APP_URL}/matches">Ver partido</a>`
     );
 
-    await sendEmail(player.email, subject, body);
+    const ok = await sendEmail(player.email, subject, body, {
+      dispatchId: makeDispatchId("match-finished", i),
+      recipientName: player.name,
+    });
+    if (ok) sent += 1;
   }
+
+  return { sent, attempted };
 }
 
 export async function sendMatchProposalNotification(opts: {
@@ -343,6 +409,9 @@ export async function sendMatchProposalNotification(opts: {
       <a class="btn" href="${APP_URL}/matches/friendly/create">Crear Partido Amistoso</a>`
     );
 
-    await sendEmail(admin.email, subject, body);
+    await sendEmail(admin.email, subject, body, {
+      dispatchId: makeDispatchId("match-proposal", 0),
+      recipientName: admin.name,
+    });
   }
 }
