@@ -18,7 +18,8 @@ export function AdminNotifications() {
         const { count } = await supabase
             .from('players')
             .select('*', { count: 'exact', head: true })
-            .eq('is_approved', false);
+            .eq('is_approved', false)
+            .is('deleted_at', null);
         
         setPendingCount(count !== null ? count : 0);
         return count !== null ? count : 0;
@@ -48,7 +49,7 @@ export function AdminNotifications() {
                 { event: '*', schema: 'public', table: 'players' },
                 (payload) => {
                     // Si el evento es una INSERCIÓN y el jugador no está aprobado, notificamos
-                    if (payload.eventType === 'INSERT' && payload.new.is_approved === false) {
+                    if (payload.eventType === 'INSERT' && payload.new.is_approved === false && !payload.new.deleted_at) {
                         const newPlayer = payload.new;
                         setPendingCount(prev => prev + 1); // Incrementamos el badge inmediatamente
 

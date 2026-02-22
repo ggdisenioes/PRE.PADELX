@@ -268,9 +268,17 @@
     "approvedPlayers": "Jugadores aprobados",
     "viewStats": "Ver estadísticas →",
     "searchPlaceholder": "Buscar jugador...",
-    "deleteConfirm": "¿Eliminar a este jugador?",
-    "deleted": "Jugador eliminado",
-    "errorDeleting": "Error al eliminar"
+    "deleteConfirm": "¿Mover este jugador a eliminados?",
+    "deleted": "Jugador movido a eliminados",
+    "errorDeleting": "Error al mover a eliminados",
+    "archivedPlayers": "Jugadores eliminados",
+    "archivedEmpty": "No hay jugadores eliminados.",
+    "archivedSince": "Eliminado el {{date}}",
+    "restore": "Restaurar",
+    "restoreConfirm": "¿Restaurar a {{name}}?",
+    "restored": "{{name}} fue restaurado.",
+    "errorRestoring": "Error al restaurar jugador.",
+    "onlyAdminCanArchive": "Solo un admin puede eliminar o restaurar jugadores."
   },
   "matches": {
     "title": "Partidos",
@@ -669,9 +677,10 @@
       "errorLoading": "Error cargando solicitudes.",
       "errorApproving": "Error al aprobar a {{name}}.",
       "approved": "{{name}} ha sido aprobado.",
-      "confirmReject": "¿Seguro que querés rechazar y eliminar a {{name}}?",
+      "confirmReject": "¿Seguro que querés rechazar y mover a eliminados a {{name}}?",
       "errorRejecting": "Error al rechazar a {{name}}.",
-      "rejectedDeleted": "{{name}} ha sido rechazado y eliminado."
+      "rejectedDeleted": "{{name}} ha sido rechazado y eliminado.",
+      "rejectedArchived": "{{name}} fue rechazado y movido a eliminados."
     },
     "logs": {
       "title": "Logs del Sistema",

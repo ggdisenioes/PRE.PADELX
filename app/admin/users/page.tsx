@@ -138,6 +138,7 @@ export default function AdminUsersPage() {
         .from("players")
         .select("id, name, user_id")
         .eq("tenant_id", me.tenant_id)
+        .is("deleted_at", null)
         .order("name", { ascending: true }),
     ]);
 

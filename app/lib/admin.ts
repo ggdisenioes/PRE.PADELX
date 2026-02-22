@@ -3,7 +3,7 @@
 //
 // Soporta:
 // - Múltiples emails admin vía NEXT_PUBLIC_ADMIN_EMAILS (separados por coma)
-// - Roles en Supabase Auth (app_metadata / user_metadata) con role = 'admin'
+// - Roles en Supabase Auth (app_metadata / user_metadata) con role = 'admin' o 'super_admin'
 
 import type { Session, User } from "@supabase/supabase-js";
 
@@ -24,6 +24,12 @@ function getRole(user: User | null | undefined): string | null {
   return (appRole || userRole || null) as string | null;
 }
 
+function isAdminLikeRole(role: string | null | undefined): boolean {
+  if (!role) return false;
+  const normalized = role.trim().toLowerCase();
+  return normalized === "admin" || normalized === "super_admin" || normalized === "super-admin" || normalized === "superadmin";
+}
+
 /**
  * Determina si el usuario actual es admin.
  *
@@ -36,8 +42,7 @@ function getRole(user: User | null | undefined): string | null {
  */
 export function isAdminSession(session: Session | null | undefined): boolean {
   const user = session?.user;
-  const role = getRole(user)?.toLowerCase();
-  if (role === "admin") return true;
+  if (isAdminLikeRole(getRole(user))) return true;
 
   const adminEmails = parseAdminEmails(process.env.NEXT_PUBLIC_ADMIN_EMAILS);
   const email = (user?.email || "").toLowerCase();

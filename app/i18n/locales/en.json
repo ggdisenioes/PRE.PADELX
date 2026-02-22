@@ -268,9 +268,17 @@
     "approvedPlayers": "Approved players",
     "viewStats": "View stats →",
     "searchPlaceholder": "Search player...",
-    "deleteConfirm": "Delete this player?",
-    "deleted": "Player deleted",
-    "errorDeleting": "Error deleting"
+    "deleteConfirm": "Move this player to archived?",
+    "deleted": "Player moved to archived",
+    "errorDeleting": "Error moving player to archived",
+    "archivedPlayers": "Archived players",
+    "archivedEmpty": "There are no archived players.",
+    "archivedSince": "Archived on {{date}}",
+    "restore": "Restore",
+    "restoreConfirm": "Restore {{name}}?",
+    "restored": "{{name}} was restored.",
+    "errorRestoring": "Error restoring player.",
+    "onlyAdminCanArchive": "Only an admin can archive or restore players."
   },
   "matches": {
     "title": "Matches",
@@ -669,9 +677,10 @@
       "errorLoading": "Error loading requests.",
       "errorApproving": "Error approving {{name}}.",
       "approved": "{{name}} has been approved.",
-      "confirmReject": "Are you sure you want to reject and delete {{name}}?",
+      "confirmReject": "Are you sure you want to reject and archive {{name}}?",
       "errorRejecting": "Error rejecting {{name}}.",
-      "rejectedDeleted": "{{name}} has been rejected and deleted."
+      "rejectedDeleted": "{{name}} has been rejected and deleted.",
+      "rejectedArchived": "{{name}} has been rejected and moved to archived."
     },
     "logs": {
       "title": "System Logs",

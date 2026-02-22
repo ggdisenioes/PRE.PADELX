@@ -98,9 +98,9 @@ export function useRole() {
         }
 
         const normalizedTokenRole = normalizeRole(roleFromToken);
-        if (normalizedTokenRole) {
+        if (normalizedTokenRole && normalizedTokenRole !== "user") {
           if (active) setRole(normalizedTokenRole);
-          // Si ya tenemos el rol del token, evitamos pegarle a la DB.
+          // Si el token ya trae privilegios, no hace falta pegarle a la DB.
           return;
         }
 
@@ -115,7 +115,7 @@ export function useRole() {
 
         if (error || !data) {
           console.warn("[useRole] failed to fetch role from profiles", error);
-          if (active) setRole("user");
+          if (active) setRole(normalizedTokenRole || "user");
           return;
         }
 
@@ -135,7 +135,7 @@ export function useRole() {
           if (active) setRole(normalizedDbRole);
         } else {
           console.warn("[useRole] invalid role value", data.role);
-          if (active) setRole("user");
+          if (active) setRole(normalizedTokenRole || "user");
         }
       } catch (err) {
         console.error("[useRole] unexpected error:", err);
