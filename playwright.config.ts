@@ -1,7 +1,9 @@
 import { defineConfig } from "@playwright/test";
 
 const baseURL = process.env.E2E_BASE_URL || "http://127.0.0.1:3000";
-const useExternalBaseUrl = Boolean(process.env.E2E_BASE_URL);
+const useExternalBaseUrl =
+  process.env.E2E_USE_EXTERNAL_BASE_URL === "1" ||
+  process.env.E2E_USE_EXTERNAL_BASE_URL === "true";
 
 export default defineConfig({
   testDir: "./tests/e2e",
