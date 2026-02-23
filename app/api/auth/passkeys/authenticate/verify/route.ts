@@ -56,13 +56,17 @@ export async function POST(req: NextRequest) {
     const context = getPasskeyContext();
     const supabaseAdmin = createSupabaseAdminClient(context);
 
-    const { data: row, error: rowError } = await supabaseAdmin
+    let credentialQuery = supabaseAdmin
       .from("passkey_credentials")
       .select("credential_id,public_key,counter,transports,user_id")
       .eq("credential_id", credential.id)
-      .eq("user_id", challenge.userId)
-      .is("revoked_at", null)
-      .maybeSingle();
+      .is("revoked_at", null);
+
+    if (challenge.userId) {
+      credentialQuery = credentialQuery.eq("user_id", challenge.userId);
+    }
+
+    const { data: row, error: rowError } = await credentialQuery.maybeSingle();
 
     if (rowError) {
       const response = NextResponse.json(
@@ -124,7 +128,7 @@ export async function POST(req: NextRequest) {
       const { data: profile } = await supabaseAdmin
         .from("profiles")
         .select("email")
-        .eq("id", challenge.userId)
+        .eq("id", stored.user_id)
         .maybeSingle();
 
       email = (profile as ProfileRow | null)?.email || null;

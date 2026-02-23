@@ -19,6 +19,10 @@ type ExistingCredential = {
   user_id: string;
 };
 
+type SavedCredentialRow = {
+  id: number;
+};
+
 type VerifyBody = {
   credential?: RegistrationResponseJSON;
   deviceName?: string;
@@ -138,16 +142,25 @@ export async function POST(req: NextRequest) {
           .update(payload)
           .eq("credential_id", credentialId)
           .eq("user_id", user.id)
-      : supabaseAdmin.from("passkey_credentials").insert(payload);
+          .select("id")
+          .single()
+      : supabaseAdmin
+          .from("passkey_credentials")
+          .insert(payload)
+          .select("id")
+          .single();
 
-    const { error: saveError } = await mutation;
+    const { data: savedCredential, error: saveError } = await mutation;
 
     const response = saveError
       ? NextResponse.json(
           { error: "save_failed", message: saveError.message },
           { status: 500 }
         )
-      : NextResponse.json({ success: true });
+      : NextResponse.json({
+          success: true,
+          passkeyId: (savedCredential as SavedCredentialRow | null)?.id ?? null,
+        });
 
     clearChallengeCookie(response, PASSKEY_REGISTER_COOKIE);
     return response;

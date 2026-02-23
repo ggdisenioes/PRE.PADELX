@@ -8,7 +8,7 @@ export const PASSKEY_AUTH_COOKIE = "passkey_auth_challenge";
 
 export type PasskeyChallengePayload = {
   challenge: string;
-  userId: string;
+  userId?: string;
   email?: string;
   rpID: string;
   origin: string;
@@ -144,7 +144,7 @@ export function readChallengeCookie(
 
   try {
     const parsed = JSON.parse(decodeBase64Url(raw)) as PasskeyChallengePayload;
-    if (!parsed?.challenge || !parsed?.userId || !parsed?.rpID || !parsed?.origin) {
+    if (!parsed?.challenge || !parsed?.rpID || !parsed?.origin) {
       return null;
     }
     if (parsed.expiresAt < Date.now()) {

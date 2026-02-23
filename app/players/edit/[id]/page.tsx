@@ -51,6 +51,18 @@ type OriginalComparable = {
   is_approved: boolean;
 };
 
+function canManagePlayersRole(role: unknown): boolean {
+  if (typeof role !== "string") return false;
+  const normalized = role.trim().toLowerCase();
+  return (
+    normalized === "admin" ||
+    normalized === "manager" ||
+    normalized === "super_admin" ||
+    normalized === "super-admin" ||
+    normalized === "superadmin"
+  );
+}
+
 export default function EditPlayerPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
@@ -178,9 +190,24 @@ export default function EditPlayerPage() {
     const load = async () => {
       setLoading(true);
 
-      // 1) Rol admin
+      // 1) Permiso de edición (admin/manager/super_admin)
       const { data: sessionRes } = await supabase.auth.getSession();
-      setIsAdmin(isAdminSession(sessionRes.session));
+      const session = sessionRes.session;
+      const userId = session?.user?.id;
+      let canManageFromProfile = false;
+
+      if (userId) {
+        const { data: profileRole } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", userId)
+          .maybeSingle();
+
+        canManageFromProfile = canManagePlayersRole((profileRole as { role?: string } | null)?.role);
+      }
+
+      // Compatibilidad: fallback por metadata/env (isAdminSession) + fuente real en profiles.role
+      setIsAdmin(Boolean(isAdminSession(session) || canManageFromProfile));
 
       // 2) Perfil jugador
       const { data: playerData, error: profileError } = await supabase

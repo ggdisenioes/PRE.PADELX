@@ -9,6 +9,8 @@ import {
   startAuthentication,
 } from "@simplewebauthn/browser";
 
+const PASSKEY_LOCAL_DEVICE_ID_KEY = "padelx_passkey_local_id";
+
 function getBaseDomain(hostname: string) {
   const parts = hostname.split(".");
   if (parts.length < 2) return hostname;
@@ -53,6 +55,7 @@ export default function LoginPage() {
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [passkeySupported, setPasskeySupported] = useState(false);
+  const [passkeyRegisteredOnDevice, setPasskeyRegisteredOnDevice] = useState(false);
 
   const errorCode = searchParams.get("error");
   const tenantSlug = searchParams.get("tenant");
@@ -72,12 +75,26 @@ export default function LoginPage() {
       try {
         const browserSupport = browserSupportsWebAuthn();
         if (!browserSupport) {
-          if (active) setPasskeySupported(false);
+          if (active) {
+            setPasskeySupported(false);
+            setPasskeyRegisteredOnDevice(false);
+          }
           return;
         }
-        if (active) setPasskeySupported(true);
+        let hasLocalPasskey = false;
+        try {
+          hasLocalPasskey = Boolean(localStorage.getItem(PASSKEY_LOCAL_DEVICE_ID_KEY));
+        } catch {}
+
+        if (active) {
+          setPasskeySupported(true);
+          setPasskeyRegisteredOnDevice(hasLocalPasskey);
+        }
       } catch {
-        if (active) setPasskeySupported(false);
+        if (active) {
+          setPasskeySupported(false);
+          setPasskeyRegisteredOnDevice(false);
+        }
       }
     };
 
@@ -144,12 +161,12 @@ export default function LoginPage() {
       return;
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) {
-      setErrorMsg(t("auth.passkeyNeedEmail"));
+    if (!passkeyRegisteredOnDevice) {
+      setErrorMsg(t("auth.passkeyNoRegistered"));
       return;
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
     setPasskeyLoading(true);
     setErrorMsg(null);
 
@@ -157,7 +174,7 @@ export default function LoginPage() {
       const optionsRes = await fetch("/api/auth/passkeys/authenticate/options", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail }),
+        body: JSON.stringify(normalizedEmail ? { email: normalizedEmail } : {}),
       });
 
       const optionsPayload = await safeReadJson(optionsRes);
@@ -165,6 +182,10 @@ export default function LoginPage() {
         const errCode = String(optionsPayload.error || "");
         if (errCode === "no_passkeys_registered" || optionsRes.status === 404) {
           setErrorMsg(t("auth.passkeyNoRegistered"));
+          try {
+            localStorage.removeItem(PASSKEY_LOCAL_DEVICE_ID_KEY);
+          } catch {}
+          setPasskeyRegisteredOnDevice(false);
         } else {
           setErrorMsg(t("auth.passkeyLoginError"));
         }
@@ -197,7 +218,7 @@ export default function LoginPage() {
       const verifiedEmail =
         typeof verifyPayload.email === "string"
           ? verifyPayload.email
-          : normalizedEmail;
+          : normalizedEmail || email.trim().toLowerCase();
 
       if (!otpToken) {
         setErrorMsg(t("auth.passkeyLoginError"));
@@ -295,19 +316,21 @@ export default function LoginPage() {
             type="submit"
             disabled={loading || passkeyLoading}
             data-testid="login-submit"
-            className="w-full bg-gray-900 text-white font-bold py-3.5 rounded-lg hover:bg-black transition duration-200 disabled:opacity-70 shadow-lg"
-          >
-            {loading ? "Accediendo..." : "Iniciar Sesión"}
-          </button>
+          className="w-full bg-gray-900 text-white font-bold py-3.5 rounded-lg hover:bg-black transition duration-200 disabled:opacity-70 shadow-lg"
+        >
+          {loading ? "Accediendo..." : "Iniciar Sesión"}
+        </button>
 
-          <button
-            type="button"
-            disabled={passkeyLoading || loading}
-            onClick={() => void handlePasskeyLogin()}
-            className="w-full bg-white text-gray-900 font-bold py-3.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-200 shadow-sm disabled:opacity-60"
-          >
-            {passkeyLoading ? t("auth.passkeyVerifying") : t("auth.passkeySignIn")}
-          </button>
+          {passkeySupported && passkeyRegisteredOnDevice && (
+            <button
+              type="button"
+              disabled={passkeyLoading || loading}
+              onClick={() => void handlePasskeyLogin()}
+              className="w-full bg-white text-gray-900 font-bold py-3.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-200 shadow-sm disabled:opacity-60"
+            >
+              {passkeyLoading ? t("auth.passkeyVerifying") : t("auth.passkeySignIn")}
+            </button>
+          )}
 
           {!passkeySupported && (
             <p className="text-xs text-amber-600 text-center">{t("auth.passkeyUnavailable")}</p>

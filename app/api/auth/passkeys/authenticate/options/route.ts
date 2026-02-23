@@ -31,13 +31,26 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json().catch(() => ({}))) as OptionsBody;
     const normalizedEmail = body.email?.trim().toLowerCase();
-
-    if (!normalizedEmail) {
-      return NextResponse.json({ error: "missing_email" }, { status: 400 });
-    }
-
+    const rpID = resolvePasskeyRPID(req);
+    const expectedOrigin = resolvePasskeyOrigin(req);
     const context = getPasskeyContext();
     const supabaseAdmin = createSupabaseAdminClient(context);
+
+    // Modo discoverable: permite login biométrico sin pedir email explícito.
+    if (!normalizedEmail) {
+      const options = await generateAuthenticationOptions({
+        rpID,
+        userVerification: "required",
+      });
+
+      const response = NextResponse.json({ options });
+      setChallengeCookie(response, PASSKEY_AUTH_COOKIE, {
+        challenge: options.challenge,
+        rpID,
+        origin: expectedOrigin,
+      });
+      return response;
+    }
 
     const { data: profileRow, error: profileError } = await supabaseAdmin
       .from("profiles")
@@ -75,9 +88,6 @@ export async function POST(req: NextRequest) {
     if (!passkeys.length) {
       return NextResponse.json({ error: "no_passkeys_registered" }, { status: 404 });
     }
-
-    const rpID = resolvePasskeyRPID(req);
-    const expectedOrigin = resolvePasskeyOrigin(req);
 
     const options = await generateAuthenticationOptions({
       rpID,
