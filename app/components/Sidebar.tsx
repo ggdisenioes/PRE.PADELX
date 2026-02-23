@@ -180,7 +180,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
   };
 
   return (
-    <aside className="w-56 min-h-screen flex flex-col text-white bg-gradient-to-b from-[#0b1220] via-[#0e1626] to-[#0a1020] border-r border-white/5">
+    <aside className="w-56 h-screen flex flex-col text-white bg-gradient-to-b from-[#0b1220] via-[#0e1626] to-[#0a1020] border-r border-white/5 overflow-hidden">
       {/* HEADER / LOGO */}
       <div className="px-5 py-6 border-b border-white/10 text-center">
         <h1 className="text-[26px] font-extrabold italic tracking-tight">
@@ -192,7 +192,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
       </div>
 
       {/* MENÚ */}
-      <nav className="flex-1 px-0 py-3">
+      <nav className="flex-1 overflow-y-auto overscroll-contain px-0 py-3">
         {/* SECCIÓN GENERAL */}
         <div>
           <p className="px-6 py-2 text-xs font-semibold text-gray-400 uppercase tracking-widest">General</p>
@@ -230,7 +230,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
       </nav>
 
       {/* FOOTER USUARIO */}
-      <div className="border-t border-white/10 p-4">
+      <div className="border-t border-white/10 p-4 shrink-0">
         {user ? (
           <>
             <div className="flex items-center gap-3 mb-4">

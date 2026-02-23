@@ -158,7 +158,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen flex bg-[#05070b]">
         {/* SIDEBAR DESKTOP — slide-in from left */}
         <div
-          className="hidden md:flex transition-transform duration-500 ease-out"
+          className="hidden md:flex md:h-screen md:sticky md:top-0 transition-transform duration-500 ease-out"
           style={{ transform: sidebarVisible ? "translateX(0)" : "translateX(-100%)" }}
         >
           <Sidebar />
@@ -224,7 +224,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {mobileOpen && (
           <div className="fixed inset-0 z-40 md:hidden">
             <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
-            <div className="absolute inset-y-0 left-0 w-64 max-w-[80%] overflow-hidden animate-slide-in-left">
+            <div
+              className="absolute inset-y-0 left-0 w-64 max-w-[80%] overflow-y-auto overscroll-contain animate-slide-in-left"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
               <Sidebar onLinkClick={() => setMobileOpen(false)} />
             </div>
           </div>
