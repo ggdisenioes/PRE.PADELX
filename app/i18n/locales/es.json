@@ -168,6 +168,9 @@
     "noPendingUserRequests": "No hay solicitudes pendientes.",
     "readyToScore": "Partidos para cargar resultado",
     "noPendingMatches": "No hay partidos pendientes.",
+    "userNextMatchTitle": "Tu próximo partido",
+    "noLinkedPlayer": "Tu usuario aún no está vinculado a un jugador. Contactá al administrador.",
+    "noUpcomingMatchesForPlayer": "No tenés partidos programados por ahora.",
     "userApproved": "Usuario aprobado.",
     "userRejected": "Usuario rechazado.",
     "userActionError": "No se pudo actualizar el usuario."

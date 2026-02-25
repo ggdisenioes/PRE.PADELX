@@ -168,6 +168,9 @@
     "noPendingUserRequests": "There are no pending requests.",
     "readyToScore": "Matches ready to score",
     "noPendingMatches": "There are no pending matches.",
+    "userNextMatchTitle": "Your next match",
+    "noLinkedPlayer": "Your account is not linked to a player profile yet. Contact your administrator.",
+    "noUpcomingMatchesForPlayer": "You don't have scheduled matches right now.",
     "userApproved": "User approved.",
     "userRejected": "User rejected.",
     "userActionError": "Could not update the user."

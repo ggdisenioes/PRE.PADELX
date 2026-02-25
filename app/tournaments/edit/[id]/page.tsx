@@ -25,7 +25,7 @@ export default function EditTournament() {
   });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const { isAdmin, isManager } = useRole();
+  const { isAdmin, isManager, loading: roleLoading } = useRole();
   const [matches, setMatches] = useState<any[]>([]);
   const [playersMap, setPlayersMap] = useState<Record<number, string>>({});
   const [openResultMatch, setOpenResultMatch] = useState<any | null>(null);
@@ -33,6 +33,16 @@ export default function EditTournament() {
 
   // Cargar datos del torneo y partidos
   useEffect(() => {
+    if (roleLoading) return;
+    if (!isAdmin && !isManager) {
+      toast.error("No tenés permisos para editar torneos");
+      router.replace("/tournaments");
+    }
+  }, [isAdmin, isManager, roleLoading, router]);
+
+  useEffect(() => {
+    if (roleLoading || (!isAdmin && !isManager)) return;
+
     const getTournamentAndMatches = async () => {
       if (!idNumber || isNaN(idNumber)) {
         setErrorMsg("ID de torneo inválido");
@@ -118,7 +128,15 @@ export default function EditTournament() {
     };
 
     getTournamentAndMatches();
-  }, [idNumber]);
+  }, [idNumber, isAdmin, isManager, roleLoading]);
+
+  if (roleLoading) {
+    return (
+      <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-20">
+        <p className="text-gray-600">Validando permisos...</p>
+      </main>
+    );
+  }
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();

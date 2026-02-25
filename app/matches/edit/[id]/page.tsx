@@ -14,7 +14,7 @@ export default function EditMatch() {
   const matchId = Array.isArray(params.id) ? params.id[0] : params.id;
   const matchIdNum = Number(matchId);
 
-  const { role } = useRole();
+  const { isAdmin, isManager, loading: roleLoading } = useRole();
 
   const [loading, setLoading] = useState(true);
   const [tournaments, setTournaments] = useState<any[]>([]);
@@ -40,6 +40,13 @@ export default function EditMatch() {
 
 // --- CARGA DE DATOS (partido existente, jugadores y torneos) ---
   useEffect(() => {
+    if (roleLoading) return;
+    if (!isAdmin && !isManager) {
+      toast.error("Solo administradores o managers pueden editar partidos");
+      router.replace('/matches');
+      return;
+    }
+
     if (!matchIdNum || Number.isNaN(matchIdNum)) {
       toast.error('ID de partido inválido. Revisá la ruta /matches/edit/[id].');
       router.push('/matches');
@@ -114,7 +121,7 @@ export default function EditMatch() {
       setLoading(false);
     };
     loadData();
-  }, [matchIdNum, router]);
+  }, [matchIdNum, router, roleLoading, isAdmin, isManager]);
 
 
   // --- MANEJO DEL ENVÍO (LÓGICA DE ACTUALIZACIÓN) ---
@@ -225,10 +232,12 @@ export default function EditMatch() {
     setFormData((prev) => (prev.court === name ? prev : { ...prev, court: name }));
   }, [formData.court_id, courts]);
 
-  if (loading) {
+  if (roleLoading || loading) {
     return (
         <main className="flex-1 overflow-y-auto p-8">
-            <p className="text-gray-500 animate-pulse">Cargando datos de edición del partido...</p>
+            <p className="text-gray-500 animate-pulse">
+              {roleLoading ? "Validando permisos..." : "Cargando datos de edición del partido..."}
+            </p>
         </main>
     );
   }
@@ -240,12 +249,6 @@ export default function EditMatch() {
   return (
     <main className="flex-1 overflow-y-auto p-8">
         <h2 className="text-3xl font-bold text-gray-800 mb-6">Editar Partido ID: {matchId}</h2>
-
-        {role === 'user' && (
-          <p className="text-sm text-red-600 font-semibold mb-4">
-            Solo administradores o managers pueden editar partidos
-          </p>
-        )}
 
         <Card className="max-w-4xl mx-auto p-6 shadow-xl">
             <form onSubmit={handleSubmit} className="space-y-8">
@@ -397,7 +400,7 @@ export default function EditMatch() {
                 {/* BOTONS FINALS */}
                 <div className="flex gap-4 pt-6 border-t">
                     <button type="button" onClick={() => router.back()} className="px-6 py-3 text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50">Cancelar</button>
-                    <button type="submit" disabled={loading || role === 'user'} className="flex-1 px-6 py-3 text-white bg-green-600 rounded hover:bg-green-700 font-bold text-lg shadow-lg">
+                    <button type="submit" disabled={loading || (!isAdmin && !isManager)} className="flex-1 px-6 py-3 text-white bg-green-600 rounded hover:bg-green-700 font-bold text-lg shadow-lg">
                         {loading ? 'Guardando...' : 'Guardar cambios'}
                     </button>
                 </div>

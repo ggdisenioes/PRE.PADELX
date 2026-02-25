@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
@@ -8,6 +8,7 @@ import Card from "../../components/Card";
 import { supabase } from "../../lib/supabase";
 import { logAction } from "../../lib/audit";
 import { useTenantPlan } from "../../hooks/useTenantPlan";
+import { useRole } from "../../hooks/useRole";
 
 type TournamentInsert = {
   name: string;
@@ -18,6 +19,7 @@ type TournamentInsert = {
 
 export default function CreateTournament() {
   const router = useRouter();
+  const { isAdmin, isManager, loading: roleLoading } = useRole();
   const { loading: planLoading, plan, canCreateTournament, usage } = useTenantPlan();
 
   const [name, setName] = useState("");
@@ -28,7 +30,20 @@ export default function CreateTournament() {
   const [customCategory, setCustomCategory] = useState("");
   const [isCustomCategory, setIsCustomCategory] = useState(false);
 
+  useEffect(() => {
+    if (roleLoading) return;
+    if (!isAdmin && !isManager) {
+      toast.error("No tenés permisos para crear torneos");
+      router.replace("/tournaments");
+    }
+  }, [isAdmin, isManager, roleLoading, router]);
+
   const handleCreate = async () => {
+    if (!isAdmin && !isManager) {
+      toast.error("No tenés permisos para crear torneos");
+      return;
+    }
+
     if (!name.trim()) {
       toast.error("Ingresá un nombre para el torneo");
       return;
@@ -93,6 +108,14 @@ export default function CreateTournament() {
     // Redirigir a edición del torneo recién creado
     router.push(`/tournaments/edit/${data.id}`);
   };
+
+  if (roleLoading) {
+    return (
+      <main className="flex-1 overflow-y-auto p-8">
+        <p className="text-gray-500 animate-pulse">Validando permisos...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 overflow-y-auto p-8">

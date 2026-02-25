@@ -7,6 +7,7 @@ import { supabase } from "../../../lib/supabase";
 import { useRouter, useParams } from "next/navigation";
 import Card from "../../../components/Card";
 import toast from "react-hot-toast";
+import { useRole } from "../../../hooks/useRole";
 
 type TournamentForm = {
   name: string;
@@ -20,6 +21,7 @@ export default function EditTournamentPage() {
   const rawId = (params as any)?.id;
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
   const idNum = Number(id);
+  const { isAdmin, isManager, loading: roleLoading } = useRole();
 
   const [formData, setFormData] = useState<TournamentForm>({
     name: "",
@@ -28,8 +30,18 @@ export default function EditTournamentPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (roleLoading) return;
+    if (!isAdmin && !isManager) {
+      toast.error("No tenés permisos para editar torneos.");
+      router.replace("/tournaments");
+    }
+  }, [isAdmin, isManager, roleLoading, router]);
+
   // Cargar torneo
   useEffect(() => {
+    if (roleLoading || (!isAdmin && !isManager)) return;
+
     if (!id || Number.isNaN(idNum)) {
       toast.error("ID de torneo inválido.");
       router.push("/tournaments");
@@ -61,7 +73,7 @@ export default function EditTournamentPage() {
     };
 
     fetchTournament();
-  }, [id, idNum, router]);
+  }, [id, idNum, router, isAdmin, isManager, roleLoading]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -119,8 +131,10 @@ export default function EditTournamentPage() {
           Editar Torneo
         </h1>
 
-        {loading ? (
-          <p className="text-gray-500">Cargando datos del torneo...</p>
+        {loading || roleLoading ? (
+          <p className="text-gray-500">
+            {roleLoading ? "Validando permisos..." : "Cargando datos del torneo..."}
+          </p>
         ) : (
           <Card className="p-4 md:p-6">
             <form onSubmit={handleSubmit} className="space-y-4">

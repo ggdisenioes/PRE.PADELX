@@ -67,6 +67,11 @@ type PendingApprovalUser = {
   created_at: string | null;
 };
 
+type LinkedPlayer = {
+  id: number;
+  name: string;
+};
+
 // --- Dashboard extra types ---
 type RankingItem = {
   player_id: number;
@@ -125,13 +130,15 @@ export default function DashboardPage() {
   const [tournamentMap, setTournamentMap] = useState<TournamentMap>({});
   const [recentLogs, setRecentLogs] = useState<AuditLog[]>([]);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
-  const { isAdmin, isManager } = useRole();
-  const isUser = !isAdmin && !isManager;
+  const { isAdmin, isManager, loading: roleLoading } = useRole();
+  const isUser = !roleLoading && !isAdmin && !isManager;
   const canManageUsers = isAdmin || isManager;
   const [pendingApprovalUsers, setPendingApprovalUsers] = useState<PendingApprovalUser[]>([]);
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
   const [overdueMatchesCount, setOverdueMatchesCount] = useState(0);
   const [actingPendingUserId, setActingPendingUserId] = useState<string | null>(null);
+  const [userLinkedPlayer, setUserLinkedPlayer] = useState<LinkedPlayer | null>(null);
+  const [userNextMatch, setUserNextMatch] = useState<UpcomingMatch | null>(null);
 
   const [topRanking, setTopRanking] = useState<RankingItem[]>([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState<number | null>(null);
@@ -276,6 +283,8 @@ export default function DashboardPage() {
   }, [canManageUsers]);
 
   useEffect(() => {
+    if (roleLoading) return;
+
     let active = true;
 
     const loadData = async () => {
@@ -413,6 +422,74 @@ export default function DashboardPage() {
         });
 
         await loadPendingApprovalUsers();
+
+        if (isUser) {
+          const {
+            data: { user },
+            error: authError,
+          } = await supabase.auth.getUser();
+          if (authError) {
+            console.error("[dashboard] auth user error:", authError);
+          }
+
+          if (user?.id) {
+            const { data: linkedPlayer, error: linkedPlayerErr } = await supabase
+              .from("players")
+              .select("id, name")
+              .eq("user_id", user.id)
+              .maybeSingle();
+
+            if (linkedPlayerErr) {
+              console.error("[dashboard] linked player error:", linkedPlayerErr);
+              setUserLinkedPlayer(null);
+              setUserNextMatch(null);
+            } else if (linkedPlayer) {
+              const normalizedPlayer = linkedPlayer as LinkedPlayer;
+              setUserLinkedPlayer(normalizedPlayer);
+
+              const nextMatchFilter = [
+                `player_1_a.eq.${normalizedPlayer.id}`,
+                `player_2_a.eq.${normalizedPlayer.id}`,
+                `player_1_b.eq.${normalizedPlayer.id}`,
+                `player_2_b.eq.${normalizedPlayer.id}`,
+                `player_1_a_id.eq.${normalizedPlayer.id}`,
+                `player_2_a_id.eq.${normalizedPlayer.id}`,
+                `player_1_b_id.eq.${normalizedPlayer.id}`,
+                `player_2_b_id.eq.${normalizedPlayer.id}`,
+              ].join(",");
+
+              const { data: nextMatch, error: nextMatchErr } = await supabase
+                .from("matches")
+                .select(
+                  "id, start_time, tournament_id, round_name, place, court, player_1_a, player_2_a, player_1_b, player_2_b, player_1_a_id, player_2_a_id, player_1_b_id, player_2_b_id, winner, score"
+                )
+                .eq("winner", "pending")
+                .gte("start_time", nowIso)
+                .or(nextMatchFilter)
+                .order("start_time", { ascending: true })
+                .limit(1)
+                .maybeSingle();
+
+              if (nextMatchErr) {
+                console.error("[dashboard] user next match error:", nextMatchErr);
+                setUserNextMatch(null);
+              } else {
+                setUserNextMatch(
+                  nextMatch ? normalizePlayersFromIds(nextMatch as UpcomingMatch) : null
+                );
+              }
+            } else {
+              setUserLinkedPlayer(null);
+              setUserNextMatch(null);
+            }
+          } else {
+            setUserLinkedPlayer(null);
+            setUserNextMatch(null);
+          }
+        } else {
+          setUserLinkedPlayer(null);
+          setUserNextMatch(null);
+        }
       } catch (error) {
         console.error("[dashboard] loadData error:", error);
       } finally {
@@ -425,7 +502,7 @@ export default function DashboardPage() {
     return () => {
       active = false;
     };
-  }, [calculateAlerts, loadPendingApprovalUsers]);
+  }, [calculateAlerts, loadPendingApprovalUsers, roleLoading, isUser]);
 
   useEffect(() => {
     let active = true;
@@ -1139,6 +1216,52 @@ export default function DashboardPage() {
 
           {/* COLUMNA DERECHA */}
           <aside className="lg:col-span-4 space-y-6">
+            {isUser && (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4 gap-2">
+                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                    {t("dashboard.userNextMatchTitle")}
+                  </h2>
+                  {userLinkedPlayer && (
+                    <span className="text-[11px] font-semibold text-indigo-600 truncate">
+                      {userLinkedPlayer.name}
+                    </span>
+                  )}
+                </div>
+
+                {!userLinkedPlayer ? (
+                  <p className="rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
+                    {t("dashboard.noLinkedPlayer")}
+                  </p>
+                ) : !userNextMatch ? (
+                  <p className="rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
+                    {t("dashboard.noUpcomingMatchesForPlayer")}
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    <MatchCard
+                      match={{
+                        ...userNextMatch,
+                        tournament_name: userNextMatch.tournament_id
+                          ? tournamentMap[userNextMatch.tournament_id]
+                          : undefined,
+                      }}
+                      playersMap={playerMap}
+                      showActions={false}
+                    />
+                    <div className="flex justify-end">
+                      <Link
+                        href="/matches"
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                      >
+                        {t("dashboard.viewAllMatches")} →
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* CENTRO DE TAREAS */}
             {canManageUsers && (
               <div

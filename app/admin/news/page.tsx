@@ -9,38 +9,59 @@ import { z } from "zod";
 import { useTranslation } from "../../i18n";
 
 const newsSchema = z.object({
-  title: z.string().min(1, "Título requerido"),
+  title: z.string().min(1, "Titulo requerido"),
   content: z.string().min(1, "Contenido requerido"),
   published: z.boolean(),
   featured: z.boolean(),
-  image_url: z.string().optional(),
+  image_url: z.string().url().optional().or(z.literal("")),
 });
 
-type News = z.infer<typeof newsSchema> & { id: number };
-type FormNews = Partial<typeof newsSchema>;
+type NewsPayload = z.infer<typeof newsSchema>;
+type News = {
+  id: number;
+  title: string;
+  content: string;
+  published: boolean;
+  featured: boolean;
+  image_url: string | null;
+};
+
+const emptyFormData = (): NewsPayload => ({
+  title: "",
+  content: "",
+  published: false,
+  featured: false,
+  image_url: "",
+});
 
 export default function AdminNewsPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const [news, setNews] = useState<News[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState<FormNews>({
-    title: "",
-    content: "",
-    published: false,
-    featured: false,
-    image_url: "",
-  });
+  const [formData, setFormData] = useState<NewsPayload>(emptyFormData());
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState("");
 
   useEffect(() => {
-    checkAuth();
-    fetchNews();
+    void checkAuth();
+    void fetchNews();
   }, []);
 
+  const resetForm = () => {
+    setFormData(emptyFormData());
+    setSelectedImageFile(null);
+    setImagePreview("");
+    setEditingId(null);
+  };
+
   const checkAuth = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) {
       router.push("/login");
       return;
@@ -66,7 +87,7 @@ export default function AdminNewsPage() {
       };
 
       if (sessionData?.session?.access_token) {
-        headers["Authorization"] = `Bearer ${sessionData.session.access_token}`;
+        headers.Authorization = `Bearer ${sessionData.session.access_token}`;
       }
 
       const response = await fetch("/api/news?admin=true", { headers });
@@ -83,8 +104,53 @@ export default function AdminNewsPage() {
     }
   };
 
+  const uploadNewsImage = async (file: File) => {
+    const extension = file.name.split(".").pop() || "jpg";
+    const randomPart =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
+    const filePath = `news/${randomPart}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, file, { upsert: false });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Solo se permiten archivos de imagen.");
+      e.target.value = "";
+      return;
+    }
+
+    const maxFileSizeMb = 5;
+    if (file.size > maxFileSizeMb * 1024 * 1024) {
+      toast.error(`La imagen no puede superar ${maxFileSizeMb}MB.`);
+      e.target.value = "";
+      return;
+    }
+
+    setSelectedImageFile(file);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImagePreview(typeof reader.result === "string" ? reader.result : "");
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
 
     try {
       const validated = newsSchema.parse(formData);
@@ -95,44 +161,42 @@ export default function AdminNewsPage() {
       };
 
       if (sessionData?.session?.access_token) {
-        headers["Authorization"] = `Bearer ${sessionData.session.access_token}`;
+        headers.Authorization = `Bearer ${sessionData.session.access_token}`;
       }
 
-      let response;
-
-      if (editingId) {
-        response = await fetch(`/api/news/${editingId}`, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify(validated),
-        });
-      } else {
-        response = await fetch("/api/news", {
-          method: "POST",
-          headers,
-          body: JSON.stringify(validated),
-        });
+      let imageUrl = validated.image_url || "";
+      if (selectedImageFile) {
+        imageUrl = await uploadNewsImage(selectedImageFile);
       }
+
+      const payload: NewsPayload = {
+        ...validated,
+        image_url: imageUrl,
+      };
+
+      const response = await fetch(
+        editingId ? `/api/news/${editingId}` : "/api/news",
+        {
+          method: editingId ? "PUT" : "POST",
+          headers,
+          body: JSON.stringify(payload),
+        }
+      );
 
       const result = await response.json();
-
-      if (response.ok) {
-        toast.success(editingId ? t("news.saved") : t("news.created"));
-        setFormData({
-          title: "",
-          content: "",
-          published: false,
-          featured: false,
-          image_url: "",
-        });
-        setEditingId(null);
-        setShowForm(false);
-        fetchNews();
-      } else {
+      if (!response.ok) {
         toast.error(result.error || t("news.errorSaving"));
+        return;
       }
+
+      toast.success(editingId ? t("news.saved") : t("news.created"));
+      resetForm();
+      setShowForm(false);
+      await fetchNews();
     } catch (error: any) {
-      toast.error(error.message || t("news.errorSaving"));
+      toast.error(error?.message || t("news.errorSaving"));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -144,6 +208,8 @@ export default function AdminNewsPage() {
       featured: item.featured,
       image_url: item.image_url || "",
     });
+    setSelectedImageFile(null);
+    setImagePreview(item.image_url || "");
     setEditingId(item.id);
     setShowForm(true);
   };
@@ -158,7 +224,7 @@ export default function AdminNewsPage() {
       };
 
       if (sessionData?.session?.access_token) {
-        headers["Authorization"] = `Bearer ${sessionData.session.access_token}`;
+        headers.Authorization = `Bearer ${sessionData.session.access_token}`;
       }
 
       const response = await fetch(`/api/news/${id}`, {
@@ -166,12 +232,13 @@ export default function AdminNewsPage() {
         headers,
       });
 
-      if (response.ok) {
-        toast.success(t("admin.newsAdmin.deleted"));
-        fetchNews();
-      } else {
+      if (!response.ok) {
         toast.error(t("admin.newsAdmin.errorDeleting"));
+        return;
       }
+
+      toast.success(t("admin.newsAdmin.deleted"));
+      await fetchNews();
     } catch (error) {
       toast.error(t("common.error"));
     }
@@ -184,20 +251,16 @@ export default function AdminNewsPage() {
   return (
     <main className="max-w-5xl mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">📝 {t("admin.newsAdmin.title")}</h1>
+        <h1 className="text-3xl font-bold">{t("admin.newsAdmin.title")}</h1>
         <button
           onClick={() => {
-            setShowForm(!showForm);
-            setEditingId(null);
             if (showForm) {
-              setFormData({
-                title: "",
-                content: "",
-                published: false,
-                featured: false,
-                image_url: "",
-              });
+              resetForm();
+              setShowForm(false);
+              return;
             }
+            resetForm();
+            setShowForm(true);
           }}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
@@ -210,14 +273,15 @@ export default function AdminNewsPage() {
           <h2 className="text-xl font-bold mb-4">
             {editingId ? t("news.editTitle") : t("news.createTitle")}
           </h2>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1">{t("news.titleField")}</label>
               <input
                 type="text"
-                value={formData.title || ""}
+                value={formData.title}
                 onChange={(e) =>
-                  setFormData({ ...formData, title: e.target.value })
+                  setFormData((prev) => ({ ...prev, title: e.target.value }))
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 required
@@ -227,34 +291,58 @@ export default function AdminNewsPage() {
             <div>
               <label className="block text-sm font-medium mb-1">{t("news.content")}</label>
               <textarea
-                value={formData.content || ""}
+                value={formData.content}
                 onChange={(e) =>
-                  setFormData({ ...formData, content: e.target.value })
+                  setFormData((prev) => ({ ...prev, content: e.target.value }))
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg h-40"
                 required
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">{t("news.imageUrl")} ({t("common.optional")})</label>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">
+                {t("news.imageUrl")} ({t("common.optional")})
+              </label>
               <input
-                type="url"
-                value={formData.image_url || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, image_url: e.target.value })
-                }
+                type="file"
+                accept="image/*"
+                onChange={handleImageFileChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
+              <p className="text-xs text-gray-500">
+                Formatos soportados: JPG, PNG, WEBP. Maximo 5MB.
+              </p>
+
+              {(imagePreview || formData.image_url) && (
+                <div className="rounded-lg border border-gray-200 p-3 space-y-3">
+                  <img
+                    src={imagePreview || formData.image_url || ""}
+                    alt="Preview de noticia"
+                    className="h-36 w-full object-cover rounded-md"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedImageFile(null);
+                      setImagePreview("");
+                      setFormData((prev) => ({ ...prev, image_url: "" }));
+                    }}
+                    className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                  >
+                    Quitar imagen
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-4">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={formData.published || false}
+                  checked={formData.published}
                   onChange={(e) =>
-                    setFormData({ ...formData, published: e.target.checked })
+                    setFormData((prev) => ({ ...prev, published: e.target.checked }))
                   }
                 />
                 <span className="text-sm">{t("news.published")}</span>
@@ -262,9 +350,9 @@ export default function AdminNewsPage() {
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={formData.featured || false}
+                  checked={formData.featured}
                   onChange={(e) =>
-                    setFormData({ ...formData, featured: e.target.checked })
+                    setFormData((prev) => ({ ...prev, featured: e.target.checked }))
                   }
                 />
                 <span className="text-sm">{t("news.featured")}</span>
@@ -273,9 +361,10 @@ export default function AdminNewsPage() {
 
             <button
               type="submit"
-              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              disabled={saving}
+              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60"
             >
-              {editingId ? t("common.save") : t("common.create")}
+              {saving ? t("news.saving") : editingId ? t("common.save") : t("news.create")}
             </button>
           </form>
         </Card>
@@ -284,8 +373,15 @@ export default function AdminNewsPage() {
       <div className="space-y-3">
         {news.map((item) => (
           <Card key={item.id} className="p-4 flex justify-between items-start gap-4">
-            <div className="flex-1">
+            <div className="flex-1 space-y-2">
               <h3 className="font-bold">{item.title}</h3>
+              {item.image_url && (
+                <img
+                  src={item.image_url}
+                  alt={item.title}
+                  className="h-32 w-full max-w-md object-cover rounded-md border border-gray-200"
+                />
+              )}
               <p className="text-sm text-gray-600 line-clamp-2">{item.content}</p>
               <div className="flex gap-2 mt-2">
                 {item.published && (
@@ -308,7 +404,7 @@ export default function AdminNewsPage() {
                 {t("common.edit")}
               </button>
               <button
-                onClick={() => handleDelete(item.id)}
+                onClick={() => void handleDelete(item.id)}
                 className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
               >
                 {t("common.delete")}
