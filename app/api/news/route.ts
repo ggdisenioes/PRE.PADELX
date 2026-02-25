@@ -1,17 +1,33 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import {
+  buildNewsContentPayload,
+  decodeNewsRecord,
+  ensureCoverAndImages,
+} from "@/lib/newsPayload";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const DEFAULT_NEWS_COVER = "/logo.svg";
+
+const localizedFieldSchema = z
+  .object({
+    es: z.string().optional(),
+    en: z.string().optional(),
+  })
+  .optional();
 
 const newsSchema = z.object({
-  title: z.string().min(1, "Título requerido").max(200),
-  content: z.string().min(1, "Contenido requerido"),
+  title: z.string().max(200).optional(),
+  content: z.string().optional(),
+  title_i18n: localizedFieldSchema,
+  content_i18n: localizedFieldSchema,
   published: z.boolean().optional(),
   featured: z.boolean().optional(),
   image_url: z.string().url().optional().or(z.literal("")),
+  image_urls: z.array(z.string().url()).optional(),
 });
 
 export async function GET(req: Request) {
@@ -67,7 +83,20 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ news });
+    const normalizedNews = (news || []).map((item: any) => {
+      const decoded = decodeNewsRecord(item);
+      return {
+        ...item,
+        title: decoded.title,
+        content: decoded.content,
+        title_i18n: decoded.title_i18n,
+        content_i18n: decoded.content_i18n,
+        image_url: decoded.cover_image_url,
+        image_urls: decoded.image_urls,
+      };
+    });
+
+    return NextResponse.json({ news: normalizedNews });
   } catch (error) {
     console.error("NEWS GET ERROR:", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
@@ -110,6 +139,28 @@ export async function POST(req: Request) {
     const body = await req.json();
     const validated = newsSchema.parse(body);
 
+    const titleEs =
+      validated.title_i18n?.es?.trim() || validated.title?.trim() || "";
+    const titleEn =
+      validated.title_i18n?.en?.trim() || validated.title?.trim() || titleEs;
+    const contentEs =
+      validated.content_i18n?.es?.trim() || validated.content?.trim() || "";
+    const contentEn =
+      validated.content_i18n?.en?.trim() || validated.content?.trim() || contentEs;
+
+    if (!titleEs) {
+      return NextResponse.json({ error: "Título requerido" }, { status: 400 });
+    }
+    if (!contentEs) {
+      return NextResponse.json({ error: "Contenido requerido" }, { status: 400 });
+    }
+
+    const { coverImageUrl, imageUrls } = ensureCoverAndImages({
+      image_url: validated.image_url || null,
+      image_urls: validated.image_urls,
+      defaultCoverUrl: DEFAULT_NEWS_COVER,
+    });
+
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false },
     });
@@ -119,11 +170,21 @@ export async function POST(req: Request) {
       .insert({
         tenant_id: profile.tenant_id,
         author_id: user.id,
-        title: validated.title,
-        content: validated.content,
+        title: titleEs,
+        content: buildNewsContentPayload({
+          title_i18n: {
+            es: titleEs,
+            en: titleEn,
+          },
+          content_i18n: {
+            es: contentEs,
+            en: contentEn,
+          },
+          image_urls: imageUrls,
+        }),
         published: validated.published || false,
         featured: validated.featured || false,
-        image_url: validated.image_url || null,
+        image_url: coverImageUrl,
       })
       .select()
       .single();
@@ -140,18 +201,39 @@ export async function POST(req: Request) {
         entity_id: news.id,
         user_id: user.id,
         user_email: user.email,
-        metadata: { title: validated.title },
+        metadata: {
+          title_i18n: {
+            es: titleEs,
+            en: titleEn,
+          },
+        },
         tenant_id: profile.tenant_id,
       });
     } catch {
       // Silent fail
     }
 
-    return NextResponse.json({ success: true, news }, { status: 201 });
+    const decoded = decodeNewsRecord(news as any);
+
+    return NextResponse.json(
+      {
+        success: true,
+        news: {
+          ...news,
+          title: decoded.title,
+          content: decoded.content,
+          title_i18n: decoded.title_i18n,
+          content_i18n: decoded.content_i18n,
+          image_url: decoded.cover_image_url,
+          image_urls: decoded.image_urls,
+        },
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: error.errors[0]?.message || "Datos inválidos" },
+        { error: error.issues[0]?.message || "Datos inválidos" },
         { status: 400 }
       );
     }
