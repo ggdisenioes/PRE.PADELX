@@ -46,55 +46,64 @@ export default function TournamentDetail() {
     const load = async () => {
       setLoading(true);
 
-      // Torneo
-      const { data: tData, error: tError } = await supabase
-        .from("tournaments")
-        .select("id, name, category, start_date, end_date")
-        .eq("id", idNum)
-        .single();
+      try {
+        const [{ data: tData, error: tError }, { data: mData, error: mError }, { data: pData, error: pError }] =
+          await Promise.all([
+            supabase
+              .from("tournaments")
+              .select("id, name, category, start_date, end_date")
+              .eq("id", idNum)
+              .maybeSingle(),
+            supabase
+              .from("matches")
+              .select(
+                "id, start_time, round_name, place, court, score, winner, player_1_a, player_2_a, player_1_b, player_2_b"
+              )
+              .eq("tournament_id", idNum)
+              .order("start_time", { ascending: true })
+              .returns<Match[]>(),
+            supabase.from("players").select("id, name"),
+          ]);
 
-      if (tError || !tData) {
-        console.error("Error cargando torneo:", tError);
-        toast.error(t("tournaments.errorLoading"));
-        router.push("/tournaments");
-        return;
+        if (tError) {
+          console.error("Error cargando torneo:", tError);
+        }
+
+        const tournamentMatches = (mData || []) as Match[];
+        if (mError) {
+          console.error("Error cargando partidos:", mError);
+          toast.error(t("matches.errorLoading"));
+          setMatches([]);
+        } else {
+          setMatches(tournamentMatches);
+        }
+
+        if (tData) {
+          setTournament(tData as Tournament);
+        } else if (tournamentMatches.length > 0) {
+          setTournament({
+            id: idNum,
+            name: `${t("nav.tournaments")} #${idNum}`,
+            category: null,
+            start_date: null,
+            end_date: null,
+          });
+        } else {
+          setTournament(null);
+        }
+
+        if (pError) {
+          console.error("Error cargando jugadores:", pError);
+        } else {
+          const map: PlayerMap = {};
+          (pData || []).forEach((p) => {
+            map[p.id] = p.name;
+          });
+          setPlayersMap(map);
+        }
+      } finally {
+        setLoading(false);
       }
-
-      setTournament(tData as Tournament);
-
-      // Partidos del torneo
-      const { data: mData, error: mError } = await supabase
-        .from("matches")
-        .select(
-          "id, start_time, round_name, place, court, score, winner, player_1_a, player_2_a, player_1_b, player_2_b"
-        )
-        .eq("tournament_id", idNum)
-        .order("start_time", { ascending: true })
-        .returns<Match[]>();
-
-      if (mError) {
-        console.error("Error cargando partidos:", mError);
-        toast.error(t("matches.errorLoading"));
-      } else {
-        setMatches((mData || []) as Match[]);
-      }
-
-      // Jugadores (map id -> nombre)
-      const { data: pData, error: pError } = await supabase
-        .from("players")
-        .select("id, name");
-
-      if (pError) {
-        console.error("Error cargando jugadores:", pError);
-      } else {
-        const map: PlayerMap = {};
-        (pData || []).forEach((p) => {
-          map[p.id] = p.name;
-        });
-        setPlayersMap(map);
-      }
-
-      setLoading(false);
     };
 
     load();
@@ -208,7 +217,7 @@ export default function TournamentDetail() {
                       key={m.id}
                       match={m}
                       playersMap={playersMap}
-                      showActions={true}
+                      showActions={false}
                     />
                   ))}
                 </div>

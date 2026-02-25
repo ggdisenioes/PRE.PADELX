@@ -455,13 +455,13 @@ export default function MatchesPage() {
                         e.stopPropagation();
                         setOpenNotifyMenuMatchId((prev) => (prev === m.id ? null : m.id));
                       }}
-                      className="bg-emerald-100 text-emerald-800 px-4 py-2 rounded-md text-sm font-semibold hover:bg-emerald-200 transition"
+                      className="inline-flex items-center justify-center max-w-[140px] bg-emerald-100 text-emerald-800 px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-semibold hover:bg-emerald-200 transition"
                     >
-                      {t("matches.notifyAction")}
+                      <span className="truncate">{t("matches.notifyAction")}</span>
                     </button>
 
                     {openNotifyMenuMatchId === m.id && (
-                      <div className="absolute right-0 top-full mt-2 z-20 min-w-[260px] rounded-xl border border-gray-200 bg-white p-1 shadow-xl">
+                      <div className="absolute right-0 top-full mt-2 z-20 min-w-[220px] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-1 shadow-xl">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -469,7 +469,7 @@ export default function MatchesPage() {
                             void handleNotify(m, "match_created");
                           }}
                           disabled={sendingNotifyKey === `${m.id}:match_created`}
-                          className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-50 transition disabled:opacity-60"
+                          className="w-full text-left px-3 py-2 rounded-lg text-xs sm:text-sm leading-snug whitespace-normal break-words hover:bg-gray-50 transition disabled:opacity-60"
                         >
                           {sendingNotifyKey === `${m.id}:match_created`
                             ? t("matches.notifySending")
@@ -483,7 +483,7 @@ export default function MatchesPage() {
                             void handleNotify(m, "match_reminder");
                           }}
                           disabled={sendingNotifyKey === `${m.id}:match_reminder`}
-                          className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-50 transition disabled:opacity-60"
+                          className="w-full text-left px-3 py-2 rounded-lg text-xs sm:text-sm leading-snug whitespace-normal break-words hover:bg-gray-50 transition disabled:opacity-60"
                         >
                           {sendingNotifyKey === `${m.id}:match_reminder`
                             ? t("matches.notifySending")
@@ -497,7 +497,7 @@ export default function MatchesPage() {
                             void handleNotify(m, "match_finished");
                           }}
                           disabled={!isPlayed(m) || sendingNotifyKey === `${m.id}:match_finished`}
-                          className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-50 transition disabled:cursor-not-allowed disabled:text-gray-400"
+                          className="w-full text-left px-3 py-2 rounded-lg text-xs sm:text-sm leading-snug whitespace-normal break-words hover:bg-gray-50 transition disabled:cursor-not-allowed disabled:text-gray-400"
                         >
                           {sendingNotifyKey === `${m.id}:match_finished`
                             ? t("matches.notifySending")
