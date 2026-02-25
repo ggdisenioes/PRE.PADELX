@@ -6,6 +6,7 @@ import {
   decodeNewsRecord,
   ensureCoverAndImages,
 } from "@/lib/newsPayload";
+import { buildBilingualNewsText, type SupportedLocale } from "@/lib/autoTranslate";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -24,6 +25,7 @@ const newsSchema = z.object({
   content: z.string().optional(),
   title_i18n: localizedFieldSchema,
   content_i18n: localizedFieldSchema,
+  source_locale: z.enum(["es", "en"]).optional(),
   published: z.boolean().optional(),
   featured: z.boolean().optional(),
   image_url: z.string().url().optional().or(z.literal("")),
@@ -138,21 +140,49 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const validated = newsSchema.parse(body);
+    const hasI18nInput = Boolean(
+      validated.title_i18n?.es ||
+      validated.title_i18n?.en ||
+      validated.content_i18n?.es ||
+      validated.content_i18n?.en
+    );
 
-    const titleEs =
-      validated.title_i18n?.es?.trim() || validated.title?.trim() || "";
-    const titleEn =
-      validated.title_i18n?.en?.trim() || validated.title?.trim() || titleEs;
-    const contentEs =
-      validated.content_i18n?.es?.trim() || validated.content?.trim() || "";
-    const contentEn =
-      validated.content_i18n?.en?.trim() || validated.content?.trim() || contentEs;
+    let titleEs = "";
+    let titleEn = "";
+    let contentEs = "";
+    let contentEn = "";
 
-    if (!titleEs) {
-      return NextResponse.json({ error: "Título requerido" }, { status: 400 });
+    if (hasI18nInput) {
+      titleEs = validated.title_i18n?.es?.trim() || validated.title?.trim() || "";
+      titleEn = validated.title_i18n?.en?.trim() || validated.title?.trim() || titleEs;
+      contentEs = validated.content_i18n?.es?.trim() || validated.content?.trim() || "";
+      contentEn = validated.content_i18n?.en?.trim() || validated.content?.trim() || contentEs;
+    } else {
+      const sourceLocale: SupportedLocale =
+        validated.source_locale === "en" ? "en" : "es";
+      const sourceTitle = validated.title?.trim() || "";
+      const sourceContent = validated.content?.trim() || "";
+
+      if (!sourceTitle) {
+        return NextResponse.json({ error: "Título requerido" }, { status: 400 });
+      }
+      if (!sourceContent) {
+        return NextResponse.json({ error: "Contenido requerido" }, { status: 400 });
+      }
+
+      const bilingual = await buildBilingualNewsText({
+        sourceLocale,
+        title: sourceTitle,
+        content: sourceContent,
+      });
+      titleEs = bilingual.titleEs;
+      titleEn = bilingual.titleEn;
+      contentEs = bilingual.contentEs;
+      contentEn = bilingual.contentEn;
     }
-    if (!contentEs) {
-      return NextResponse.json({ error: "Contenido requerido" }, { status: 400 });
+
+    if (!titleEs || !contentEs) {
+      return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
 
     const { coverImageUrl, imageUrls } = ensureCoverAndImages({

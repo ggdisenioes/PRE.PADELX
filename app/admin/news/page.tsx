@@ -12,10 +12,8 @@ import { resolveNewsText } from "@/lib/newsPayload";
 const DEFAULT_COVER = "/logo.svg";
 
 const newsSchema = z.object({
-  title_es: z.string().min(1, "Titulo requerido"),
-  title_en: z.string().optional(),
-  content_es: z.string().min(1, "Contenido requerido"),
-  content_en: z.string().optional(),
+  title: z.string().min(1, "Titulo requerido"),
+  content: z.string().min(1, "Contenido requerido"),
   published: z.boolean(),
   featured: z.boolean(),
   image_url: z.string().url().optional().or(z.literal("")),
@@ -37,10 +35,8 @@ type News = {
 };
 
 const emptyFormData = (): NewsFormState => ({
-  title_es: "",
-  title_en: "",
-  content_es: "",
-  content_en: "",
+  title: "",
+  content: "",
   published: false,
   featured: false,
   image_url: "",
@@ -120,10 +116,8 @@ export default function AdminNewsPage() {
     loading: t("admin.newsAdmin.loading"),
     createTitle:
       locale === "en" ? "Create / Edit News" : "Crear / Editar Noticia",
-    titleEs: locale === "en" ? "Title (Spanish)" : "Titulo (Español)",
-    titleEn: locale === "en" ? "Title (English)" : "Titulo (Inglés)",
-    contentEs: locale === "en" ? "Content (Spanish)" : "Contenido (Español)",
-    contentEn: locale === "en" ? "Content (English)" : "Contenido (Inglés)",
+    titleField: locale === "en" ? "Title" : "Titulo",
+    contentField: locale === "en" ? "Content" : "Contenido",
     coverImage: locale === "en" ? "Cover image" : "Imagen de portada",
     addImages: locale === "en" ? "Additional images" : "Imagenes adicionales",
     createButton: locale === "en" ? "Create" : "Crear",
@@ -141,6 +135,10 @@ export default function AdminNewsPage() {
       locale === "en"
         ? "Supported: JPG, PNG, WEBP. Max 5MB each."
         : "Formatos: JPG, PNG, WEBP. Maximo 5MB cada una.",
+    autoTranslateNote:
+      locale === "en"
+        ? "The app auto-translates this content to Spanish/English."
+        : "La app traduce automaticamente este contenido a Español/Inglés.",
   };
 
   const resetForm = () => {
@@ -307,16 +305,9 @@ export default function AdminNewsPage() {
       }
 
       const payload = {
-        title_i18n: {
-          es: validated.title_es,
-          en: validated.title_en || validated.title_es,
-        },
-        content_i18n: {
-          es: validated.content_es,
-          en: validated.content_en || validated.content_es,
-        },
-        title: validated.title_es,
-        content: validated.content_es,
+        title: validated.title,
+        content: validated.content,
+        source_locale: locale,
         image_url: coverUrl,
         image_urls: imageUrls,
         published: validated.published,
@@ -349,19 +340,16 @@ export default function AdminNewsPage() {
   };
 
   const handleEdit = (item: News) => {
-    const titleEs = resolveNewsText(item.title_i18n, "es", item.title);
-    const titleEn = resolveNewsText(item.title_i18n, "en", item.title);
-    const contentEs = resolveNewsText(item.content_i18n, "es", item.content);
-    const contentEn = resolveNewsText(item.content_i18n, "en", item.content);
+    const currentLocale = locale === "en" ? "en" : "es";
+    const localizedTitle = resolveNewsText(item.title_i18n, currentLocale, item.title);
+    const localizedContent = resolveNewsText(item.content_i18n, currentLocale, item.content);
     const imageUrls = dedupeUrls(item.image_urls || (item.image_url ? [item.image_url] : []));
     const coverUrl = item.image_url || imageUrls[0] || "";
     const galleryUrls = imageUrls.filter((img) => img !== coverUrl);
 
     setFormData({
-      title_es: titleEs,
-      title_en: titleEn === titleEs ? "" : titleEn,
-      content_es: contentEs,
-      content_en: contentEn === contentEs ? "" : contentEn,
+      title: localizedTitle,
+      content: localizedContent,
       published: item.published,
       featured: item.featured,
       image_url: coverUrl,
@@ -439,56 +427,30 @@ export default function AdminNewsPage() {
           <h2 className="text-xl font-bold mb-4">{labels.createTitle}</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">{labels.titleEs}</label>
-                <input
-                  type="text"
-                  value={formData.title_es}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, title_es: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">{labels.titleEn}</label>
-                <input
-                  type="text"
-                  value={formData.title_en}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, title_en: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{labels.titleField}</label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, title: e.target.value }))
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                required
+              />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">{labels.contentEs}</label>
-                <textarea
-                  value={formData.content_es}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, content_es: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg h-36"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">{labels.contentEn}</label>
-                <textarea
-                  value={formData.content_en}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, content_en: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg h-36"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{labels.contentField}</label>
+              <textarea
+                value={formData.content}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, content: e.target.value }))
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg h-40"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">{labels.autoTranslateNote}</p>
             </div>
 
             <div className="space-y-2">

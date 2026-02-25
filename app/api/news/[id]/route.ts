@@ -5,7 +5,9 @@ import {
   buildNewsContentPayload,
   decodeNewsRecord,
   ensureCoverAndImages,
+  resolveNewsText,
 } from "@/lib/newsPayload";
+import { buildBilingualNewsText, type SupportedLocale } from "@/lib/autoTranslate";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -24,6 +26,7 @@ const newsUpdateSchema = z.object({
   content: z.string().optional(),
   title_i18n: localizedFieldSchema,
   content_i18n: localizedFieldSchema,
+  source_locale: z.enum(["es", "en"]).optional(),
   published: z.boolean().optional(),
   featured: z.boolean().optional(),
   image_url: z.string().url().optional().or(z.literal("")),
@@ -170,29 +173,71 @@ export async function PUT(
 
     const currentDecoded = decodeNewsRecord(currentNews as any);
 
-    const nextTitleEs =
-      validated.title_i18n?.es?.trim() ||
-      validated.title?.trim() ||
-      currentDecoded.title_i18n.es ||
-      currentDecoded.title;
+    const hasI18nInput = Boolean(
+      validated.title_i18n?.es ||
+      validated.title_i18n?.en ||
+      validated.content_i18n?.es ||
+      validated.content_i18n?.en
+    );
 
-    const nextTitleEn =
-      validated.title_i18n?.en?.trim() ||
-      validated.title?.trim() ||
-      currentDecoded.title_i18n.en ||
-      nextTitleEs;
+    let nextTitleEs = "";
+    let nextTitleEn = "";
+    let nextContentEs = "";
+    let nextContentEn = "";
 
-    const nextContentEs =
-      validated.content_i18n?.es?.trim() ||
-      validated.content?.trim() ||
-      currentDecoded.content_i18n.es ||
-      currentDecoded.content;
+    if (hasI18nInput) {
+      nextTitleEs =
+        validated.title_i18n?.es?.trim() ||
+        validated.title?.trim() ||
+        currentDecoded.title_i18n.es ||
+        currentDecoded.title;
 
-    const nextContentEn =
-      validated.content_i18n?.en?.trim() ||
-      validated.content?.trim() ||
-      currentDecoded.content_i18n.en ||
-      nextContentEs;
+      nextTitleEn =
+        validated.title_i18n?.en?.trim() ||
+        validated.title?.trim() ||
+        currentDecoded.title_i18n.en ||
+        nextTitleEs;
+
+      nextContentEs =
+        validated.content_i18n?.es?.trim() ||
+        validated.content?.trim() ||
+        currentDecoded.content_i18n.es ||
+        currentDecoded.content;
+
+      nextContentEn =
+        validated.content_i18n?.en?.trim() ||
+        validated.content?.trim() ||
+        currentDecoded.content_i18n.en ||
+        nextContentEs;
+    } else {
+      const sourceLocale: SupportedLocale =
+        validated.source_locale === "en" ? "en" : "es";
+
+      const fallbackTitle = resolveNewsText(
+        currentDecoded.title_i18n,
+        sourceLocale,
+        currentDecoded.title
+      );
+      const fallbackContent = resolveNewsText(
+        currentDecoded.content_i18n,
+        sourceLocale,
+        currentDecoded.content
+      );
+
+      const sourceTitle = validated.title?.trim() || fallbackTitle;
+      const sourceContent = validated.content?.trim() || fallbackContent;
+
+      const bilingual = await buildBilingualNewsText({
+        sourceLocale,
+        title: sourceTitle,
+        content: sourceContent,
+      });
+
+      nextTitleEs = bilingual.titleEs;
+      nextTitleEn = bilingual.titleEn;
+      nextContentEs = bilingual.contentEs;
+      nextContentEn = bilingual.contentEn;
+    }
 
     if (!nextTitleEs) {
       return NextResponse.json({ error: "Título requerido" }, { status: 400 });
