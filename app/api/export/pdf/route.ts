@@ -255,7 +255,22 @@ export async function POST(req: Request) {
         );
       }
 
-      htmlContent = generateAnalyticsHTML(stats);
+      // Keep analytics export aligned with UI cards: exclude soft-deleted players.
+      const { count: activePlayersCount } = await supabaseClient
+        .from("players")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", profile.tenant_id)
+        .is("deleted_at", null);
+
+      const normalizedStats = {
+        ...(stats as any),
+        total_players:
+          typeof activePlayersCount === "number"
+            ? activePlayersCount
+            : Number((stats as any)?.total_players || 0),
+      };
+
+      htmlContent = generateAnalyticsHTML(normalizedStats);
     } else {
       return NextResponse.json(
         { error: "Tipo de reporte no soportado" },
