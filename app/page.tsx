@@ -1513,22 +1513,24 @@ export default function DashboardPage() {
             )}
 
             {/* AYUDA RÁPIDA */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                {t("dashboard.quickActions")}
-              </h2>
-              <div className="text-sm text-gray-600 space-y-2">
-                <Link href="/players" className="block hover:text-gray-900">
-                  {t("nav.players")} →
-                </Link>
-                <Link href="/tournaments" className="block hover:text-gray-900">
-                  {t("nav.tournaments")} →
-                </Link>
-                <Link href="/matches" className="block hover:text-gray-900">
-                  {t("nav.matches")} →
-                </Link>
+            {(isAdmin || isManager) && (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  {t("dashboard.quickActions")}
+                </h2>
+                <div className="text-sm text-gray-600 space-y-2">
+                  <Link href="/players" className="block hover:text-gray-900">
+                    {t("nav.players")} →
+                  </Link>
+                  <Link href="/tournaments" className="block hover:text-gray-900">
+                    {t("nav.tournaments")} →
+                  </Link>
+                  <Link href="/matches" className="block hover:text-gray-900">
+                    {t("nav.matches")} →
+                  </Link>
+                </div>
               </div>
-            </div>
+            )}
           </aside>
         </section>
       </div>

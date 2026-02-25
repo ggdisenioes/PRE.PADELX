@@ -201,7 +201,7 @@ export default function PlayerStatsPage() {
   }
 
   return (
-    <main className="max-w-6xl mx-auto p-6 md:p-10 space-y-8">
+    <main className="max-w-6xl mx-auto p-4 sm:p-6 md:p-10 space-y-8">
       {/* Back link */}
       <Link href="/players" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 transition">
         ← Volver a jugadores
@@ -210,7 +210,7 @@ export default function PlayerStatsPage() {
       {/* Profile header */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
         <div className="h-32 bg-gradient-to-r from-[#0b1220] via-[#1a2740] to-[#0e1626] rounded-t-2xl" />
-        <div className="px-6 pb-6 pt-3 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="px-4 sm:px-6 pb-5 sm:pb-6 pt-3 flex flex-col sm:flex-row sm:items-center gap-4">
           <img
             src={player.avatar_url || "https://placehold.co/200x200?text=Jugador"}
             alt={`Avatar de ${player.name}`}
@@ -218,8 +218,8 @@ export default function PlayerStatsPage() {
             loading="lazy"
           />
           <div className="flex-1">
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{player.name}</h1>
-            <div className="flex items-center gap-3 mt-1.5">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 break-words">{player.name}</h1>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1.5">
               <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-sm font-medium px-3 py-1 rounded-full">
                 Nivel {player.level ?? "—"}
               </span>
@@ -284,8 +284,11 @@ export default function PlayerStatsPage() {
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50 overflow-hidden">
             {history.map((m) => (
-              <div key={m.id} className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-gray-50/50 transition">
-                <div className="flex items-center gap-4 min-w-0">
+              <div
+                key={m.id}
+                className="flex flex-col gap-3 px-4 sm:px-5 py-4 hover:bg-gray-50/50 transition sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="flex items-center gap-4 min-w-0 w-full sm:w-auto">
                   <div className={`w-1 h-10 rounded-full shrink-0 ${
                     m.result === "Victoria"
                       ? "bg-green-500"
@@ -301,7 +304,7 @@ export default function PlayerStatsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-6 shrink-0">
+                <div className="flex w-full items-center justify-between gap-4 sm:w-auto sm:justify-end sm:gap-6 sm:shrink-0">
                   <div className="text-right">
                     <p className={`text-sm font-bold ${
                       m.result === "Victoria"
@@ -314,7 +317,7 @@ export default function PlayerStatsPage() {
                     </p>
                     <p className="text-sm font-mono text-gray-700">{m.score}</p>
                   </div>
-                  <p className="text-xs text-gray-400 w-20 text-right">{m.dateLabel}</p>
+                  <p className="text-xs text-gray-400 w-auto sm:w-20 text-right">{m.dateLabel}</p>
                 </div>
               </div>
             ))}

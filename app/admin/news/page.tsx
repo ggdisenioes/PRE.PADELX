@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Card from "../../components/Card";
 import toast from "react-hot-toast";
 import { z } from "zod";
@@ -37,6 +37,7 @@ const emptyFormData = (): NewsPayload => ({
 export default function AdminNewsPage() {
   const { t } = useTranslation();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [news, setNews] = useState<News[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,6 +46,12 @@ export default function AdminNewsPage() {
   const [formData, setFormData] = useState<NewsPayload>(emptyFormData());
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
+  const requestedEditId = useMemo(() => {
+    const raw = searchParams.get("edit");
+    if (!raw) return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [searchParams]);
 
   useEffect(() => {
     void checkAuth();
@@ -243,6 +250,24 @@ export default function AdminNewsPage() {
       toast.error(t("common.error"));
     }
   };
+
+  useEffect(() => {
+    if (!requestedEditId || news.length === 0 || editingId === requestedEditId) return;
+    const item = news.find((entry) => entry.id === requestedEditId);
+    if (!item) return;
+
+    setFormData({
+      title: item.title,
+      content: item.content,
+      published: item.published,
+      featured: item.featured,
+      image_url: item.image_url || "",
+    });
+    setSelectedImageFile(null);
+    setImagePreview(item.image_url || "");
+    setEditingId(item.id);
+    setShowForm(true);
+  }, [editingId, news, requestedEditId]);
 
   if (loading) {
     return <div className="p-8 text-center">{t("admin.newsAdmin.loading")}</div>;
