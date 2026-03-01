@@ -1,0 +1,35 @@
+name: Migration Guardrails
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "scripts/go-live/**"
+      - "package.json"
+      - ".github/workflows/migration-guardrails.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase/migrations/**"
+      - "scripts/go-live/**"
+      - "package.json"
+      - ".github/workflows/migration-guardrails.yml"
+
+jobs:
+  check-migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate migration naming/order/version uniqueness
+        run: npm run check:migrations
+
+      - name: Validate no service-role secret in client code
+        run: npm run check:client-secrets

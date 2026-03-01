@@ -124,7 +124,7 @@
   },
   "dashboard": {
     "title": "Panel General",
-    "welcome": "Bienvenido a PadelX QA",
+    "welcome": "Bienvenido a Twinco",
     "loading": "Cargando datos del panel...",
     "errorLoading": "Error cargando datos",
     "totalPlayers": "Jugadores",
@@ -487,6 +487,9 @@
     "creating": "Creando...",
     "created": "¡Desafío creado!",
     "errorCreating": "Error al crear desafío",
+    "deleteConfirm": "¿Eliminar este desafío?",
+    "deleted": "Desafío eliminado",
+    "errorDeleting": "Error al eliminar desafío",
     "accepted": "Desafío aceptado",
     "rejected": "Desafío rechazado",
     "errorAccepting": "Error al aceptar",
@@ -732,7 +735,7 @@
     },
     "dashboard": {
       "title": "Super Admin Dashboard",
-      "subtitle": "Bienvenido a PadelX QA — Control total de tu SaaS",
+      "subtitle": "Bienvenido a Twinco — Control total de tu SaaS",
       "loading": "Cargando métricas...",
       "errorLoading": "Error cargando métricas",
       "mrrSubtitle": "Monthly Recurring Revenue",

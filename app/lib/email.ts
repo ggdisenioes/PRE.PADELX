@@ -6,17 +6,7 @@ function getResend() {
   return _resend;
 }
 const FROM_EMAIL = process.env.EMAIL_FROM || "PadelX <noreply@padelx.es>";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://qa.padelx.es";
-
-function makeDispatchId(prefix: string, index: number) {
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `${prefix}-${Date.now()}-${index}-${rand}`;
-}
-
-function sanitizeHeaderValue(value: string | undefined, fallback: string) {
-  const raw = value || fallback;
-  return raw.replace(/[^\x20-\x7E]+/g, " ").slice(0, 120);
-}
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://twinco.padelx.es";
 
 function esc(str: string | null | undefined): string {
   if (!str) return "";
@@ -40,7 +30,7 @@ function baseLayout(title: string, bodyHtml: string) {
     .card { max-width:640px; margin:0 auto; background:#ffffff; border:1px solid #e6e8ef; border-radius:16px; overflow:hidden; box-shadow:0 10px 30px rgba(15,23,42,.08); }
     .header { background:#05070b; padding:18px 20px; }
     .brand { color:#fff; font-weight:900; letter-spacing:.26em; font-size:14px; font-style:italic; }
-    .sub { color:#00b4ff; font-weight:700; letter-spacing:.32em; font-size:10px; margin-top:4px; }
+    .sub { color:#ccff00; font-weight:700; letter-spacing:.32em; font-size:10px; margin-top:4px; }
     .content { padding:24px; color:#0f172a; }
     h2 { font-size:20px; font-weight:800; margin:0 0 12px; }
     p { font-size:14px; line-height:1.6; margin:0 0 12px; color:#334155; }
@@ -56,14 +46,14 @@ function baseLayout(title: string, bodyHtml: string) {
   <div class="wrap">
     <div class="card">
       <div class="header">
-        <div class="brand">PadelX QA</div>
+        <div class="brand">TWINCO</div>
         <div class="sub">PÁDEL MANAGER</div>
       </div>
       <div class="content">
         ${bodyHtml}
       </div>
       <div class="footer">
-        Este email fue enviado automáticamente por PadelX QA.
+        Este email fue enviado automáticamente por TWINCO Pádel Manager.
       </div>
     </div>
   </div>
@@ -71,39 +61,27 @@ function baseLayout(title: string, bodyHtml: string) {
 </html>`;
 }
 
-export async function sendEmail(
-  to: string,
-  subject: string,
-  htmlBody: string,
-  meta?: { dispatchId?: string; recipientName?: string }
-) {
+export async function sendEmail(to: string, subject: string, htmlBody: string) {
   if (!process.env.RESEND_API_KEY) {
     console.warn("[email] RESEND_API_KEY not configured, skipping email to:", to);
-    return false;
+    return;
   }
 
   try {
-    const dispatchId = meta?.dispatchId || makeDispatchId("email", 0);
     const { data, error } = await getResend().emails.send({
       from: FROM_EMAIL,
       to,
       subject,
       html: htmlBody,
-      headers: {
-        "X-PadelX-Dispatch-ID": dispatchId,
-        "X-PadelX-Recipient": sanitizeHeaderValue(meta?.recipientName, to),
-      },
     });
 
     if (error) {
-      console.error(`[email] Resend error (${dispatchId}) to ${to}:`, error);
-      return false;
+      console.error(`[email] Resend error sending to ${to}:`, error);
+    } else {
+      console.log(`[email] Sent to ${to} (id: ${data?.id})`);
     }
-    console.log(`[email] Sent (${dispatchId}) to ${to} id=${data?.id || "n/a"}`);
-    return true;
   } catch (err) {
-    console.error("[email] Failed to send email:", err);
-    return false;
+    console.error(`[email] Failed to send to ${to}:`, err);
   }
 }
 
@@ -129,7 +107,7 @@ export async function sendChallengeNotification(opts: {
     challengedPartnerName,
     challengedPartnerEmail,
     message,
-    clubName = "PadelX QA",
+    clubName = "TWINCO",
   } = opts;
 
   const safeChallenger = esc(challengerName);
@@ -157,10 +135,7 @@ export async function sendChallengeNotification(opts: {
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
       <a class="btn" href="${APP_URL}/challenges">Ver desafío</a>`
     );
-    await sendEmail(challengerEmail, subjectChallenger, body, {
-      dispatchId: makeDispatchId("challenge-challenger", 0),
-      recipientName: challengerName,
-    });
+    await sendEmail(challengerEmail, subjectChallenger, body);
   }
 
   // Email al compañero del retador
@@ -173,10 +148,7 @@ export async function sendChallengeNotification(opts: {
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
       <a class="btn" href="${APP_URL}/challenges">Ver desafío</a>`
     );
-    await sendEmail(challengerPartnerEmail, subjectPartner, body, {
-      dispatchId: makeDispatchId("challenge-partner", 0),
-      recipientName: challengerPartnerName || challengerName,
-    });
+    await sendEmail(challengerPartnerEmail, subjectPartner, body);
   }
 
   // Email al desafiado principal
@@ -191,10 +163,7 @@ export async function sendChallengeNotification(opts: {
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
       <a class="btn" href="${APP_URL}/challenges">Ver desafío</a>`
     );
-    await sendEmail(challengedEmail, subjectChallenged, body, {
-      dispatchId: makeDispatchId("challenge-challenged", 0),
-      recipientName: challengedName,
-    });
+    await sendEmail(challengedEmail, subjectChallenged, body);
   }
 
   // Email al compañero del desafiado
@@ -209,10 +178,7 @@ export async function sendChallengeNotification(opts: {
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
       <a class="btn" href="${APP_URL}/challenges">Ver desafío</a>`
     );
-    await sendEmail(challengedPartnerEmail, subjectPartner, body, {
-      dispatchId: makeDispatchId("challenge-challenged-partner", 0),
-      recipientName: challengedPartnerName,
-    });
+    await sendEmail(challengedPartnerEmail, subjectPartner, body);
   }
 }
 
@@ -224,7 +190,7 @@ export async function sendMatchNotification(opts: {
   court?: string;
   clubName?: string;
 }) {
-  const { playerEmails, teamA, teamB, matchDate, court, clubName = "PadelX QA" } = opts;
+  const { playerEmails, teamA, teamB, matchDate, court, clubName = "TWINCO" } = opts;
 
   const safeClub = esc(clubName);
   const safeTeamA = esc(teamA);
@@ -233,11 +199,7 @@ export async function sendMatchNotification(opts: {
   const safeCourt = esc(court);
   const subject = `Nuevo partido programado en ${safeClub}`;
 
-  let sent = 0;
-  const attempted = playerEmails.filter((p) => !!p.email).length;
-
-  for (let i = 0; i < playerEmails.length; i++) {
-    const player = playerEmails[i];
+  for (const player of playerEmails) {
     if (!player.email) continue;
 
     const safeName = esc(player.name);
@@ -254,14 +216,8 @@ export async function sendMatchNotification(opts: {
       <a class="btn" href="${APP_URL}/matches">Ver partido</a>`
     );
 
-    const ok = await sendEmail(player.email, subject, body, {
-      dispatchId: makeDispatchId("match-created", i),
-      recipientName: player.name,
-    });
-    if (ok) sent += 1;
+    await sendEmail(player.email, subject, body);
   }
-
-  return { sent, attempted };
 }
 
 export async function sendMatchReminderNotification(opts: {
@@ -272,7 +228,7 @@ export async function sendMatchReminderNotification(opts: {
   court?: string;
   clubName?: string;
 }) {
-  const { playerEmails, teamA, teamB, matchDate, court, clubName = "PadelX QA" } = opts;
+  const { playerEmails, teamA, teamB, matchDate, court, clubName = "TWINCO" } = opts;
 
   const safeClub = esc(clubName);
   const safeTeamA = esc(teamA);
@@ -281,11 +237,7 @@ export async function sendMatchReminderNotification(opts: {
   const safeCourt = esc(court);
   const subject = `Recordatorio de partido en ${safeClub}`;
 
-  let sent = 0;
-  const attempted = playerEmails.filter((p) => !!p.email).length;
-
-  for (let i = 0; i < playerEmails.length; i++) {
-    const player = playerEmails[i];
+  for (const player of playerEmails) {
     if (!player.email) continue;
 
     const safeName = esc(player.name);
@@ -302,14 +254,8 @@ export async function sendMatchReminderNotification(opts: {
       <a class="btn" href="${APP_URL}/matches">Ver partido</a>`
     );
 
-    const ok = await sendEmail(player.email, subject, body, {
-      dispatchId: makeDispatchId("match-reminder", i),
-      recipientName: player.name,
-    });
-    if (ok) sent += 1;
+    await sendEmail(player.email, subject, body);
   }
-
-  return { sent, attempted };
 }
 
 export async function sendMatchFinishedNotification(opts: {
@@ -330,7 +276,7 @@ export async function sendMatchFinishedNotification(opts: {
     matchDate,
     court,
     roundName,
-    clubName = "PadelX QA",
+    clubName = "TWINCO",
   } = opts;
 
   const safeClub = esc(clubName);
@@ -342,11 +288,7 @@ export async function sendMatchFinishedNotification(opts: {
   const safeRound = esc(roundName);
   const subject = `Partido finalizado en ${safeClub}`;
 
-  let sent = 0;
-  const attempted = playerEmails.filter((p) => !!p.email).length;
-
-  for (let i = 0; i < playerEmails.length; i++) {
-    const player = playerEmails[i];
+  for (const player of playerEmails) {
     if (!player.email) continue;
 
     const safeName = esc(player.name);
@@ -366,14 +308,8 @@ export async function sendMatchFinishedNotification(opts: {
       <a class="btn" href="${APP_URL}/matches">Ver partido</a>`
     );
 
-    const ok = await sendEmail(player.email, subject, body, {
-      dispatchId: makeDispatchId("match-finished", i),
-      recipientName: player.name,
-    });
-    if (ok) sent += 1;
+    await sendEmail(player.email, subject, body);
   }
-
-  return { sent, attempted };
 }
 
 export async function sendMatchProposalNotification(opts: {
@@ -384,7 +320,7 @@ export async function sendMatchProposalNotification(opts: {
   court?: string;
   clubName?: string;
 }) {
-  const { adminEmails, teamA, teamB, matchDate, court, clubName = "PadelX QA" } = opts;
+  const { adminEmails, teamA, teamB, matchDate, court, clubName = "TWINCO" } = opts;
 
   const safeClub = esc(clubName);
   const safeTeamA = esc(teamA);
@@ -409,9 +345,6 @@ export async function sendMatchProposalNotification(opts: {
       <a class="btn" href="${APP_URL}/matches/friendly/create">Crear Partido Amistoso</a>`
     );
 
-    await sendEmail(admin.email, subject, body, {
-      dispatchId: makeDispatchId("match-proposal", 0),
-      recipientName: admin.name,
-    });
+    await sendEmail(admin.email, subject, body);
   }
 }

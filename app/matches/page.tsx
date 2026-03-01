@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toPng } from "html-to-image";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import toast from "react-hot-toast";
 
 import { supabase } from "../lib/supabase";
@@ -51,9 +49,9 @@ type Tournament = {
 type View = "pending" | "finished" | "all";
 
 export default function MatchesPage() {
-  const { t } = useTranslation();
   const { isAdmin, isManager, loading: roleLoading } = useRole();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
 
   const [matches, setMatches] = useState<Match[]>([]);
   const [playersMapObj, setPlayersMapObj] = useState<Record<number, string>>({});
@@ -79,13 +77,44 @@ export default function MatchesPage() {
   }, [searchParams]);
 
   useEffect(() => {
+    let active = true;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
     const loadData = async () => {
+      if (!active) return;
       setLoading(true);
 
-      const { data: playersData, error: playersError } = await supabase
-        .from("players")
-        .select("id, name")
-        .order("name");
+      const [{ data: playersData, error: playersError }, { data: matchesData, error: matchError }, { data: tournamentsData }] =
+        await Promise.all([
+          supabase.from("players").select("id, name").order("name"),
+          supabase
+            .from("matches")
+            .select(`
+              id,
+              start_time,
+              tournament_id,
+              round_name,
+              score,
+              winner,
+              court,
+              place,
+              player_1_a_id,
+              player_2_a_id,
+              player_1_b_id,
+              player_2_b_id,
+              player_1_a:players!matches_player_1_a_fkey ( id, name ),
+              player_2_a:players!matches_player_2_a_fkey ( id, name ),
+              player_1_b:players!matches_player_1_b_fkey ( id, name ),
+              player_2_b:players!matches_player_2_b_fkey ( id, name )
+            `)
+            .order("start_time", { ascending: true })
+            .returns<Match[]>(),
+          supabase
+            .from("tournaments")
+            .select("id, name, category")
+            .order("name"),
+        ]);
+      if (!active) return;
 
       if (playersError) {
         console.error(playersError);
@@ -100,29 +129,6 @@ export default function MatchesPage() {
       for (const [k, v] of playersMap.entries()) playersMapObj[k] = v;
       setPlayersMapObj(playersMapObj);
 
-      const { data: matchesData, error: matchError } = await supabase
-        .from("matches")
-        .select(`
-          id,
-          start_time,
-          tournament_id,
-          round_name,
-          score,
-          winner,
-          court,
-          place,
-          player_1_a_id,
-          player_2_a_id,
-          player_1_b_id,
-          player_2_b_id,
-          player_1_a:players!matches_player_1_a_fkey ( id, name ),
-          player_2_a:players!matches_player_2_a_fkey ( id, name ),
-          player_1_b:players!matches_player_1_b_fkey ( id, name ),
-          player_2_b:players!matches_player_2_b_fkey ( id, name )
-        `)
-        .order("start_time", { ascending: true })
-        .returns<Match[]>();
-
       if (matchError) {
         console.error(matchError);
         toast.error(t("matches.errorLoading"));
@@ -130,11 +136,6 @@ export default function MatchesPage() {
         setLoading(false);
         return;
       }
-
-      const { data: tournamentsData } = await supabase
-        .from("tournaments")
-        .select("id, name, category")
-        .order("name");
 
       setTournaments(tournamentsData ?? []);
 
@@ -160,19 +161,32 @@ export default function MatchesPage() {
       setLoading(false);
     };
 
+    const scheduleReload = () => {
+      if (refreshTimer) return;
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null;
+        void loadData();
+      }, 350);
+    };
+
     loadData();
 
-    // Realtime: cuando cambie un partido, refrescamos la lista
+    // Realtime: debounce para evitar múltiples recargas en ráfaga.
     const channel = supabase
       .channel("matches_realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "matches" },
-        () => loadData()
+        scheduleReload
       )
       .subscribe();
 
     return () => {
+      active = false;
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
       supabase.removeChannel(channel);
     };
   }, []);
@@ -209,9 +223,7 @@ export default function MatchesPage() {
 
   // 1️⃣ AGREGAR FUNCIÓN handleDeleteMatch
   const handleDeleteMatch = async (matchId: number) => {
-    const confirmed = window.confirm(
-      "¿Estás seguro? El partido se eliminará definitivamente y quedará registrado en los logs."
-    );
+    const confirmed = window.confirm(t("matches.deleteConfirm"));
     if (!confirmed) return;
 
     const { error } = await supabase
@@ -221,11 +233,11 @@ export default function MatchesPage() {
 
     if (error) {
       console.error(error);
-      toast.error(t("matches.errorSaving"));
+      toast.error(t("matches.errorDeleting"));
       return;
     }
 
-    toast.success(t("matches.saved"));
+    toast.success(t("matches.deleted"));
     setMatches((prev) => prev.filter((m) => m.id !== matchId));
   };
 
@@ -359,14 +371,14 @@ export default function MatchesPage() {
 
       <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6">
         <h2 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">
-          {t("matches.filterAll")}
+          {t("matches.filterPanel")}
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Torneo */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">
-              {t("matches.filterTournament")}
+              {t("matches.filterTournamentLabel")}
             </label>
             <select
               value={filterTournament}
@@ -374,7 +386,7 @@ export default function MatchesPage() {
               className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <option value="all">{t("matches.filterAll")}</option>
-              <option value="friendly">{t("matches.typeFriendly")}</option>
+              <option value="friendly">{t("matches.filterFriendly")}</option>
               {tournaments.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -386,38 +398,38 @@ export default function MatchesPage() {
           {/* Ronda / Fase */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">
-              {t("tournaments.roundName")}
+              {t("matches.filterRoundPhase")}
             </label>
             <select
               value={filterRound}
               onChange={(e) => setFilterRound(e.target.value)}
               className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              <option value="all">Todas</option>
-              <option value="grupos">Grupos</option>
-              <option value="cuartos">Cuartos</option>
-              <option value="semifinal">Semifinal</option>
-              <option value="final">Final</option>
-              <option value="amistoso">Amistoso</option>
+              <option value="all">{t("matches.filterRoundAll")}</option>
+              <option value="grupos">{t("matches.filterRoundGroups")}</option>
+              <option value="cuartos">{t("matches.filterRoundQuarterfinals")}</option>
+              <option value="semifinal">{t("matches.filterRoundSemifinal")}</option>
+              <option value="final">{t("matches.filterRoundFinal")}</option>
+              <option value="amistoso">{t("matches.filterRoundFriendly")}</option>
             </select>
           </div>
 
           {/* Categoría */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">
-              {t("tournaments.category")}
+              {t("matches.filterCategory")}
             </label>
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
               className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              <option value="all">Todas</option>
-              <option value="grupos">Grupos</option>
-              <option value="cuartos">Cuartos</option>
-              <option value="semifinal">Semifinal</option>
-              <option value="final">Final</option>
-              <option value="amistoso">Amistoso</option>
+              <option value="all">{t("matches.filterRoundAll")}</option>
+              <option value="grupos">{t("matches.filterRoundGroups")}</option>
+              <option value="cuartos">{t("matches.filterRoundQuarterfinals")}</option>
+              <option value="semifinal">{t("matches.filterRoundSemifinal")}</option>
+              <option value="final">{t("matches.filterRoundFinal")}</option>
+              <option value="amistoso">{t("matches.filterRoundFriendly")}</option>
             </select>
           </div>
         </div>
@@ -426,7 +438,7 @@ export default function MatchesPage() {
       {loading ? (
         <p className="text-gray-500">{t("matches.loading")}</p>
       ) : filteredMatches.length === 0 ? (
-        <p className="text-gray-500">{t("matches.empty")}</p>
+        <p className="text-gray-500">{t("matches.emptyForFilters")}</p>
       ) : (
         <div className="space-y-4">
           {filteredMatches.map((m) => (
@@ -520,7 +532,7 @@ export default function MatchesPage() {
                     onClick={(e) => e.stopPropagation()}
                     className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-indigo-700 transition"
                   >
-                    {isPlayed(m) ? t("matches.scoreTitle") : t("matches.scoreTitle")}
+                    {isPlayed(m) ? t("shareModal.editResult") : t("matches.loadResult")}
                   </Link>
 
                   {isAdmin && (
@@ -552,8 +564,8 @@ export default function MatchesPage() {
           : `${m.player_1_a?.name || ""}${m.player_2_a ? " y " + m.player_2_a.name : ""}`.trim();
         const score = formatScoreForDisplay(m.score);
         const matchType = m.tournament_id
-          ? (tournaments.find(t => t.id === m.tournament_id)?.name || "Torneo")
-          : "Partido Amistoso";
+          ? (tournaments.find(t => t.id === m.tournament_id)?.name || t("matches.typeTournament"))
+          : t("matches.friendlyMatchLabel");
         const dateStr = m.start_time ? formatDateMadrid(m.start_time) : "";
         const timeStr = m.start_time ? formatTimeMadrid(m.start_time) : "";
         const courtPlace = [m.court, m.place].filter(Boolean).join(" · ");
@@ -580,12 +592,11 @@ export default function MatchesPage() {
                 }}>
                   {/* Header with logo */}
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: 3, fontStyle: "italic", color: "#ffffff" }}>
-                      PadelX QA
-                    </div>
-                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 5, color: "#00b4ff", marginTop: 3 }}>
-                      PÁDEL MANAGER
-                    </div>
+                    <img
+                      src="/logo.svg"
+                      alt="TWINCO"
+                      style={{ height: 44, width: "auto", margin: "0 auto", objectFit: "contain" }}
+                    />
                   </div>
 
                   {/* Match type badge */}
@@ -606,7 +617,7 @@ export default function MatchesPage() {
                     {/* Winners */}
                     <div>
                       <div style={{ fontSize: 10, fontWeight: 700, color: "#4ade80", letterSpacing: 3, marginBottom: 6 }}>
-                        GANADORES
+                        {t("matches.shareCardWinners").toUpperCase()}
                       </div>
                       <div style={{ fontSize: 20, fontWeight: 700, color: "#ffffff" }}>
                         {winnerTeam}
@@ -614,14 +625,14 @@ export default function MatchesPage() {
                     </div>
 
                     {/* Score */}
-                    <div style={{ fontSize: 56, fontWeight: 900, letterSpacing: 4, color: "#00b4ff", margin: "8px 0" }}>
+                    <div style={{ fontSize: 56, fontWeight: 900, letterSpacing: 4, color: "#ccff00", margin: "8px 0" }}>
                       {score}
                     </div>
 
                     {/* Losers */}
                     <div>
                       <div style={{ fontSize: 10, fontWeight: 700, color: "#666", letterSpacing: 3, marginBottom: 6 }}>
-                        PERDEDORES
+                        {t("matches.shareCardLosers").toUpperCase()}
                       </div>
                       <div style={{ fontSize: 16, color: "#999" }}>
                         {loserTeam}
@@ -656,12 +667,13 @@ export default function MatchesPage() {
                     el.style.transform = "none";
                     el.style.marginBottom = "0";
                     try {
+                      const { toPng } = await import("html-to-image");
                       const dataUrl = await toPng(el, { cacheBust: true, pixelRatio: 2, width: 480, height: 520 });
                       const link = document.createElement("a");
-                      link.download = `PadelXQA_Partido_${m.id}.png`;
+                      link.download = `Twinco_Partido_${m.id}.png`;
                       link.href = dataUrl;
                       link.click();
-                      toast.success(t("shareModal.download"));
+                      toast.success(t("matches.imageDownloaded"));
                     } catch (err) {
                       console.error("toPng error:", err);
                       toast.error(t("shareModal.errorCreating"));
@@ -680,7 +692,7 @@ export default function MatchesPage() {
                 onClick={() => setOpenResultMatch(null)}
                 className="w-full border border-gray-200 py-2 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition"
               >
-                {t("common.close")}
+                {t("shareModal.close")}
               </button>
             </div>
           </div>

@@ -1,16 +1,43 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getApiTimingRating, recordPerformanceEvent } from "@/lib/performance";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export async function GET(req: Request) {
+  const startedAt = performance.now();
+  let tenantId: string | null = null;
+  let userId: string | null = null;
+
+  const respond = (
+    body: Record<string, unknown>,
+    status = 200
+  ) => {
+    const durationMs = performance.now() - startedAt;
+    const response = NextResponse.json(body, { status });
+    response.headers.set("Server-Timing", `app;dur=${durationMs.toFixed(1)}`);
+
+    void recordPerformanceEvent({
+      metricType: "api_timing",
+      path: "/api/stats/global",
+      name: "GET",
+      method: "GET",
+      statusCode: status,
+      value: durationMs,
+      rating: getApiTimingRating(durationMs),
+      tenantId,
+      userId,
+      sampleRate: 0.6,
+      userAgent: req.headers.get("user-agent"),
+    });
+
+    return response;
+  };
+
   try {
     if (!supabaseUrl || !supabaseAnonKey) {
-      return NextResponse.json(
-        { error: "Servidor mal configurado" },
-        { status: 500 }
-      );
+      return respond({ error: "Servidor mal configurado" }, 500);
     }
 
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
@@ -19,9 +46,10 @@ export async function GET(req: Request) {
     });
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    userId = user?.id ?? null;
 
     if (authError || !user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      return respond({ error: "No autorizado" }, 401);
     }
 
     const { data: profile } = await supabaseClient
@@ -31,11 +59,12 @@ export async function GET(req: Request) {
       .single();
 
     if (!profile || (profile.role !== "admin" && profile.role !== "manager")) {
-      return NextResponse.json(
+      return respond(
         { error: "Solo admins/managers pueden ver estadísticas globales" },
-        { status: 403 }
+        403
       );
     }
+    tenantId = profile.tenant_id;
 
     // Get platform stats using database function
     const { data: platformStats, error: statsErr } = await supabaseClient.rpc(
@@ -45,7 +74,7 @@ export async function GET(req: Request) {
 
     if (statsErr) {
       console.error("Platform stats error:", statsErr);
-      return NextResponse.json({ error: statsErr.message }, { status: 500 });
+      return respond({ error: statsErr.message }, 500);
     }
 
     // Count only active (non-deleted) players for analytics cards.
@@ -96,7 +125,7 @@ export async function GET(req: Request) {
           : Number((platformStats as any)?.total_players || 0),
     };
 
-    return NextResponse.json({
+    return respond({
       stats: Object.keys(normalizedStats).length > 0 ? normalizedStats : {
         total_users: 0,
         total_active_users: 0,
@@ -114,6 +143,6 @@ export async function GET(req: Request) {
     });
   } catch (error) {
     console.error("GLOBAL STATS GET ERROR:", error);
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+    return respond({ error: "Error interno del servidor" }, 500);
   }
 }

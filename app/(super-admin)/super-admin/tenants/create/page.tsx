@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { SubscriptionPlan, Addon } from '@/lib/types/saas';
-import { useTranslation } from '../../../../i18n';
 
 type FormData = {
   name: string;
@@ -16,7 +15,6 @@ type FormData = {
 };
 
 export default function CreateTenantPage() {
-  const { t } = useTranslation();
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,7 +47,7 @@ export default function CreateTenantPage() {
       setPlans(plansData.data);
       setAddons(addonsData.data);
     } catch (error) {
-      toast.error(t('superAdmin.createTenant.errorLoading'));
+      toast.error('Error cargando planes y add-ons');
     }
   };
 
@@ -65,14 +63,14 @@ export default function CreateTenantPage() {
       const json = await response.json();
 
       if (!response.ok) {
-        toast.error(json.error || t('superAdmin.createTenant.errorCreating'));
+        toast.error(json.error || 'Error al crear cliente');
         return;
       }
 
-      toast.success(t('superAdmin.createTenant.created'));
+      toast.success('✅ Cliente creado exitosamente');
       router.push(`/super-admin/tenants/${json.data.id}`);
     } catch (error) {
-      toast.error(t('superAdmin.createTenant.errorCreating'));
+      toast.error('Error al crear cliente');
     } finally {
       setIsLoading(false);
     }
@@ -81,8 +79,8 @@ export default function CreateTenantPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">{t('superAdmin.createTenant.title')}</h1>
-        <p className="text-gray-600 mt-2">{t('superAdmin.createTenant.stepIndicator', { step })}</p>
+        <h1 className="text-3xl font-bold">Crear Nuevo Cliente</h1>
+        <p className="text-gray-600 mt-2">Paso {step} de 3</p>
 
         {/* Progress Bar */}
         <div className="w-full bg-gray-200 rounded-full h-2 mt-4">
@@ -97,11 +95,11 @@ export default function CreateTenantPage() {
         {/* PASO 1: Datos básicos */}
         {step === 1 && (
           <div className="space-y-4">
-            <h2 className="text-xl font-bold mb-6">{t('superAdmin.createTenant.step1Title')}</h2>
+            <h2 className="text-xl font-bold mb-6">Información del Cliente</h2>
 
             <div>
               <label className="block text-sm font-medium mb-1">
-                {t('superAdmin.createTenant.clubName')}
+                Nombre del Club *
               </label>
               <input
                 type="text"
@@ -110,13 +108,13 @@ export default function CreateTenantPage() {
                   setFormData({ ...formData, name: e.target.value })
                 }
                 className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder={t('superAdmin.createTenant.clubNamePlaceholder')}
+                placeholder="Ej: Club Pádel Madrid"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">
-                {t('superAdmin.createTenant.contactEmail')}
+                Email de Contacto *
               </label>
               <input
                 type="email"
@@ -125,14 +123,14 @@ export default function CreateTenantPage() {
                   setFormData({ ...formData, admin_email: e.target.value })
                 }
                 className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder={t('superAdmin.createTenant.contactEmailPlaceholder')}
+                placeholder="admin@club.com"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  {t('superAdmin.createTenant.phone')}
+                  Teléfono
                 </label>
                 <input
                   type="tel"
@@ -141,12 +139,12 @@ export default function CreateTenantPage() {
                     setFormData({ ...formData, phone: e.target.value })
                   }
                   className="w-full px-4 py-2 border rounded-lg"
-                  placeholder={t('superAdmin.createTenant.phonePlaceholder')}
+                  placeholder="+34 91 234 56 78"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  {t('superAdmin.createTenant.country')}
+                  País (ISO)
                 </label>
                 <input
                   type="text"
@@ -155,7 +153,7 @@ export default function CreateTenantPage() {
                     setFormData({ ...formData, country: e.target.value.toUpperCase() })
                   }
                   className="w-full px-4 py-2 border rounded-lg"
-                  placeholder={t('superAdmin.createTenant.countryPlaceholder')}
+                  placeholder="ES"
                   maxLength={2}
                 />
               </div>
@@ -166,7 +164,7 @@ export default function CreateTenantPage() {
         {/* PASO 2: Seleccionar Plan */}
         {step === 2 && (
           <div className="space-y-6">
-            <h2 className="text-xl font-bold mb-6">{t('superAdmin.createTenant.step2Title')}</h2>
+            <h2 className="text-xl font-bold mb-6">Selecciona un Plan</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {plans.map((plan) => (
@@ -189,19 +187,19 @@ export default function CreateTenantPage() {
                     €{plan.price_eur}
                   </p>
                   <ul className="mt-4 space-y-2 text-sm">
-                    <li>👥 {plan.max_players} {t('superAdmin.createTenant.clubName').includes('*') ? 'jugadores' : 'jugadores'}</li>
+                    <li>👥 {plan.max_players} jugadores</li>
                     <li>🏆 {plan.max_concurrent_tournaments} torneos</li>
                     <li>
                       📊{' '}
                       {plan.has_advanced_rankings
-                        ? `✅ ${t('superAdmin.createTenant.advancedRankings')}`
-                        : `❌ ${t('superAdmin.createTenant.basicRankings')}`}
+                        ? '✅ Rankings avanzados'
+                        : '❌ Rankings básicos'}
                     </li>
                     <li>
                       📱{' '}
                       {plan.has_mobile_app
-                        ? `✅ ${t('superAdmin.createTenant.mobileApp')}`
-                        : `❌ ${t('superAdmin.createTenant.noMobileApp')}`}
+                        ? '✅ App móvil'
+                        : '❌ Sin app móvil'}
                     </li>
                   </ul>
                 </div>
@@ -213,7 +211,7 @@ export default function CreateTenantPage() {
         {/* PASO 3: Seleccionar Add-ons */}
         {step === 3 && (
           <div className="space-y-6">
-            <h2 className="text-xl font-bold mb-6">{t('superAdmin.createTenant.step3Title')}</h2>
+            <h2 className="text-xl font-bold mb-6">Add-ons Opcionales</h2>
 
             <div className="space-y-3">
               {addons.map((addon) => (
@@ -247,7 +245,7 @@ export default function CreateTenantPage() {
                       {addon.description}
                     </p>
                     <p className="text-sm font-bold text-blue-600 mt-1">
-                      €{addon.price_eur}/{addon.billing_type === 'monthly' ? t('superAdmin.createTenant.perMonth') : t('superAdmin.createTenant.oneTime')}
+                      €{addon.price_eur}/{addon.billing_type === 'monthly' ? 'mes' : 'único'}
                     </p>
                   </div>
                 </label>
@@ -256,10 +254,10 @@ export default function CreateTenantPage() {
 
             {/* Resumen */}
             <div className="bg-gray-50 p-4 rounded-lg mt-6">
-              <h4 className="font-bold mb-3">{t('superAdmin.createTenant.costSummary')}</h4>
+              <h4 className="font-bold mb-3">Resumen de Costos</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>{t('superAdmin.createTenant.basePlan')}</span>
+                  <span>Plan Base:</span>
                   <span>
                     €
                     {plans
@@ -268,7 +266,7 @@ export default function CreateTenantPage() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>{t('superAdmin.createTenant.monthlyAddons')}</span>
+                  <span>Add-ons (mensuales):</span>
                   <span>
                     €
                     {addons
@@ -283,7 +281,7 @@ export default function CreateTenantPage() {
                 </div>
                 <hr />
                 <div className="flex justify-between font-bold">
-                  <span>{t('superAdmin.createTenant.totalMonthly')}</span>
+                  <span>Total Mensual:</span>
                   <span>
                     €
                     {(
@@ -312,7 +310,7 @@ export default function CreateTenantPage() {
           disabled={step === 1}
           className="px-6 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {t('superAdmin.createTenant.back')}
+          ← Atrás
         </button>
 
         {step < 3 ? (
@@ -324,7 +322,7 @@ export default function CreateTenantPage() {
             }
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {t('superAdmin.createTenant.next')}
+            Siguiente →
           </button>
         ) : (
           <button
@@ -332,7 +330,7 @@ export default function CreateTenantPage() {
             disabled={isLoading || !formData.subscription_plan_id}
             className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? t('superAdmin.createTenant.submitting') : `✅ ${t('superAdmin.createTenant.submit')}`}
+            {isLoading ? 'Creando...' : '✅ Crear Cliente'}
           </button>
         )}
       </div>

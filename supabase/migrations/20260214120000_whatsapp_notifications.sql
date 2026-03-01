@@ -73,7 +73,7 @@ BEGIN
       user_email,
       'Pista Reservada Correctamente',
       format(
-        '<h2>¡Reserva Confirmada!</h2><p>Pista: %s</p><p>Fecha: %s</p><p>Hora: %s - %s</p><p><a href="https://qa.padelx.es/bookings">Ver reserva</a></p>',
+        '<h2>¡Reserva Confirmada!</h2><p>Pista: %s</p><p>Fecha: %s</p><p>Hora: %s - %s</p><p><a href="https://twinco.padelx.es/bookings">Ver reserva</a></p>',
         court_name,
         NEW.booking_date,
         NEW.start_time,

@@ -1,7 +1,7 @@
 # 🔒 AUDITORÍA DE SEGURIDAD - PÁDEL MANAGER v2026
 
 **Fecha**: 11 de Febrero, 2026
-**Proyecto**: PadelX QA (Next.js 16 + Supabase)
+**Proyecto**: TWINCO Pádel Manager (Next.js 16 + Supabase)
 **Clasificación**: Confidencial - Auditoría Técnica
 
 ---

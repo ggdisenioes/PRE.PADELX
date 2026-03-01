@@ -175,12 +175,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="text-center">
-              <p className="text-[11px] font-extrabold tracking-[0.26em] text-white uppercase">
-                PADELX QA
-              </p>
-              <p className="text-[9px] font-semibold tracking-[0.32em] text-[#ccff00] uppercase mt-1">
-                Pádel Manager
-              </p>
+              <img
+                src="/logo.svg"
+                alt="TWINCO"
+                className="h-7 w-auto mx-auto object-contain"
+              />
             </div>
 
             <button

@@ -1,9 +1,10 @@
 import { defineConfig } from "@playwright/test";
 
-const baseURL = process.env.E2E_BASE_URL || "http://127.0.0.1:3000";
+const localBaseURL = "http://127.0.0.1:3000";
+const requestedBaseURL = process.env.E2E_BASE_URL || localBaseURL;
 const useExternalBaseUrl =
-  process.env.E2E_USE_EXTERNAL_BASE_URL === "1" ||
-  process.env.E2E_USE_EXTERNAL_BASE_URL === "true";
+  process.env.PLAYWRIGHT_USE_EXTERNAL_BASE_URL === "true";
+const baseURL = useExternalBaseUrl ? requestedBaseURL : localBaseURL;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -27,7 +28,7 @@ export default defineConfig({
     ? undefined
     : {
         command: "npm run dev -- --hostname 127.0.0.1 --port 3000",
-        url: baseURL,
+        url: localBaseURL,
         timeout: 180_000,
         reuseExistingServer: !process.env.CI,
       },

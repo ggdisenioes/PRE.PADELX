@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslation } from "../../i18n";
+import { useTranslation } from "@/i18n";
 
 type TeamProps = {
   p1?: string;
@@ -98,7 +98,7 @@ export default function MatchCard(props: MatchCardProps) {
 
   const isFinished = status ? status === "finalizado" : inferredFinished;
 
-  const headerLeft = match?.round_name || "Partido";
+  const headerLeft = match?.round_name || t("matches.match");
   const headerRight =
     tournament ||
     match?.tournament_name ||
@@ -154,7 +154,7 @@ export default function MatchCard(props: MatchCardProps) {
           <p className="text-sm text-gray-500">{resolvedTeamA.p2}</p>
         </div>
 
-        <div className="mx-4 text-gray-400 font-bold">VS</div>
+        <div className="mx-4 text-gray-400 font-bold">{t("matches.vs").toUpperCase()}</div>
 
         <div className="flex-1">
           <p

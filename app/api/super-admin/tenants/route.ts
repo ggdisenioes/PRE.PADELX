@@ -7,6 +7,10 @@ import { TenantService } from '@/lib/services/saas.service';
 import { CreateTenantSchema } from '@/lib/validation/saas.schema';
 import { z } from 'zod';
 
+function getErrorMessage(error: unknown, fallback = 'Error interno') {
+  return error instanceof Error ? error.message : fallback;
+}
+
 /**
  * GET /api/super-admin/tenants
  * Listar todos los tenants (paginado)
@@ -64,17 +68,28 @@ export async function GET(request: NextRequest) {
     const status = url.searchParams.get('status');
     const search = url.searchParams.get('search');
 
-    const tenantService = new TenantService();
-    const result = await tenantService.listTenants(page, limit, {
-      status,
-      search,
-    });
+    const result = await TenantService.listTenants(
+      page,
+      limit,
+      search || undefined,
+      status || undefined
+    );
 
-    return NextResponse.json(result);
-  } catch (error: any) {
+    const totalPages = Math.max(1, Math.ceil(result.total / limit));
+
+    return NextResponse.json({
+      data: result.tenants,
+      pagination: {
+        page,
+        limit,
+        total: result.total,
+        totalPages,
+      },
+    });
+  } catch (error: unknown) {
     console.error('[GET /api/super-admin/tenants]', error);
     return NextResponse.json(
-      { error: error.message || 'Error interno' },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }
@@ -135,11 +150,10 @@ export async function POST(request: NextRequest) {
     const validated = CreateTenantSchema.parse(body);
 
     // Crear tenant
-    const tenantService = new TenantService();
-    const newTenant = await tenantService.createTenant(validated);
+    const newTenant = await TenantService.createTenant(validated);
 
     return NextResponse.json({ data: newTenant }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[POST /api/super-admin/tenants]', error);
 
     if (error instanceof z.ZodError) {
@@ -150,7 +164,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: error.message || 'Error interno' },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }

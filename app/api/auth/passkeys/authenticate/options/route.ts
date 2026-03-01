@@ -4,9 +4,12 @@ import {
   type AuthenticatorTransportFuture,
 } from "@simplewebauthn/server";
 import {
+  applyPasskeyRateLimit,
   PASSKEY_AUTH_COOKIE,
   createSupabaseAdminClient,
+  getPasskeyRequestContext,
   getPasskeyContext,
+  logPasskeyAuditEvent,
   resolvePasskeyOrigin,
   resolvePasskeyRPID,
   setChallengeCookie,
@@ -31,25 +34,57 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json().catch(() => ({}))) as OptionsBody;
     const normalizedEmail = body.email?.trim().toLowerCase();
-    const rpID = resolvePasskeyRPID(req);
-    const expectedOrigin = resolvePasskeyOrigin(req);
+
+    if (!normalizedEmail) {
+      return NextResponse.json({ error: "missing_email" }, { status: 400 });
+    }
+
     const context = getPasskeyContext();
     const supabaseAdmin = createSupabaseAdminClient(context);
+    const reqContext = getPasskeyRequestContext(req);
 
-    // Modo discoverable: permite login biométrico sin pedir email explícito.
-    if (!normalizedEmail) {
-      const options = await generateAuthenticationOptions({
-        rpID,
-        userVerification: "required",
+    const ipLimit = applyPasskeyRateLimit(
+      `passkeys:auth:options:ip:${reqContext.ip}`,
+      { maxRequests: 30, windowMs: 60_000 }
+    );
+    if (!ipLimit.success) {
+      await logPasskeyAuditEvent({
+        supabaseAdmin,
+        action: "PASSKEY_AUTH_OPTIONS_RATE_LIMIT",
+        userEmail: normalizedEmail,
+        metadata: {
+          endpoint: "authenticate/options",
+          limiter: "ip",
+          ip: reqContext.ip,
+          user_agent: reqContext.userAgent,
+        },
       });
+      return NextResponse.json(
+        { error: "too_many_attempts" },
+        { status: 429, headers: { "Retry-After": "60" } }
+      );
+    }
 
-      const response = NextResponse.json({ options });
-      setChallengeCookie(response, PASSKEY_AUTH_COOKIE, {
-        challenge: options.challenge,
-        rpID,
-        origin: expectedOrigin,
+    const emailLimit = applyPasskeyRateLimit(
+      `passkeys:auth:options:email:${normalizedEmail}`,
+      { maxRequests: 8, windowMs: 60_000 }
+    );
+    if (!emailLimit.success) {
+      await logPasskeyAuditEvent({
+        supabaseAdmin,
+        action: "PASSKEY_AUTH_OPTIONS_RATE_LIMIT",
+        userEmail: normalizedEmail,
+        metadata: {
+          endpoint: "authenticate/options",
+          limiter: "email",
+          ip: reqContext.ip,
+          user_agent: reqContext.userAgent,
+        },
       });
-      return response;
+      return NextResponse.json(
+        { error: "too_many_attempts" },
+        { status: 429, headers: { "Retry-After": "60" } }
+      );
     }
 
     const { data: profileRow, error: profileError } = await supabaseAdmin
@@ -59,6 +94,17 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (profileError) {
+      await logPasskeyAuditEvent({
+        supabaseAdmin,
+        action: "PASSKEY_AUTH_OPTIONS_REJECTED",
+        userEmail: normalizedEmail,
+        metadata: {
+          endpoint: "authenticate/options",
+          reason: "profile_lookup_failed",
+          ip: reqContext.ip,
+          user_agent: reqContext.userAgent,
+        },
+      });
       return NextResponse.json(
         { error: "profile_lookup_failed", message: profileError.message },
         { status: 500 }
@@ -68,6 +114,17 @@ export async function POST(req: NextRequest) {
     const profile = profileRow as ProfileRow | null;
 
     if (!profile || !profile.id || profile.active === false) {
+      await logPasskeyAuditEvent({
+        supabaseAdmin,
+        action: "PASSKEY_AUTH_OPTIONS_REJECTED",
+        userEmail: normalizedEmail,
+        metadata: {
+          endpoint: "authenticate/options",
+          reason: "passkey_unavailable",
+          ip: reqContext.ip,
+          user_agent: reqContext.userAgent,
+        },
+      });
       return NextResponse.json({ error: "passkey_unavailable" }, { status: 404 });
     }
 
@@ -78,6 +135,18 @@ export async function POST(req: NextRequest) {
       .is("revoked_at", null);
 
     if (passkeyError) {
+      await logPasskeyAuditEvent({
+        supabaseAdmin,
+        action: "PASSKEY_AUTH_OPTIONS_REJECTED",
+        userId: profile.id,
+        userEmail: normalizedEmail,
+        metadata: {
+          endpoint: "authenticate/options",
+          reason: "passkey_lookup_failed",
+          ip: reqContext.ip,
+          user_agent: reqContext.userAgent,
+        },
+      });
       return NextResponse.json(
         { error: "passkey_lookup_failed", message: passkeyError.message },
         { status: 500 }
@@ -86,8 +155,23 @@ export async function POST(req: NextRequest) {
 
     const passkeys = (passkeyRows || []) as StoredPasskey[];
     if (!passkeys.length) {
+      await logPasskeyAuditEvent({
+        supabaseAdmin,
+        action: "PASSKEY_AUTH_OPTIONS_REJECTED",
+        userId: profile.id,
+        userEmail: normalizedEmail,
+        metadata: {
+          endpoint: "authenticate/options",
+          reason: "no_passkeys_registered",
+          ip: reqContext.ip,
+          user_agent: reqContext.userAgent,
+        },
+      });
       return NextResponse.json({ error: "no_passkeys_registered" }, { status: 404 });
     }
+
+    const rpID = resolvePasskeyRPID(req);
+    const expectedOrigin = resolvePasskeyOrigin(req);
 
     const options = await generateAuthenticationOptions({
       rpID,
@@ -114,6 +198,19 @@ export async function POST(req: NextRequest) {
       email: normalizedEmail,
       rpID,
       origin: expectedOrigin,
+    });
+
+    await logPasskeyAuditEvent({
+      supabaseAdmin,
+      action: "PASSKEY_AUTH_OPTIONS_ISSUED",
+      userId: profile.id,
+      userEmail: normalizedEmail,
+      metadata: {
+        endpoint: "authenticate/options",
+        credentials_available: passkeys.length,
+        ip: reqContext.ip,
+        user_agent: reqContext.userAgent,
+      },
     });
 
     return response;

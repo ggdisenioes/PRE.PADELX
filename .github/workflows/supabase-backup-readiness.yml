@@ -1,0 +1,146 @@
+name: Supabase Backup Readiness
+
+on:
+  schedule:
+    - cron: "15 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup-readiness:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
+    env:
+      SUPABASE_PROJECT_REF: qfnqhpdvhbhpdgrxdnlu
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      BACKUP_READINESS_STRICT: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Preflight backup readiness inputs
+        id: preflight
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "can_run=false" >> "$GITHUB_OUTPUT"
+            echo "SUPABASE_ACCESS_TOKEN secret is missing. Running in skipped mode."
+          else
+            echo "can_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Login to Supabase CLI
+        if: steps.preflight.outputs.can_run == 'true'
+        run: supabase login --token "$SUPABASE_ACCESS_TOKEN"
+
+      - name: Run backup readiness check
+        id: backups
+        env:
+          CAN_RUN: ${{ steps.preflight.outputs.can_run }}
+        run: |
+          set +e
+          if [ "$CAN_RUN" != "true" ]; then
+            {
+              echo "SKIPPED: backup readiness check was not executed."
+              echo "Reason: SUPABASE_ACCESS_TOKEN secret is missing."
+              echo "Action: add repository secret SUPABASE_ACCESS_TOKEN to enable automated checks."
+            } > backup-readiness-report.txt
+            cat backup-readiness-report.txt
+            echo "status=skipped" >> "$GITHUB_OUTPUT"
+            echo "exit_code=78" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          npm run check:backup-readiness > backup-readiness-report.txt 2>&1
+          ec=$?
+          cat backup-readiness-report.txt
+          if [ "$ec" -eq 0 ]; then
+            echo "status=pass" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+          fi
+          echo "exit_code=$ec" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload backup readiness report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-readiness-report
+          path: backup-readiness-report.txt
+          if-no-files-found: ignore
+
+      - name: Open or update issue on readiness failure
+        if: steps.backups.outputs.status == 'fail'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const report = fs.existsSync("backup-readiness-report.txt")
+              ? fs.readFileSync("backup-readiness-report.txt", "utf8")
+              : "backup-readiness-report.txt not found";
+            const marker = "[backup-readiness]";
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: "open",
+              per_page: 100
+            });
+
+            const existing = issues.find((i) => i.title.startsWith(`${marker} incident`));
+            const now = new Date().toISOString();
+            const body = [
+              `Automatic backup readiness check failed at ${now}.`,
+              "",
+              "```",
+              report,
+              "```",
+              "",
+              `Workflow run: ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+            ].join("\\n");
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body
+              });
+            } else {
+              await github.rest.issues.create({
+                owner,
+                repo,
+                title: `${marker} incident ${now}`,
+                body
+              });
+            }
+
+      - name: Add workflow summary
+        if: always()
+        run: |
+          {
+            echo "## Supabase Backup Readiness"
+            echo ""
+            echo "- status: ${{ steps.backups.outputs.status }}"
+            echo "- strict_mode: $BACKUP_READINESS_STRICT"
+            echo "- exit_code: ${{ steps.backups.outputs.exit_code }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Mark workflow as failed when strict mode is enabled
+        if: env.BACKUP_READINESS_STRICT == 'true' && steps.backups.outputs.status != 'pass'
+        run: exit 1

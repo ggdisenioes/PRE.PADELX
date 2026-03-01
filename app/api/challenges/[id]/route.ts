@@ -285,7 +285,7 @@ export async function PUT(
             teamB,
             matchDate,
             court: courtText,
-            clubName: tenant?.name || "PadelX QA",
+            clubName: tenant?.name || "TWINCO",
           });
         }
       } catch (notifError) {
@@ -381,13 +381,28 @@ export async function DELETE(
     // Verify user belongs to the same tenant as the challenge
     const { data: profile } = await supabaseClient
       .from("profiles")
-      .select("tenant_id")
+      .select("tenant_id, role")
       .eq("id", user.id)
       .single();
 
     if (!profile || profile.tenant_id !== challenge.tenant_id) {
       return NextResponse.json(
         { error: "No tienes acceso a este desafío" },
+        { status: 403 }
+      );
+    }
+
+    const normalizedRole = String(profile.role || "").trim().toLowerCase();
+    const canDeleteChallenge =
+      normalizedRole === "admin" ||
+      normalizedRole === "manager" ||
+      normalizedRole === "super_admin" ||
+      normalizedRole === "super-admin" ||
+      normalizedRole === "superadmin";
+
+    if (!canDeleteChallenge) {
+      return NextResponse.json(
+        { error: "Solo admins/managers pueden eliminar desafíos" },
         { status: 403 }
       );
     }

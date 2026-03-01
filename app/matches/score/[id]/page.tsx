@@ -7,6 +7,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Card from '../../../components/Card';
 import toast from 'react-hot-toast';
 import { logAction } from '../../../lib/audit';
+import { notifyMatchFinished } from '../../../lib/notify';
 import { formatDateMadrid, formatTimeMadrid } from '@/lib/dates';
 
 export default function ScoreEntryPage() {
@@ -216,6 +217,9 @@ export default function ScoreEntryPage() {
                     winner: winnerTeam,
                 },
             });
+
+            // Fire-and-forget notification email to players.
+            void notifyMatchFinished(matchIdNum);
 
             toast.success('Resultado guardado correctamente.');
             router.push('/matches?status=pending');

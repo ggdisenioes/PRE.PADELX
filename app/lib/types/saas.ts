@@ -39,9 +39,12 @@ export interface Tenant {
   status: 'trial' | 'active' | 'suspended' | 'cancelled';
   trial_started_at: string;
   trial_ends_at: string;
+  subscription_started_at?: string | null;
+  subscription_ends_at?: string | null;
   created_at: string;
   updated_at: string;
   subscription_plan?: SubscriptionPlan;
+  addons?: TenantAddon[];
 }
 
 export interface TenantAddon {
@@ -101,4 +104,18 @@ export interface UpdateTenantRequest {
 
 export interface ManageAddonsRequest {
   addon_ids: string[];
+}
+
+export interface TenantWithPlan extends Tenant {
+  subscription_plans?: SubscriptionPlan | null;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }

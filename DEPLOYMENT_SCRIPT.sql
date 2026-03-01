@@ -261,7 +261,7 @@ BEGIN
       challenged_email,
       '¡Nuevo Desafío Recibido!',
       format(
-        '<h2>¡Hola %s!</h2><p>%s te ha retado a un desafío.</p><p>Mensaje: %s</p><p><a href="https://qa.padelx.es/challenges">Ver desafío</a></p>',
+        '<h2>¡Hola %s!</h2><p>%s te ha retado a un desafío.</p><p>Mensaje: %s</p><p><a href="https://twinco.padelx.es/challenges">Ver desafío</a></p>',
         challenged_name,
         challenger_name,
         COALESCE(NEW.message, 'Sin mensaje')
@@ -374,7 +374,7 @@ BEGIN
       user_email,
       'Pista Reservada Correctamente',
       format(
-        '<h2>¡Reserva Confirmada!</h2><p>Pista: %s</p><p>Fecha: %s</p><p>Hora: %s - %s</p><p><a href="https://qa.padelx.es/bookings">Ver reserva</a></p>',
+        '<h2>¡Reserva Confirmada!</h2><p>Pista: %s</p><p>Fecha: %s</p><p>Hora: %s - %s</p><p><a href="https://twinco.padelx.es/bookings">Ver reserva</a></p>',
         court_name,
         NEW.booking_date,
         NEW.start_time,

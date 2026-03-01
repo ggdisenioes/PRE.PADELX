@@ -9,7 +9,7 @@ import { z } from "zod";
 import { useTranslation } from "@/i18n";
 import { resolveNewsText } from "@/lib/newsPayload";
 
-const DEFAULT_COVER = "/logo.svg";
+const DEFAULT_COVER = "/logo-fondo.png";
 
 const newsSchema = z.object({
   title: z.string().min(1, "Titulo requerido"),

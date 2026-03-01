@@ -3,10 +3,8 @@
 import { useEffect, useState } from 'react';
 import { SaaSMetrics } from '@/lib/types/saas';
 import toast from 'react-hot-toast';
-import { useTranslation } from '../../../i18n';
 
 export default function AnalyticsPage() {
-  const { t } = useTranslation();
   const [metrics, setMetrics] = useState<SaaSMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -22,27 +20,27 @@ export default function AnalyticsPage() {
       const json = await response.json();
       setMetrics(json.data);
     } catch (error) {
-      toast.error(t('superAdmin.analytics.errorLoading'));
+      toast.error('Error cargando métricas');
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (isLoading) return <div>{t('superAdmin.analytics.loading')}</div>;
-  if (!metrics) return <div>{t('superAdmin.analytics.errorLoading')}</div>;
+  if (isLoading) return <div>Cargando métricas...</div>;
+  if (!metrics) return <div>Error cargando métricas</div>;
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-4xl font-bold">📊 {t('superAdmin.analytics.title')}</h1>
-        <p className="text-gray-600 mt-2">{t('superAdmin.analytics.subtitle')}</p>
+        <h1 className="text-4xl font-bold">📊 Analytics SaaS</h1>
+        <p className="text-gray-600 mt-2">Métricas en tiempo real de tu plataforma</p>
       </div>
 
       {/* Revenue Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg shadow p-8">
           <p className="text-gray-700 text-sm font-semibold uppercase tracking-wide">
-            {t('superAdmin.analytics.mrrLabel')}
+            MRR
           </p>
           <p className="text-5xl font-bold text-blue-600 mt-3">
             €{metrics.mrr.toLocaleString('es-ES', {
@@ -50,16 +48,16 @@ export default function AnalyticsPage() {
             })}
           </p>
           <p className="text-sm text-gray-600 mt-3">
-            💶 {t('superAdmin.analytics.mrrSubtitle')}
+            💶 Monthly Recurring Revenue
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            {t('superAdmin.analytics.mrrDesc')}
+            Ingresos mensuales garantizados
           </p>
         </div>
 
         <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg shadow p-8">
           <p className="text-gray-700 text-sm font-semibold uppercase tracking-wide">
-            {t('superAdmin.analytics.arrLabel')}
+            ARR
           </p>
           <p className="text-5xl font-bold text-green-600 mt-3">
             €{metrics.arr.toLocaleString('es-ES', {
@@ -67,10 +65,10 @@ export default function AnalyticsPage() {
             })}
           </p>
           <p className="text-sm text-gray-600 mt-3">
-            📈 {t('superAdmin.analytics.arrSubtitle')}
+            📈 Annual Recurring Revenue
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            {t('superAdmin.analytics.arrDesc')}
+            Proyección anual (MRR × 12)
           </p>
         </div>
       </div>
@@ -79,39 +77,37 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg shadow p-8">
           <p className="text-gray-700 text-sm font-semibold uppercase tracking-wide">
-            {t('superAdmin.analytics.activeClientsLabel')}
+            Clientes Activos
           </p>
           <p className="text-5xl font-bold text-purple-600 mt-3">
             {metrics.activeTenants}
           </p>
           <p className="text-sm text-gray-600 mt-3">
-            👥 {t('superAdmin.analytics.activeClientsSubtitle')}
+            👥 En plan de pago
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            {t('superAdmin.analytics.activeClientsDesc')}
+            Generando ingresos actualmente
           </p>
         </div>
 
         <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg shadow p-8">
           <p className="text-gray-700 text-sm font-semibold uppercase tracking-wide">
-            {t('superAdmin.analytics.trialLabel')}
+            En Trial
           </p>
           <p className="text-5xl font-bold text-orange-600 mt-3">
             {metrics.trialTenants}
           </p>
           <p className="text-sm text-gray-600 mt-3">
-            ⏰ {t('superAdmin.analytics.trialSubtitle')}
+            ⏰ Próximos a convertir
           </p>
           <p className="text-xs text-gray-500 mt-1">
             {metrics.trialTenants === 0
-              ? t('superAdmin.analytics.noTrialClients')
-              : t('superAdmin.analytics.trialPercent', {
-                  pct: Math.round(
-                    (metrics.trialTenants /
-                      (metrics.activeTenants + metrics.trialTenants)) *
-                      100
-                  ),
-                })}
+              ? 'Sin clientes en trial'
+              : `${Math.round(
+                  (metrics.trialTenants /
+                    (metrics.activeTenants + metrics.trialTenants)) *
+                    100
+                )}% del total`}
           </p>
         </div>
       </div>
@@ -119,7 +115,7 @@ export default function AnalyticsPage() {
       {/* Health Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg shadow p-8">
-          <h3 className="text-xl font-bold mb-6">{t('superAdmin.analytics.churnTitle')}</h3>
+          <h3 className="text-xl font-bold mb-6">Churn Rate (30 días)</h3>
           <p className="text-6xl font-bold text-red-600 mb-4">
             {metrics.churnRate.toFixed(2)}%
           </p>
@@ -127,28 +123,28 @@ export default function AnalyticsPage() {
             {metrics.churnRate < 5 ? (
               <>
                 <p className="text-green-600 font-semibold">
-                  ✅ {t('superAdmin.analytics.churnHealthy')}
+                  ✅ Saludable
                 </p>
                 <p className="text-sm text-gray-600">
-                  {t('superAdmin.analytics.churnHealthyDesc')}
+                  Por debajo del 5% - Excelente retención
                 </p>
               </>
             ) : metrics.churnRate < 10 ? (
               <>
                 <p className="text-orange-600 font-semibold">
-                  ⚠️ {t('superAdmin.analytics.churnNormal')}
+                  ⚠️ Normal
                 </p>
                 <p className="text-sm text-gray-600">
-                  {t('superAdmin.analytics.churnNormalDesc')}
+                  Entre 5-10% - Dentro de lo esperado
                 </p>
               </>
             ) : (
               <>
                 <p className="text-red-600 font-semibold">
-                  🔴 {t('superAdmin.analytics.churnHigh')}
+                  🔴 Alto
                 </p>
                 <p className="text-sm text-gray-600">
-                  {t('superAdmin.analytics.churnHighDesc')}
+                  Requiere atención inmediata
                 </p>
               </>
             )}
@@ -156,7 +152,7 @@ export default function AnalyticsPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow p-8">
-          <h3 className="text-lg font-bold mb-6">{t('superAdmin.analytics.planDistribution')}</h3>
+          <h3 className="text-lg font-bold mb-6">Distribución de Planes</h3>
           <div className="space-y-3">
             {Object.entries(metrics.planDistribution).map(
               ([plan, count]) => {
@@ -189,7 +185,7 @@ export default function AnalyticsPage() {
 
       {/* Add-ons Popularity */}
       <div className="bg-white rounded-lg shadow p-8">
-        <h3 className="text-xl font-bold mb-6">{t('superAdmin.analytics.popularAddons')}</h3>
+        <h3 className="text-xl font-bold mb-6">Add-ons Más Populares</h3>
         <div className="space-y-3">
           {Object.entries(metrics.addonsPopularity)
             .sort(([, a], [, b]) => b - a)
@@ -198,7 +194,7 @@ export default function AnalyticsPage() {
               <div key={addon} className="flex items-center justify-between">
                 <span className="text-gray-700">{addon}</span>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600">{count} {t('superAdmin.analytics.clients')}</span>
+                  <span className="text-sm text-gray-600">{count} clientes</span>
                   <div className="w-24 bg-gray-200 rounded-full h-2">
                     <div
                       className="bg-green-600 h-2 rounded-full"
@@ -222,18 +218,16 @@ export default function AnalyticsPage() {
 
       {/* Insights */}
       <div className="bg-blue-50 border-l-4 border-blue-600 rounded-lg p-8">
-        <h3 className="text-lg font-bold text-blue-900 mb-3">💡 {t('superAdmin.analytics.insightsTitle')}</h3>
+        <h3 className="text-lg font-bold text-blue-900 mb-3">💡 Insights</h3>
         <ul className="space-y-2 text-blue-900 text-sm">
           <li>
-            • {t('superAdmin.analytics.insightLtv', { value: (metrics.mrr * 12).toLocaleString('es-ES') })}
+            • Tu LTV (Lifetime Value) promedio es €{(metrics.mrr * 12).toLocaleString('es-ES')} por cliente
           </li>
           <li>
-            • {t('superAdmin.analytics.insightCac')}
+            • Relación CAC/LTV: Necesitas optimizar tu adquisición de clientes
           </li>
           <li>
-            • {t('superAdmin.analytics.insightPopularPlan', {
-                plan: Object.entries(metrics.planDistribution).sort(([, a], [, b]) => b - a)[0]?.[0] || 'N/A',
-              })}
+            • El plan más popular es: {Object.entries(metrics.planDistribution).sort(([, a], [, b]) => b - a)[0]?.[0] || 'N/A'}
           </li>
         </ul>
       </div>
@@ -244,10 +238,10 @@ export default function AnalyticsPage() {
           onClick={fetchMetrics}
           className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
         >
-          🔄 {t('superAdmin.analytics.refreshButton')}
+          🔄 Refrescar Ahora
         </button>
         <p className="text-xs text-gray-500 mt-2">
-          {t('superAdmin.analytics.autoRefresh')}
+          Se actualiza automáticamente cada minuto
         </p>
       </div>
     </div>

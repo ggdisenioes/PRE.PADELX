@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateRegistrationOptions } from "@simplewebauthn/server";
 import {
+  applyPasskeyRateLimit,
   PASSKEY_REGISTER_COOKIE,
   createSupabaseAdminClient,
   createSupabaseUserClient,
   extractBearerToken,
+  getPasskeyRequestContext,
   getPasskeyContext,
   getPasskeyRPName,
+  logPasskeyAuditEvent,
   resolvePasskeyOrigin,
   resolvePasskeyRPID,
   setChallengeCookie,
@@ -20,14 +23,36 @@ type StoredPasskey = {
 
 export async function POST(req: NextRequest) {
   try {
+    const reqContext = getPasskeyRequestContext(req);
+    const context = getPasskeyContext();
+    const supabaseAdmin = createSupabaseAdminClient(context);
+    const ipLimit = applyPasskeyRateLimit(`passkeys:register:options:ip:${reqContext.ip}`, {
+      maxRequests: 30,
+      windowMs: 60_000,
+    });
+    if (!ipLimit.success) {
+      await logPasskeyAuditEvent({
+        supabaseAdmin,
+        action: "PASSKEY_REGISTER_OPTIONS_RATE_LIMIT",
+        metadata: {
+          endpoint: "register/options",
+          limiter: "ip",
+          ip: reqContext.ip,
+          user_agent: reqContext.userAgent,
+        },
+      });
+      return NextResponse.json(
+        { error: "too_many_attempts" },
+        { status: 429, headers: { "Retry-After": "60" } }
+      );
+    }
+
     const token = extractBearerToken(req);
     if (!token) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const context = getPasskeyContext();
     const supabaseUser = createSupabaseUserClient(context, token);
-    const supabaseAdmin = createSupabaseAdminClient(context);
 
     const {
       data: { user },
@@ -38,7 +63,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "invalid_session" }, { status: 401 });
     }
 
+    const userLimit = applyPasskeyRateLimit(`passkeys:register:options:user:${user.id}`, {
+      maxRequests: 10,
+      windowMs: 60_000,
+    });
+    if (!userLimit.success) {
+      await logPasskeyAuditEvent({
+        supabaseAdmin,
+        action: "PASSKEY_REGISTER_OPTIONS_RATE_LIMIT",
+        userId: user.id,
+        userEmail: user.email || null,
+        metadata: {
+          endpoint: "register/options",
+          limiter: "user",
+          ip: reqContext.ip,
+          user_agent: reqContext.userAgent,
+        },
+      });
+      return NextResponse.json(
+        { error: "too_many_attempts" },
+        { status: 429, headers: { "Retry-After": "60" } }
+      );
+    }
+
     if (!user.email) {
+      await logPasskeyAuditEvent({
+        supabaseAdmin,
+        action: "PASSKEY_REGISTER_OPTIONS_REJECTED",
+        userId: user.id,
+        metadata: {
+          endpoint: "register/options",
+          reason: "missing_email",
+          ip: reqContext.ip,
+          user_agent: reqContext.userAgent,
+        },
+      });
       return NextResponse.json(
         { error: "missing_email", message: "El usuario no tiene email asociado." },
         { status: 400 }
@@ -52,6 +111,18 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (profile && profile.active === false) {
+      await logPasskeyAuditEvent({
+        supabaseAdmin,
+        action: "PASSKEY_REGISTER_OPTIONS_REJECTED",
+        userId: user.id,
+        userEmail: user.email,
+        metadata: {
+          endpoint: "register/options",
+          reason: "user_inactive",
+          ip: reqContext.ip,
+          user_agent: reqContext.userAgent,
+        },
+      });
       return NextResponse.json({ error: "user_inactive" }, { status: 403 });
     }
 
@@ -62,6 +133,18 @@ export async function POST(req: NextRequest) {
       .is("revoked_at", null);
 
     if (existingError) {
+      await logPasskeyAuditEvent({
+        supabaseAdmin,
+        action: "PASSKEY_REGISTER_OPTIONS_REJECTED",
+        userId: user.id,
+        userEmail: user.email,
+        metadata: {
+          endpoint: "register/options",
+          reason: "storage_error",
+          ip: reqContext.ip,
+          user_agent: reqContext.userAgent,
+        },
+      });
       return NextResponse.json(
         { error: "storage_error", message: existingError.message },
         { status: 500 }
@@ -97,6 +180,19 @@ export async function POST(req: NextRequest) {
       email: user.email,
       rpID,
       origin: expectedOrigin,
+    });
+
+    await logPasskeyAuditEvent({
+      supabaseAdmin,
+      action: "PASSKEY_REGISTER_OPTIONS_ISSUED",
+      userId: user.id,
+      userEmail: user.email,
+      metadata: {
+        endpoint: "register/options",
+        existing_credentials: existing.length,
+        ip: reqContext.ip,
+        user_agent: reqContext.userAgent,
+      },
     });
 
     return response;

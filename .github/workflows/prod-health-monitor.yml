@@ -1,0 +1,96 @@
+name: Production Health Monitor
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  health-monitor:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run production health check
+        id: health
+        run: |
+          set +e
+          npm run monitor:health
+          ec=$?
+          echo "exit_code=$ec" >> "$GITHUB_OUTPUT"
+          exit 0
+        env:
+          GO_LIVE_BASE_URL: https://twinco.padelx.es
+          HEALTH_REPORT_PATH: health-report.json
+          HEALTH_ATTEMPTS: "3"
+          HEALTH_TIMEOUT_MS: "15000"
+
+      - name: Upload health report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-health-report
+          path: health-report.json
+          if-no-files-found: ignore
+
+      - name: Open or update incident issue on failure
+        if: steps.health.outputs.exit_code != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const report = fs.existsSync("health-report.json")
+              ? fs.readFileSync("health-report.json", "utf8")
+              : "health-report.json not found";
+            const marker = "[prod-health]";
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: "open",
+              per_page: 100
+            });
+
+            const existing = issues.find((i) => i.title.startsWith(`${marker} incident`));
+            const now = new Date().toISOString();
+            const body = [
+              `Automatic production health monitor failed at ${now}.`,
+              "",
+              "```json",
+              report,
+              "```",
+              "",
+              `Workflow run: ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+            ].join("\\n");
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body
+              });
+            } else {
+              await github.rest.issues.create({
+                owner,
+                repo,
+                title: `${marker} incident ${now}`,
+                body
+              });
+            }
+
+      - name: Mark workflow as failed when health fails
+        if: steps.health.outputs.exit_code != '0'
+        run: exit 1

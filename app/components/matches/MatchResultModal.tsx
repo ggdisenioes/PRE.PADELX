@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { toPng } from "html-to-image";
 import MatchShareCard from "./MatchShareCard";
-import { useTranslation } from "../../i18n";
+import { useTranslation } from "@/i18n";
 
 type Props = {
   open: boolean;

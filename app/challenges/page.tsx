@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Card from "../components/Card";
 import toast from "react-hot-toast";
 import { useTranslation } from "../i18n";
+import { useRole } from "../hooks/useRole";
 
 type Challenge = {
   id: number;
@@ -38,6 +39,7 @@ type Court = {
 export default function ChallengesPage() {
   const router = useRouter();
   const { t, locale } = useTranslation();
+  const { isAdmin, isManager, loading: roleLoading } = useRole();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
@@ -234,6 +236,42 @@ export default function ChallengesPage() {
     }
   };
 
+  const handleDeleteChallenge = async (challengeId: number) => {
+    if (!isAdmin && !isManager) {
+      toast.error(t("challenges.errorDeleting"));
+      return;
+    }
+
+    if (!confirm(t("challenges.deleteConfirm"))) return;
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      if (sessionData?.session?.access_token) {
+        headers["Authorization"] = `Bearer ${sessionData.session.access_token}`;
+      }
+
+      const response = await fetch(`/api/challenges/${challengeId}`, {
+        method: "DELETE",
+        headers,
+      });
+
+      if (response.ok) {
+        toast.success(t("challenges.deleted"));
+        fetchChallenges();
+        return;
+      }
+
+      const result = await response.json().catch(() => ({}));
+      toast.error(result.error || t("challenges.errorDeleting"));
+    } catch {
+      toast.error(t("challenges.errorDeleting"));
+    }
+  };
+
   const getPlayerName = (playerId: number) => {
     return players.find((p) => p.id === playerId)?.name || `${t("ranking.player")} ${playerId}`;
   };
@@ -273,9 +311,11 @@ export default function ChallengesPage() {
     return <span className="text-yellow-600 font-semibold text-xs">{label}: {t("challenges.statusPending")}</span>;
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return <div className="p-8 text-center">{t("challenges.loading")}</div>;
   }
+
+  const canDeleteChallenges = isAdmin || isManager;
 
   return (
     <main className="max-w-4xl mx-auto p-6 space-y-6">
@@ -462,6 +502,14 @@ export default function ChallengesPage() {
                         </p>
                       </div>
                     </div>
+                    {canDeleteChallenges && (
+                      <button
+                        onClick={() => handleDeleteChallenge(challenge.id)}
+                        className="px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 font-semibold shrink-0"
+                      >
+                        {t("common.delete")}
+                      </button>
+                    )}
                   </div>
 
                   {/* Individual acceptance status */}

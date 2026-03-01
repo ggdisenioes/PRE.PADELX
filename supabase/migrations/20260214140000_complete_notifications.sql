@@ -54,7 +54,7 @@ BEGIN
       '<h2>¡Nuevo Desafío!</h2>'
       '<p><strong>%s</strong>%s te han desafiado%s en <strong>%s</strong>.</p>'
       '%s'
-      '<p style="margin-top:16px;"><a href="https://qa.padelx.es/challenges" style="background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Ver desafío</a></p>',
+      '<p style="margin-top:16px;"><a href="https://twinco.padelx.es/challenges" style="background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Ver desafío</a></p>',
       challenger_name,
       CASE WHEN challenger_partner_name IS NOT NULL THEN format(' y %s', challenger_partner_name) ELSE '' END,
       CASE WHEN challenged_partner_rec.name IS NOT NULL THEN format(' junto con %s', challenged_partner_rec.name) ELSE '' END,
@@ -95,7 +95,7 @@ BEGIN
       '<h2>¡Nuevo Desafío!</h2>'
       '<p><strong>%s</strong>%s te han desafiado junto con <strong>%s</strong> en <strong>%s</strong>.</p>'
       '%s'
-      '<p style="margin-top:16px;"><a href="https://qa.padelx.es/challenges" style="background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Ver desafío</a></p>',
+      '<p style="margin-top:16px;"><a href="https://twinco.padelx.es/challenges" style="background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Ver desafío</a></p>',
       challenger_name,
       CASE WHEN challenger_partner_name IS NOT NULL THEN format(' y %s', challenger_partner_name) ELSE '' END,
       challenged_rec.name,
@@ -198,7 +198,7 @@ BEGIN
       '<tr><td style="padding:4px 12px;font-weight:bold;">Fecha:</td><td style="padding:4px 12px;">%s</td></tr>'
       '<tr><td style="padding:4px 12px;font-weight:bold;">Pista:</td><td style="padding:4px 12px;">%s</td></tr>'
       '</table>'
-      '<p><a href="https://qa.padelx.es/matches" style="background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Ver partido</a></p>',
+      '<p><a href="https://twinco.padelx.es/matches" style="background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Ver partido</a></p>',
       p.name,
       COALESCE(p1a_name, '—'), COALESCE(p2a_name, '—'),
       COALESCE(p1b_name, '—'), COALESCE(p2b_name, '—'),
@@ -324,7 +324,7 @@ BEGIN
             '<tr><td style="padding:4px 12px;font-weight:bold;">Fecha:</td><td style="padding:4px 12px;">%s</td></tr>'
             '<tr><td style="padding:4px 12px;font-weight:bold;">Pista:</td><td style="padding:4px 12px;">%s</td></tr>'
             '</table>'
-            '<p><a href="https://qa.padelx.es/matches" style="background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Ver partido</a></p>',
+            '<p><a href="https://twinco.padelx.es/matches" style="background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Ver partido</a></p>',
             p.name,
             COALESCE(p1a_name, '—'), COALESCE(p2a_name, '—'),
             COALESCE(p1b_name, '—'), COALESCE(p2b_name, '—'),

@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { SaaSMetrics } from '@/lib/types/saas';
-import { useTranslation } from '../../i18n';
 
 export default function SuperAdminDashboard() {
-  const { t } = useTranslation();
   const [metrics, setMetrics] = useState<SaaSMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -26,18 +24,18 @@ export default function SuperAdminDashboard() {
   };
 
   if (isLoading) {
-    return <div>{t('superAdmin.dashboard.loading')}</div>;
+    return <div>Cargando métricas...</div>;
   }
 
   if (!metrics) {
-    return <div>{t('superAdmin.dashboard.errorLoading')}</div>;
+    return <div>Error cargando métricas</div>;
   }
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-4xl font-bold text-gray-900">{t('superAdmin.dashboard.title')}</h1>
-        <p className="text-gray-600 mt-2">{t('superAdmin.dashboard.subtitle')}</p>
+        <h1 className="text-4xl font-bold text-gray-900">Dashboard Super Admin</h1>
+        <p className="text-gray-600 mt-2">Bienvenido a PadelX - Control total de tu SaaS</p>
       </div>
 
       {/* Top metrics */}
@@ -47,7 +45,7 @@ export default function SuperAdminDashboard() {
           value={`€${metrics.mrr.toLocaleString('es-ES', {
             minimumFractionDigits: 2,
           })}`}
-          subtitle={t('superAdmin.dashboard.mrrSubtitle')}
+          subtitle="Monthly Recurring Revenue"
           color="bg-blue-50"
           icon="💶"
         />
@@ -56,21 +54,21 @@ export default function SuperAdminDashboard() {
           value={`€${metrics.arr.toLocaleString('es-ES', {
             minimumFractionDigits: 2,
           })}`}
-          subtitle={t('superAdmin.dashboard.arrSubtitle')}
+          subtitle="Annual Recurring Revenue"
           color="bg-green-50"
           icon="📈"
         />
         <MetricCard
-          title={t('superAdmin.dashboard.activeClientsTitle')}
+          title="Clientes Activos"
           value={metrics.activeTenants.toString()}
-          subtitle={t('superAdmin.dashboard.activeClientsSubtitle')}
+          subtitle="En plan de pago"
           color="bg-purple-50"
           icon="👥"
         />
         <MetricCard
-          title={t('superAdmin.dashboard.trialTitle')}
+          title="En Trial"
           value={metrics.trialTenants.toString()}
-          subtitle={t('superAdmin.dashboard.trialSubtitle')}
+          subtitle="Próximos a convertir"
           color="bg-orange-50"
           icon="⏰"
         />
@@ -79,21 +77,21 @@ export default function SuperAdminDashboard() {
       {/* Health metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-bold mb-4">{t('superAdmin.dashboard.churnTitle')}</h3>
+          <h3 className="text-lg font-bold mb-4">Churn Rate (30 días)</h3>
           <div className="text-5xl font-bold text-red-600">
             {metrics.churnRate.toFixed(2)}%
           </div>
           <p className="text-sm text-gray-600 mt-2">
             {metrics.churnRate < 5
-              ? `✅ ${t('superAdmin.dashboard.churnHealthy')}`
+              ? '✅ Saludable - Por debajo del 5%'
               : metrics.churnRate < 10
-              ? `⚠️ ${t('superAdmin.dashboard.churnNormal')}`
-              : `🔴 ${t('superAdmin.dashboard.churnHigh')}`}
+              ? '⚠️ Normal - Entre 5-10%'
+              : '🔴 Alto - Requiere atención'}
           </p>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-bold mb-4">{t('superAdmin.dashboard.planDistribution')}</h3>
+          <h3 className="text-lg font-bold mb-4">Distribución de Planes</h3>
           <div className="space-y-2">
             {Object.entries(metrics.planDistribution).map(([plan, count]) => (
               <div key={plan} className="flex justify-between items-center">
@@ -107,25 +105,25 @@ export default function SuperAdminDashboard() {
 
       {/* Quick actions */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-bold mb-4">{t('superAdmin.dashboard.quickActions')}</h3>
+        <h3 className="text-lg font-bold mb-4">Acciones Rápidas</h3>
         <div className="flex gap-3">
           <a
             href="/super-admin/tenants/create"
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
-            ➕ {t('superAdmin.dashboard.createNewClient')}
+            ➕ Crear Nuevo Cliente
           </a>
           <a
             href="/super-admin/tenants"
             className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
           >
-            👥 {t('superAdmin.dashboard.viewClients')}
+            👥 Ver Clientes
           </a>
           <a
             href="/super-admin/analytics"
             className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
           >
-            📊 {t('superAdmin.dashboard.viewAnalytics')}
+            📊 Ver Analytics
           </a>
         </div>
       </div>

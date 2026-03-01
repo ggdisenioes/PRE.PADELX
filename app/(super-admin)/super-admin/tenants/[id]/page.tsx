@@ -4,10 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { TenantWithPlan, SubscriptionPlan, Addon } from '@/lib/types/saas';
 import toast from 'react-hot-toast';
-import { useTranslation } from '../../../../i18n';
 
 export default function TenantDetailPage() {
-  const { t } = useTranslation();
   const params = useParams();
   const tenantId = params.id as string;
 
@@ -41,7 +39,7 @@ export default function TenantDetailPage() {
       setNewPlanId(tenantData.data.subscription_plan_id);
       setNewStatus(tenantData.data.status);
     } catch (error) {
-      toast.error(t('superAdmin.tenantDetail.errorLoading'));
+      toast.error('Error cargando datos');
     } finally {
       setIsLoading(false);
     }
@@ -49,7 +47,7 @@ export default function TenantDetailPage() {
 
   const handleChangePlan = async () => {
     if (newPlanId === tenant?.subscription_plan_id) {
-      toast.error(t('superAdmin.tenantDetail.selectDifferentPlan'));
+      toast.error('Selecciona un plan diferente');
       return;
     }
 
@@ -69,9 +67,9 @@ export default function TenantDetailPage() {
       }
 
       setTenant(json.data);
-      toast.success(t('superAdmin.tenantDetail.planUpdated'));
+      toast.success('✅ Plan actualizado');
     } catch (error) {
-      toast.error(t('superAdmin.tenantDetail.errorUpdatingPlan'));
+      toast.error('Error actualizando plan');
     } finally {
       setIsChangingPlan(false);
     }
@@ -79,7 +77,7 @@ export default function TenantDetailPage() {
 
   const handleChangeStatus = async () => {
     if (newStatus === tenant?.status) {
-      toast.error(t('superAdmin.tenantDetail.selectDifferentStatus'));
+      toast.error('Selecciona un estado diferente');
       return;
     }
 
@@ -98,9 +96,9 @@ export default function TenantDetailPage() {
       }
 
       setTenant(json.data);
-      toast.success(t('superAdmin.tenantDetail.statusUpdated'));
+      toast.success('✅ Estado actualizado');
     } catch (error) {
-      toast.error(t('superAdmin.tenantDetail.errorUpdatingStatus'));
+      toast.error('Error actualizando estado');
     }
   };
 
@@ -124,14 +122,14 @@ export default function TenantDetailPage() {
       }
 
       setTenant(json.data);
-      toast.success(isAdding ? t('superAdmin.tenantDetail.addonAdded') : t('superAdmin.tenantDetail.addonRemoved'));
+      toast.success(isAdding ? '✅ Add-on agregado' : '✅ Add-on removido');
     } catch (error) {
-      toast.error(t('superAdmin.tenantDetail.errorUpdatingAddons'));
+      toast.error('Error actualizando add-ons');
     }
   };
 
-  if (isLoading) return <div>{t('superAdmin.tenantDetail.loading')}</div>;
-  if (!tenant) return <div>{t('superAdmin.tenantDetail.notFound')}</div>;
+  if (isLoading) return <div>Cargando...</div>;
+  if (!tenant) return <div>Cliente no encontrado</div>;
 
   const currentPlan = plans.find((p) => p.id === tenant.subscription_plan_id);
   const tenantAddonIds = tenant.addons?.map((a) => a.addon_id) || [];
@@ -145,24 +143,24 @@ export default function TenantDetailPage() {
 
       {/* Información Básica */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold mb-4">{t('superAdmin.tenantDetail.generalInfo')}</h2>
+        <h2 className="text-xl font-bold mb-4">Información General</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <p className="text-gray-600 text-sm">{t('superAdmin.tenantDetail.phone')}</p>
-            <p className="font-semibold">{tenant.phone || t('superAdmin.tenantDetail.notSpecified')}</p>
+            <p className="text-gray-600 text-sm">Teléfono</p>
+            <p className="font-semibold">{tenant.phone || 'No especificado'}</p>
           </div>
           <div>
-            <p className="text-gray-600 text-sm">{t('superAdmin.tenantDetail.country')}</p>
-            <p className="font-semibold">{tenant.country || t('superAdmin.tenantDetail.notSpecified')}</p>
+            <p className="text-gray-600 text-sm">País</p>
+            <p className="font-semibold">{tenant.country || 'No especificado'}</p>
           </div>
           <div>
-            <p className="text-gray-600 text-sm">{t('superAdmin.tenantDetail.from')}</p>
+            <p className="text-gray-600 text-sm">Desde</p>
             <p className="font-semibold">
               {new Date(tenant.created_at).toLocaleDateString('es-ES')}
             </p>
           </div>
           <div>
-            <p className="text-gray-600 text-sm">{t('superAdmin.tenantDetail.status')}</p>
+            <p className="text-gray-600 text-sm">Estado</p>
             <p className="font-semibold">
               <StatusBadge status={tenant.status} />
             </p>
@@ -173,10 +171,10 @@ export default function TenantDetailPage() {
       {/* Plan Actual */}
       {currentPlan && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold mb-4">{t('superAdmin.tenantDetail.currentPlan')}</h2>
+          <h2 className="text-xl font-bold mb-4">Plan Actual</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <p className="text-gray-600 text-sm">{t('superAdmin.tenantDetail.plan')}</p>
+              <p className="text-gray-600 text-sm">Plan</p>
               <p className="text-2xl font-bold text-blue-600">
                 {currentPlan.name}
               </p>
@@ -185,7 +183,7 @@ export default function TenantDetailPage() {
               </p>
             </div>
             <div>
-              <p className="text-gray-600 text-sm mb-3">{t('superAdmin.tenantDetail.limitsTitle')}</p>
+              <p className="text-gray-600 text-sm mb-3">Límites</p>
               <ul className="space-y-1 text-sm">
                 <li>👥 {currentPlan.max_players} jugadores</li>
                 <li>🏆 {currentPlan.max_concurrent_tournaments} torneos</li>
@@ -193,16 +191,17 @@ export default function TenantDetailPage() {
               </ul>
             </div>
             <div>
-              <p className="text-gray-600 text-sm mb-3">{t('superAdmin.tenantDetail.featuresTitle')}</p>
+              <p className="text-gray-600 text-sm mb-3">Características</p>
               <ul className="space-y-1 text-sm">
                 <li>
-                  {currentPlan.has_advanced_rankings ? '✅' : '❌'} {t('superAdmin.tenantDetail.advancedRankings')}
+                  {currentPlan.has_advanced_rankings ? '✅' : '❌'} Rankings
+                  avanzados
                 </li>
                 <li>
-                  {currentPlan.has_mobile_app ? '✅' : '❌'} {t('superAdmin.tenantDetail.mobileApp')}
+                  {currentPlan.has_mobile_app ? '✅' : '❌'} App móvil
                 </li>
                 <li>
-                  {currentPlan.has_api_access ? '✅' : '❌'} {t('superAdmin.tenantDetail.apiAccess')}
+                  {currentPlan.has_api_access ? '✅' : '❌'} Acceso API
                 </li>
               </ul>
             </div>
@@ -212,7 +211,7 @@ export default function TenantDetailPage() {
 
       {/* Cambiar Plan */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold mb-4">{t('superAdmin.tenantDetail.changePlan')}</h2>
+        <h2 className="text-xl font-bold mb-4">Cambiar Plan</h2>
         <div className="flex gap-4">
           <select
             value={newPlanId}
@@ -230,14 +229,14 @@ export default function TenantDetailPage() {
             disabled={isChangingPlan}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
-            {isChangingPlan ? t('superAdmin.tenantDetail.updating') : t('superAdmin.tenantDetail.updatePlan')}
+            {isChangingPlan ? 'Actualizando...' : 'Actualizar Plan'}
           </button>
         </div>
       </div>
 
       {/* Cambiar Estado */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold mb-4">{t('superAdmin.tenantDetail.changeStatus')}</h2>
+        <h2 className="text-xl font-bold mb-4">Cambiar Estado</h2>
         <div className="flex gap-4">
           <select
             value={newStatus}
@@ -253,14 +252,14 @@ export default function TenantDetailPage() {
             onClick={handleChangeStatus}
             className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
           >
-            {t('superAdmin.tenantDetail.changeStatusButton')}
+            Cambiar Estado
           </button>
         </div>
       </div>
 
       {/* Add-ons */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold mb-4">{t('superAdmin.tenantDetail.addonsTitle')}</h2>
+        <h2 className="text-xl font-bold mb-4">Add-ons Contratados</h2>
         <div className="space-y-3">
           {addons.map((addon) => {
             const isActive = tenantAddonIds.includes(addon.id);
@@ -284,7 +283,7 @@ export default function TenantDetailPage() {
                       : 'bg-green-600 text-white hover:bg-green-700'
                   }`}
                 >
-                  {isActive ? `✅ ${t('superAdmin.tenantDetail.removeAddon')}` : `➕ ${t('superAdmin.tenantDetail.addAddon')}`}
+                  {isActive ? '✅ Remover' : '➕ Agregar'}
                 </button>
               </div>
             );
@@ -296,7 +295,6 @@ export default function TenantDetailPage() {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const { t } = useTranslation();
   const colors: Record<string, string> = {
     trial: 'bg-yellow-100 text-yellow-800',
     active: 'bg-green-100 text-green-800',
@@ -304,11 +302,11 @@ function StatusBadge({ status }: { status: string }) {
     cancelled: 'bg-gray-100 text-gray-800',
   };
 
-  const labelKeys: Record<string, string> = {
-    trial: 'superAdmin.tenants.statusTrial',
-    active: 'superAdmin.tenants.statusActive',
-    suspended: 'superAdmin.tenants.statusSuspended',
-    cancelled: 'superAdmin.tenants.statusCancelled',
+  const labels: Record<string, string> = {
+    trial: 'En Trial',
+    active: 'Activo',
+    suspended: 'Suspendido',
+    cancelled: 'Cancelado',
   };
 
   return (
@@ -317,7 +315,7 @@ function StatusBadge({ status }: { status: string }) {
         colors[status] || colors.active
       }`}
     >
-      {labelKeys[status] ? t(labelKeys[status] as any) : status}
+      {labels[status] || status}
     </span>
   );
 }

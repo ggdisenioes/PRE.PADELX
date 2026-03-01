@@ -852,7 +852,7 @@ export default function DashboardPage() {
         {/* GRID PRINCIPAL (estilo dashboard con panel derecho) */}
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* COLUMNA IZQUIERDA */}
-          <div className="lg:col-span-8 space-y-6">
+          <div className="order-2 lg:order-1 lg:col-span-8 space-y-6">
             {/* KPIs */}
             {(isAdmin || isManager) && (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
@@ -1215,7 +1215,7 @@ export default function DashboardPage() {
           </div>
 
           {/* COLUMNA DERECHA */}
-          <aside className="lg:col-span-4 space-y-6">
+          <aside className="order-1 lg:order-2 lg:col-span-4 space-y-6">
             {isUser && (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-4 gap-2">
@@ -1577,7 +1577,7 @@ export default function DashboardPage() {
                   <div style={{ textAlign: "center" }}>
                     <img
                       src="/logo.svg"
-                      alt="PadelX QA"
+                      alt="TWINCO"
                       style={{ height: 44, width: "auto", margin: "0 auto", objectFit: "contain" }}
                     />
                   </div>
@@ -1661,7 +1661,7 @@ export default function DashboardPage() {
                         height: 520,
                       });
                       const link = document.createElement("a");
-                      link.download = `PadelX_QA_Partido_${match.id}.png`;
+                      link.download = `Twinco_Partido_${match.id}.png`;
                       link.href = dataUrl;
                       link.click();
                       toast.success(t("matches.imageDownloaded"));

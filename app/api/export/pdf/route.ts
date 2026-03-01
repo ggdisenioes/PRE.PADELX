@@ -97,7 +97,7 @@ function generatePlayerStatsHTML(
         </table>
       </div>
       <div class="footer">
-        <p>PadelX QA</p>
+        <p>TWINCO - Pádel Manager</p>
       </div>
     </body>
     </html>
@@ -171,7 +171,7 @@ function generateAnalyticsHTML(stats: any): string {
         </div>
       </div>
       <div class="footer">
-        <p>PadelX QA</p>
+        <p>TWINCO - Pádel Manager</p>
       </div>
     </body>
     </html>

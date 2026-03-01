@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import Card from "../components/Card";
@@ -14,14 +14,17 @@ type Player = {
 };
 
 type PlayerWithStats = Player & {
-  stats?: {
+  stats: {
     total_matches: number;
     wins: number;
     losses: number;
     pending_matches: number;
-    winRate?: number;
+    winRate: number;
   };
 };
+
+const STATS_CACHE_KEY = "padelx-stats-players-v1";
+const STATS_CACHE_TTL_MS = 60_000;
 
 export default function StatsPage() {
   const { t } = useTranslation();
@@ -35,16 +38,26 @@ export default function StatsPage() {
 
   const fetchPlayersStats = async () => {
     try {
-      // Get approved players
-      const { data: playersData } = await supabase
-        .from("players")
-        .select("id, name, level, avatar_url")
-        .eq("is_approved", true)
-        .order("level", { ascending: false });
+      if (typeof window !== "undefined") {
+        const cachedRaw = sessionStorage.getItem(STATS_CACHE_KEY);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw) as {
+              ts: number;
+              players: PlayerWithStats[];
+            };
+            if (Date.now() - cached.ts < STATS_CACHE_TTL_MS) {
+              setPlayers(cached.players || []);
+              setLoading(false);
+              return;
+            }
+          } catch {
+            // cache inválido: continuamos con fetch de red
+          }
+        }
+      }
 
-      if (!playersData) return;
-
-      // Get stats for each player
+      // Batch fetch: one request for players + stats (avoids N+1 calls)
       const { data: sessionData } = await supabase.auth.getSession();
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -54,60 +67,46 @@ export default function StatsPage() {
         headers["Authorization"] = `Bearer ${sessionData.session.access_token}`;
       }
 
-      const playersWithStats = await Promise.all(
-        playersData.map(async (player) => {
-          try {
-            const response = await fetch(`/api/stats/player/${player.id}`, { headers });
-            const result = await response.json();
-
-            return {
-              ...player,
-              stats: result.stats || {
-                total_matches: 0,
-                wins: 0,
-                losses: 0,
-                pending_matches: 0,
-              },
-            };
-          } catch {
-            return {
-              ...player,
-              stats: {
-                total_matches: 0,
-                wins: 0,
-                losses: 0,
-                pending_matches: 0,
-              },
-            };
-          }
-        })
-      );
-
-      // Sort based on selected criteria
-      let sorted = [...playersWithStats];
-      if (sortBy === "matches") {
-        sorted.sort((a, b) => (b.stats?.total_matches || 0) - (a.stats?.total_matches || 0));
-      } else if (sortBy === "winRate") {
-        sorted.sort((a, b) => {
-          const aWins = a.stats?.wins || 0;
-          const aTotal = a.stats?.total_matches || 0;
-          const bWins = b.stats?.wins || 0;
-          const bTotal = b.stats?.total_matches || 0;
-
-          const aRate = aTotal > 0 ? aWins / (aTotal - (a.stats?.pending_matches || 0)) : 0;
-          const bRate = bTotal > 0 ? bWins / (bTotal - (b.stats?.pending_matches || 0)) : 0;
-
-          return bRate - aRate;
-        });
+      const response = await fetch("/api/stats/players", { headers });
+      if (!response.ok) {
+        throw new Error("No se pudieron cargar estadísticas");
       }
-
-      setPlayers(sorted);
+      const result = await response.json();
+      const nextPlayers = (result.players || []) as PlayerWithStats[];
+      setPlayers(nextPlayers);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(
+          STATS_CACHE_KEY,
+          JSON.stringify({ ts: Date.now(), players: nextPlayers })
+        );
+      }
     } catch (error) {
       console.error("Error fetching stats:", error);
+      setPlayers([]);
     } finally {
       setLoading(false);
     }
   };
+
+  const sortedPlayers = useMemo(() => {
+    const sorted = [...players];
+    if (sortBy === "matches") {
+      sorted.sort((a, b) => (b.stats.total_matches || 0) - (a.stats.total_matches || 0));
+      return sorted;
+    }
+    if (sortBy === "winRate") {
+      sorted.sort((a, b) => {
+        const aCompleted = a.stats.total_matches - a.stats.pending_matches;
+        const bCompleted = b.stats.total_matches - b.stats.pending_matches;
+        const aRate = aCompleted > 0 ? a.stats.wins / aCompleted : 0;
+        const bRate = bCompleted > 0 ? b.stats.wins / bCompleted : 0;
+        return bRate - aRate;
+      });
+      return sorted;
+    }
+    sorted.sort((a, b) => (b.level || 0) - (a.level || 0));
+    return sorted;
+  }, [players, sortBy]);
 
   if (loading) {
     return <div className="p-8 text-center text-gray-500">{t("stats.loading")}</div>;
@@ -166,11 +165,11 @@ export default function StatsPage() {
               </tr>
             </thead>
             <tbody>
-              {players.map((player, idx) => {
-                const completed = (player.stats?.total_matches || 0) - (player.stats?.pending_matches || 0);
+              {sortedPlayers.map((player, idx) => {
+                const completed = player.stats.total_matches - player.stats.pending_matches;
                 const winRate =
                   completed > 0
-                    ? Math.round(((player.stats?.wins || 0) / completed) * 100)
+                    ? Math.round((player.stats.wins / completed) * 100)
                     : 0;
 
                 return (
@@ -196,13 +195,13 @@ export default function StatsPage() {
                       </span>
                     </td>
                     <td className="text-center py-3 px-2 font-semibold">
-                      {player.stats?.total_matches || 0}
+                      {player.stats.total_matches}
                     </td>
                     <td className="text-center py-3 px-2 text-green-600 font-semibold">
-                      {player.stats?.wins || 0}
+                      {player.stats.wins}
                     </td>
                     <td className="text-center py-3 px-2 text-red-600 font-semibold">
-                      {player.stats?.losses || 0}
+                      {player.stats.losses}
                     </td>
                     <td className="text-center py-3 px-2">
                       <span className="text-lg font-bold">{winRate}%</span>
@@ -223,7 +222,7 @@ export default function StatsPage() {
         </Card>
       </div>
 
-      {players.length === 0 && (
+      {sortedPlayers.length === 0 && (
         <Card className="p-8 text-center text-gray-500">
           {t("stats.emptyApproved")}
         </Card>

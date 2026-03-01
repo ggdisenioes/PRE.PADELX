@@ -106,7 +106,6 @@ export async function POST(req: Request) {
       .single();
 
     let totalSent = 0;
-    let totalAttempted = 0;
 
     // Send notifications for each match
     for (const match of matches) {
@@ -136,51 +135,56 @@ export async function POST(req: Request) {
       const matchPlayerIds = [match.player_1_a, match.player_2_a, match.player_1_b, match.player_2_b]
         .filter((id): id is number => id != null);
 
+      // Log all players and their notification flags for debugging
       const matchPlayers = players.filter((p: any) => matchPlayerIds.includes(p.id));
+      console.log(
+        `[notifications] Match ${match.id}: All players in match:`,
+        matchPlayers.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          email: p.email || "(vacío)",
+          notify_email: p.notify_email,
+        }))
+      );
+
       const skipped = matchPlayers.filter(
         (p: any) => p.notify_email === false || !p.email
       );
       if (skipped.length > 0) {
         console.warn(
-          `[notifications] Match ${match.id}: skipped recipients`,
-          skipped.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            email: p.email || "(vacío)",
-            reason: !p.email ? "sin email" : "notify_email=false",
-          }))
+          `[notifications] Match ${match.id}: Skipped players:`,
+          skipped.map((p: any) => ({ id: p.id, name: p.name, reason: !p.email ? "sin email" : "notify_email=false" }))
         );
       }
 
       // Send to ALL eligible players (one email per player, even if same email address)
-      const playerEmails = matchPlayers
-        .filter((p: any) => p.notify_email !== false && p.email)
+      const playerEmails = players
+        .filter((p: any) => matchPlayerIds.includes(p.id) && p.notify_email !== false && p.email)
         .map((p: any) => ({ name: p.name, email: p.email as string }));
 
       console.log(
-        `[notifications] Match ${match.id}: recipients`,
-        playerEmails.map((p, i) => `${i + 1}. ${p.name} <${p.email}>`)
+        `[notifications] Match ${match.id}: Sending ${playerEmails.length} emails:`,
+        playerEmails.map((p) => `${p.name} <${p.email}>`)
       );
 
       if (playerEmails.length > 0) {
-        let delivery = { sent: 0, attempted: 0 };
         if (type === "match_created") {
-          delivery = await sendMatchNotification({
+          await sendMatchNotification({
             playerEmails,
             teamA,
             teamB,
             matchDate,
             court: courtText,
-            clubName: tenant?.name || "PadelX QA",
+            clubName: tenant?.name || "TWINCO",
           });
         } else if (type === "match_reminder") {
-          delivery = await sendMatchReminderNotification({
+          await sendMatchReminderNotification({
             playerEmails,
             teamA,
             teamB,
             matchDate,
             court: courtText,
-            clubName: tenant?.name || "PadelX QA",
+            clubName: tenant?.name || "TWINCO",
           });
         } else {
           if (!winners) {
@@ -188,7 +192,7 @@ export async function POST(req: Request) {
             continue;
           }
 
-          delivery = await sendMatchFinishedNotification({
+          await sendMatchFinishedNotification({
             playerEmails,
             winners,
             losers,
@@ -196,18 +200,14 @@ export async function POST(req: Request) {
             matchDate,
             court: courtText,
             roundName: match.round_name || undefined,
-            clubName: tenant?.name || "PadelX QA",
+            clubName: tenant?.name || "TWINCO",
           });
         }
-        totalSent += delivery.sent;
-        totalAttempted += delivery.attempted;
-        console.log(
-          `[notifications] Match ${match.id}: delivery summary sent=${delivery.sent} attempted=${delivery.attempted}`
-        );
+        totalSent += playerEmails.length;
       }
     }
 
-    return NextResponse.json({ ok: true, sent: totalSent, attempted: totalAttempted });
+    return NextResponse.json({ ok: true, sent: totalSent });
   } catch (error) {
     console.error("Notification error:", error);
     return NextResponse.json({ error: "Error sending notifications" }, { status: 500 });

@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { useRole } from '../../hooks/useRole';
 import Card from '../../components/Card';
 import { formatDateTimeMadrid } from '@/lib/dates';
+import { useTranslation } from '@/i18n';
 
 type Match = {
   id: number;
@@ -22,6 +23,7 @@ type Match = {
 
 export default function FriendlyMatchesPage() {
   const { role } = useRole();
+  const { t } = useTranslation();
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -63,27 +65,27 @@ export default function FriendlyMatchesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Partidos amistosos</h1>
+        <h1 className="text-2xl font-bold">{t("matches.friendlyListTitle")}</h1>
 
         {(isAdmin || isManager) && (
           <Link
             href="/matches/friendly/create"
             className="btn-primary"
           >
-            ➕ Crear partido amistoso
+            ➕ {t("matches.createFriendly")}
           </Link>
         )}
       </div>
 
-      {loading && <p>Cargando partidos...</p>}
+      {loading && <p>{t("matches.loading")}</p>}
 
       {!loading && matches.length === 0 && (
-        <p className="text-gray-500">No hay partidos amistosos creados.</p>
+        <p className="text-gray-500">{t("matches.noFriendlyMatches")}</p>
       )}
 
       <div className="grid gap-4">
         {matches.map(match => (
-          <Card key={match.id} title={`Amistoso #${match.id}`}>
+          <Card key={match.id} title={t("matches.friendlyCardTitle", { id: match.id })}>
             <div className="flex justify-between items-center flex-wrap gap-4">
               <div>
                 <p className="font-semibold">
@@ -100,7 +102,7 @@ export default function FriendlyMatchesPage() {
 
                 {match.score && (
                   <p className="mt-1 text-sm">
-                    Resultado: <strong>{match.score}</strong>
+                    {t("matches.score")}: <strong>{match.score}</strong>
                   </p>
                 )}
               </div>
@@ -111,7 +113,7 @@ export default function FriendlyMatchesPage() {
                     href={`/matches/edit/${match.id}`}
                     className="btn-secondary"
                   >
-                    Editar
+                    {t("common.edit")}
                   </Link>
                 )}
 
@@ -120,7 +122,7 @@ export default function FriendlyMatchesPage() {
                     href={`/matches/score/${match.id}`}
                     className="btn-primary"
                   >
-                    Cargar resultado
+                    {t("matches.loadResult")}
                   </Link>
                 )}
               </div>

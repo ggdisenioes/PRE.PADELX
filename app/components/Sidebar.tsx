@@ -29,6 +29,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
   const { hasFeature, loading: planLoading } = useTenantPlan();
   const { t } = useTranslation();
   const [user, setUser] = useState<UserInfo | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -52,6 +53,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
       } else {
         setUser(null);
       }
+      setAuthChecked(true);
     };
 
     checkUser();
@@ -73,6 +75,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
         } else {
           setUser(null);
         }
+        setAuthChecked(true);
       }
     );
 
@@ -92,16 +95,16 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
     }
   };
 
-  const handleProtectedNavigation = (
-    e: React.MouseEvent,
-    href: string
-  ) => {
+  const handleProtectedNavigation = (e: React.MouseEvent) => {
+    onLinkClick?.();
+
+    // Evita falsos "sesión no iniciada" mientras Supabase restaura sesión en cliente.
+    if (!authChecked) return;
+
     if (!user) {
       e.preventDefault();
       toast.error(t("auth.loginRequired"));
       router.push("/login");
-    } else {
-      router.push(href);
     }
   };
 
@@ -151,7 +154,8 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
   const getRoleBadge = () => {
     if (isAdmin) return { text: "ADMIN", color: "bg-red-600" };
     if (isManager) return { text: "MANAGER", color: "bg-blue-600" };
-    return null;
+    if (role === "super_admin") return { text: "SUPER ADMIN", color: "bg-indigo-600" };
+    return { text: "USER", color: "bg-slate-600" };
   };
 
   const renderMenuItem = (item: { id: string; label: string; href: string; emoji: string; requiredFeature?: string }) => {
@@ -162,12 +166,12 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
     return (
       <div key={item.id} className="relative">
         {active && (
-          <div className="absolute left-0 top-0 h-full w-1 bg-[#00b4ff]" />
+          <div className="absolute left-0 top-0 h-full w-1 bg-[#ccff00]" />
         )}
 
         <Link
           href={item.href}
-          onClick={(e) => handleProtectedNavigation(e, item.href)}
+          onClick={(e) => handleProtectedNavigation(e)}
           className={`relative flex items-center gap-3 px-6 py-3 text-[15px] font-medium transition
             ${active ? "bg-white/10" : "hover:bg-white/5"}
           `}
@@ -180,13 +184,13 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
   };
 
   return (
-    <aside className="w-56 h-screen flex flex-col text-white bg-gradient-to-b from-[#0b1220] via-[#0e1626] to-[#0a1020] border-r border-white/5 overflow-hidden">
+    <aside className="w-56 h-screen flex flex-col overflow-hidden text-white bg-gradient-to-b from-[#0b1220] via-[#0e1626] to-[#0a1020] border-r border-white/5">
       {/* HEADER / LOGO */}
       <div className="px-5 py-6 border-b border-white/10 text-center">
         <h1 className="text-[26px] font-extrabold italic tracking-tight">
-          PadelX QA
+          TWINCO
         </h1>
-        <p className="mt-1 text-[10px] font-bold tracking-[0.3em] text-[#00b4ff] uppercase">
+        <p className="mt-1 text-[10px] font-bold tracking-[0.3em] text-[#ccff00] uppercase">
           Pádel Manager
         </p>
       </div>
@@ -230,7 +234,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
       </nav>
 
       {/* FOOTER USUARIO */}
-      <div className="border-t border-white/10 p-4 shrink-0">
+      <div className="shrink-0 border-t border-white/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {user ? (
           <>
             <div className="flex items-center gap-3 mb-4">
@@ -267,14 +271,14 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
             <Link
               href="/login"
               onClick={onLinkClick}
-              className="text-sm text-[#00b4ff] hover:underline"
+              className="text-sm text-[#ccff00] hover:underline"
             >
               {t("auth.login")} &rarr;
             </Link>
           </div>
         )}
 
-        <div className="mt-3 flex items-center justify-center gap-2">
+        <div className="mt-3 hidden items-center justify-center gap-2 md:flex">
           <LanguageSelector />
         </div>
 
@@ -284,7 +288,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
             href="https://ggdisenio.es"
             target="_blank"
             rel="noreferrer"
-            className="font-bold hover:text-[#00b4ff]"
+            className="font-bold hover:text-[#ccff00]"
           >
             GGDisenio.es
           </a>

@@ -51,8 +51,6 @@ type PasskeyDevice = {
   last_used_at: string | null;
 };
 
-const PASSKEY_LOCAL_DEVICE_ID_KEY = "padelx_passkey_local_id";
-
 function detectDevicePlatform(userAgent: string) {
   const ua = userAgent.toLowerCase();
   if (ua.includes("iphone")) return "iPhone";
@@ -148,17 +146,7 @@ export default function MiCuentaPage() {
 
     if (!response.ok) return;
     const payload = (await response.json()) as { credentials?: PasskeyDevice[] };
-    const devices = payload.credentials || [];
-    setPasskeyDevices(devices);
-
-    try {
-      const rawStoredId = localStorage.getItem(PASSKEY_LOCAL_DEVICE_ID_KEY);
-      if (!rawStoredId) return;
-      const storedId = Number(rawStoredId);
-      if (!Number.isInteger(storedId) || !devices.some((device) => device.id === storedId)) {
-        localStorage.removeItem(PASSKEY_LOCAL_DEVICE_ID_KEY);
-      }
-    } catch {}
+    setPasskeyDevices(payload.credentials || []);
   };
 
   useEffect(() => {
@@ -307,19 +295,9 @@ export default function MiCuentaPage() {
         }),
       });
 
-      const verifyPayload = (await verifyResponse.json().catch(() => ({}))) as {
-        passkeyId?: number;
-      };
-
       if (!verifyResponse.ok) {
         toast.error(t("auth.passkeySetupError"));
         return;
-      }
-
-      if (typeof verifyPayload.passkeyId === "number") {
-        try {
-          localStorage.setItem(PASSKEY_LOCAL_DEVICE_ID_KEY, String(verifyPayload.passkeyId));
-        } catch {}
       }
 
       toast.success(t("auth.passkeySetupSuccess"));
@@ -354,13 +332,6 @@ export default function MiCuentaPage() {
         toast.error(t("auth.passkeySetupError"));
         return;
       }
-
-      try {
-        const rawStoredId = localStorage.getItem(PASSKEY_LOCAL_DEVICE_ID_KEY);
-        if (rawStoredId && Number(rawStoredId) === id) {
-          localStorage.removeItem(PASSKEY_LOCAL_DEVICE_ID_KEY);
-        }
-      } catch {}
 
       toast.success(t("auth.passkeyRemoved"));
       await loadPasskeyDevices();

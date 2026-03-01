@@ -461,7 +461,7 @@ export default function EditTournament() {
 
                     const res = await fetch(dataUrl);
                     const blob = await res.blob();
-                    const file = new File([blob], "resultado-padelx-qa.png", { type: "image/png" });
+                    const file = new File([blob], "resultado-twinco.png", { type: "image/png" });
 
                     if (navigator.share) {
                       try {
@@ -479,7 +479,7 @@ export default function EditTournament() {
 
                     const a = document.createElement("a");
                     a.href = dataUrl;
-                    a.download = "resultado-padelx-qa.png";
+                    a.download = "resultado-twinco.png";
                     a.click();
                     toast.success("Imagen descargada");
                   } catch (err) {
@@ -515,7 +515,7 @@ export default function EditTournament() {
 
                     const a = document.createElement("a");
                     a.href = dataUrl;
-                    a.download = "resultado-padelx-qa.png";
+                    a.download = "resultado-twinco.png";
                     a.click();
                     toast.success("Imagen descargada");
                   } catch (err) {

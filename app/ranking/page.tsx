@@ -6,7 +6,6 @@ import { supabase } from "../lib/supabase";
 import Card from "../components/Card";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { useTranslation } from "../i18n";
 
 type RankedPlayer = {
   id: number;
@@ -21,7 +20,6 @@ type RankedPlayer = {
 };
 
 export default function RankingPage() {
-  const { t } = useTranslation();
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -33,110 +31,154 @@ export default function RankingPage() {
   const loadRanking = useCallback(async () => {
     setLoading(true);
 
-    // Jugadores aprobados
-    const { data: playerData, error: playerError } = await supabase
-      .from("players")
-      .select("id, name, avatar_url")
-      .eq("is_approved", true);
+    const [{ data: playerData, error: playerError }, { data: tournamentData }] = await Promise.all([
+      supabase
+        .from("players")
+        .select("id, name, avatar_url")
+        .eq("is_approved", true),
+      supabase
+        .from("tournaments")
+        .select("id, name")
+        .order("start_date", { ascending: false }),
+    ]);
 
     if (playerError) {
       console.error("Error cargando jugadores:", playerError);
-      toast.error(t("ranking.errorLoading"));
+      toast.error("No se pudieron cargar los jugadores");
       setLoading(false);
       return;
     }
-
-    const { data: tournamentData } = await supabase
-      .from("tournaments")
-      .select("id, name")
-      .order("start_date", { ascending: false });
 
     setTournaments(tournamentData || []);
 
-    let matchQuery = supabase
-      .from("matches")
-      .select("winner, player_1_a, player_2_a, player_1_b, player_2_b, tournament_id, score");
+    let rankingsQuery = supabase
+      .from("tournament_rankings")
+      .select("tournament_id, player_id, matches_won, matches_lost, points, games_for, games_against");
 
     if (selectedTournament !== "all") {
-      matchQuery = matchQuery.eq("tournament_id", selectedTournament);
-    } else {
-      // IMPORTANTE: el ranking es POR TORNEO. Los amistosos (tournament_id null) NO cuentan.
-      matchQuery = matchQuery.not("tournament_id", "is", null);
+      rankingsQuery = rankingsQuery.eq("tournament_id", selectedTournament);
     }
 
-    const { data: matches, error: matchError } = await matchQuery;
-
-    if (matchError) {
-      console.error("Error cargando partidos:", matchError);
-      toast.error(t("ranking.errorLoading"));
-      setLoading(false);
-      return;
-    }
-
-    // Contar partidos jugados, victorias y derrotas por jugador
     const statsMap: Record<
       number,
-      { wins: number; losses: number; played: number; games_for: number; games_against: number }
+      { wins: number; losses: number; played: number; games_for: number; games_against: number; points: number }
     > = {};
 
-    (matches || []).forEach((match: any) => {
-      if (!match.player_1_a || !match.player_2_a || !match.player_1_b || !match.player_2_b) return;
-      if (!match.winner || match.winner === "pending") return;
+    const { data: rankingRows, error: rankingError } = await rankingsQuery;
 
-      const teamA = [match.player_1_a, match.player_2_a];
-      const teamB = [match.player_1_b, match.player_2_b];
+    if (rankingError) {
+      console.warn("Error cargando tournament_rankings, usando fallback:", rankingError);
 
-      const sets = match.score?.split(" ") || [];
-      let gamesA = 0;
-      let gamesB = 0;
+      let matchQuery = supabase
+        .from("matches")
+        .select("winner, player_1_a, player_2_a, player_1_b, player_2_b, tournament_id, score")
+        .not("tournament_id", "is", null);
 
-      sets.forEach((set: string) => {
-        const [a, b] = set.split("-").map(Number);
-        if (!isNaN(a) && !isNaN(b)) {
-          gamesA += a;
-          gamesB += b;
-        }
-      });
-
-      [...teamA, ...teamB].forEach((id: number) => {
-        if (!statsMap[id]) {
-          statsMap[id] = { wins: 0, losses: 0, played: 0, games_for: 0, games_against: 0 };
-        }
-        statsMap[id].played += 1;
-      });
-
-      teamA.forEach((id: number) => {
-        statsMap[id].games_for += gamesA;
-        statsMap[id].games_against += gamesB;
-      });
-
-      teamB.forEach((id: number) => {
-        statsMap[id].games_for += gamesB;
-        statsMap[id].games_against += gamesA;
-      });
-
-      if (match.winner === "A") {
-        teamA.forEach((id: number) => {
-          statsMap[id].wins += 1;
-        });
-        teamB.forEach((id: number) => {
-          statsMap[id].losses += 1;
-        });
+      if (selectedTournament !== "all") {
+        matchQuery = matchQuery.eq("tournament_id", selectedTournament);
       }
 
-      if (match.winner === "B") {
-        teamB.forEach((id: number) => {
-          statsMap[id].wins += 1;
-        });
-        teamA.forEach((id: number) => {
-          statsMap[id].losses += 1;
-        });
+      const { data: matches, error: matchError } = await matchQuery;
+
+      if (matchError) {
+        console.error("Error cargando ranking (fallback):", matchError);
+        toast.error("No se pudo cargar el ranking");
+        setLoading(false);
+        return;
       }
-    });
+
+      (matches || []).forEach((match: any) => {
+        if (!match.player_1_a || !match.player_2_a || !match.player_1_b || !match.player_2_b) return;
+        if (!match.winner || match.winner === "pending") return;
+
+        const teamA = [match.player_1_a, match.player_2_a];
+        const teamB = [match.player_1_b, match.player_2_b];
+
+        const sets = match.score?.split(" ") || [];
+        let gamesA = 0;
+        let gamesB = 0;
+
+        sets.forEach((set: string) => {
+          const [a, b] = set.split("-").map(Number);
+          if (!isNaN(a) && !isNaN(b)) {
+            gamesA += a;
+            gamesB += b;
+          }
+        });
+
+        [...teamA, ...teamB].forEach((id: number) => {
+          if (!statsMap[id]) {
+            statsMap[id] = { wins: 0, losses: 0, played: 0, games_for: 0, games_against: 0, points: 0 };
+          }
+          statsMap[id].played += 1;
+        });
+
+        teamA.forEach((id: number) => {
+          statsMap[id].games_for += gamesA;
+          statsMap[id].games_against += gamesB;
+        });
+
+        teamB.forEach((id: number) => {
+          statsMap[id].games_for += gamesB;
+          statsMap[id].games_against += gamesA;
+        });
+
+        if (match.winner === "A") {
+          teamA.forEach((id: number) => {
+            statsMap[id].wins += 1;
+            statsMap[id].points += 3;
+          });
+          teamB.forEach((id: number) => {
+            statsMap[id].losses += 1;
+            statsMap[id].points += 1;
+          });
+        }
+
+        if (match.winner === "B") {
+          teamB.forEach((id: number) => {
+            statsMap[id].wins += 1;
+            statsMap[id].points += 3;
+          });
+          teamA.forEach((id: number) => {
+            statsMap[id].losses += 1;
+            statsMap[id].points += 1;
+          });
+        }
+      });
+    } else {
+      for (const row of (rankingRows || []) as any[]) {
+        const playerId = Number(row.player_id);
+        if (!Number.isFinite(playerId)) continue;
+        if (!statsMap[playerId]) {
+          statsMap[playerId] = {
+            wins: 0,
+            losses: 0,
+            played: 0,
+            games_for: 0,
+            games_against: 0,
+            points: 0,
+          };
+        }
+        const wins = Number(row.matches_won) || 0;
+        const losses = Number(row.matches_lost) || 0;
+        statsMap[playerId].wins += wins;
+        statsMap[playerId].losses += losses;
+        statsMap[playerId].played += wins + losses;
+        statsMap[playerId].games_for += Number(row.games_for) || 0;
+        statsMap[playerId].games_against += Number(row.games_against) || 0;
+        statsMap[playerId].points += Number(row.points) || 0;
+      }
+    }
 
     const ranking: RankedPlayer[] = (playerData || []).map((p: any) => {
-      const stats = statsMap[p.id] || { wins: 0, losses: 0, played: 0, games_for: 0, games_against: 0 };
-      const points = stats.wins * 3 + stats.losses * 1;
+      const stats = statsMap[p.id] || {
+        wins: 0,
+        losses: 0,
+        played: 0,
+        games_for: 0,
+        games_against: 0,
+        points: 0,
+      };
 
       return {
         id: p.id,
@@ -147,7 +189,7 @@ export default function RankingPage() {
         played: stats.played,
         games_for: stats.games_for,
         games_against: stats.games_against,
-        points,
+        points: stats.points,
       };
     });
 
@@ -167,22 +209,32 @@ export default function RankingPage() {
   }, [selectedTournament]);
 
   useEffect(() => {
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     loadRanking();
 
-    // Recalcular ranking en tiempo real cuando cambien los partidos
+    // Recalcular ranking en tiempo real, con debounce para evitar ráfagas.
+    const scheduleRefresh = () => {
+      if (refreshTimer) return;
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null;
+        void loadRanking();
+      }, 400);
+    };
+
     const channel = supabase
       .channel("public:matches-ranking")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "matches" },
-        () => {
-          loadRanking();
-          toast.success(t("ranking.title"));
-        }
+        scheduleRefresh
       )
       .subscribe();
 
     return () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
       supabase.removeChannel(channel);
     };
   }, [loadRanking]);
@@ -200,7 +252,7 @@ export default function RankingPage() {
       <section className="max-w-5xl mx-auto">
         <div className="mb-6 text-center">
           <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-wide">
-            {t("ranking.title")}
+            Ranking de Jugadores
           </h1>
           <div className="mt-4 flex justify-center">
             <select
@@ -212,33 +264,33 @@ export default function RankingPage() {
               }
               className="border rounded-md px-3 py-2 text-sm"
             >
-              <option value="all">{t("ranking.filterAll")}</option>
-              {tournaments.map((tournament) => (
-                <option key={tournament.id} value={tournament.id}>
-                  {tournament.name}
+              <option value="all">Todos los torneos</option>
+              {tournaments.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
                 </option>
               ))}
             </select>
           </div>
           <p className="text-sm text-gray-600 mt-1">
-            {t("ranking.pointsNote")}
+            Puntos calculados automáticamente: 3 por victoria y 1 por derrota.
           </p>
         </div>
 
         {loading ? (
           <p className="text-gray-400 text-center animate-pulse">
-            {t("ranking.loading")}
+            Cargando ranking...
           </p>
         ) : players.length === 0 ? (
           <p className="text-gray-400 text-center">
-            {t("ranking.empty")}
+            Todavía no hay jugadores con puntos. ¡Registrá algunos partidos!
           </p>
         ) : (
           <>
             {/* 🔝 PODIO TOP 3 */}
             <Card className="mb-8">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.18em] mb-4 text-center">
-                {t("ranking.podium")}
+                Podio
               </h2>
               <div className="grid grid-cols-3 gap-3 items-end">
                 {podium.map((player, index) => (
@@ -249,7 +301,7 @@ export default function RankingPage() {
                       index === 0 ? "md:scale-105" : ""
                     }`}
                   >
-                    <div className="text-sm font-bold text-[#00b4ff] mb-1">
+                    <div className="text-sm font-bold text-[#ccff00] mb-1">
                       {index + 1}º
                     </div>
                     <div className="text-2xl mb-1">
@@ -260,7 +312,7 @@ export default function RankingPage() {
                       <img
                         src={player.avatar_url}
                         alt={player.name}
-                        className="w-12 h-12 rounded-full object-cover border-2 border-[#00b4ff]"
+                        className="w-12 h-12 rounded-full object-cover border-2 border-[#ccff00]"
                         onError={(e: any) => {
                           e.currentTarget.onerror = null;
                           e.currentTarget.src = `https://placehold.co/80x80/111827/ccff00?text=${player.name
@@ -269,7 +321,7 @@ export default function RankingPage() {
                         }}
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-full bg-[#00b4ff] text-gray-900 flex items-center justify-center font-bold">
+                      <div className="w-12 h-12 rounded-full bg-[#ccff00] text-gray-900 flex items-center justify-center font-bold">
                         {player.name.slice(0, 1).toUpperCase()}
                       </div>
                     )}
@@ -278,13 +330,14 @@ export default function RankingPage() {
                       {player.name}
                     </span>
                     <span className="mt-1 text-xs text-gray-600">
-                      {player.points} {t("ranking.points")} · {player.wins} {t("ranking.won")}
+                      {player.points} pts · {player.wins} victoria
+                      {player.wins === 1 ? "" : "s"}
                     </span>
                   </button>
                 ))}
                 {podium.length === 0 && (
                   <p className="col-span-3 text-center text-gray-400 text-sm">
-                    {t("ranking.empty")}
+                    Aún no hay jugadores en el podio.
                   </p>
                 )}
               </div>
@@ -294,32 +347,32 @@ export default function RankingPage() {
             {rest.length > 0 && (
               <Card>
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.18em] mb-3">
-                  {t("ranking.restOfTable")}
+                  Resto del ranking
                 </h2>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-800 text-xs uppercase text-gray-400">
                         <th className="py-2 pr-2 text-left font-semibold">
-                          {t("ranking.position")}
+                          Posición
                         </th>
                         <th className="py-2 pr-2 text-left font-semibold">
-                          {t("ranking.player")}
+                          Jugador
                         </th>
                         <th className="py-2 pr-2 text-center font-semibold">
-                          {t("ranking.played")}
+                          PJ
                         </th>
                         <th className="py-2 pr-2 text-center font-semibold">
-                          {t("ranking.won")}
+                          PG
                         </th>
                         <th className="py-2 pr-2 text-center font-semibold">
-                          {t("ranking.lost")}
+                          PP
                         </th>
                         <th className="py-2 pr-2 text-center font-semibold">
-                          {t("ranking.gamesDiff")}
+                          +/-
                         </th>
                         <th className="py-2 text-center font-semibold">
-                          {t("ranking.points")}
+                          Puntos
                         </th>
                       </tr>
                     </thead>
@@ -348,7 +401,7 @@ export default function RankingPage() {
                                   }}
                                 />
                               ) : (
-                                <div className="w-7 h-7 rounded-full bg-[#00b4ff] text-gray-900 flex items-center justify-center text-xs font-bold">
+                                <div className="w-7 h-7 rounded-full bg-[#ccff00] text-gray-900 flex items-center justify-center text-xs font-bold">
                                   {player.name.slice(0, 1).toUpperCase()}
                                 </div>
                               )}
