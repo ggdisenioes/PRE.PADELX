@@ -2,8 +2,11 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const FUNCTION_VERSION = "2026-02-13-01";
+const FUNCTION_VERSION = "2026-03-01-02";
 const DEBUG_LOGS = (Deno.env.get("DEBUG_SEND_EMAILS") || "").toLowerCase() === "true";
+const DEFAULT_FROM = Deno.env.get("EMAIL_FROM") || "PadelX <noreply@padelx.es>";
+const EMAIL_REPLY_TO = (Deno.env.get("EMAIL_REPLY_TO") || "").trim();
+const EMAIL_UNSUBSCRIBE_MAILTO = (Deno.env.get("EMAIL_UNSUBSCRIBE_MAILTO") || "").trim();
 
 type OutboxRow = {
   id: number;
@@ -72,6 +75,71 @@ function normalizeSlug(value: string | null | undefined): string | null {
   const slug = String(value || "").trim().toLowerCase();
   if (!slug || !/^[a-z0-9-]+$/.test(slug)) return null;
   return slug;
+}
+
+function extractFromAddress(value: string): string | null {
+  const inBrackets = value.match(/<([^<>]+)>/)?.[1]?.trim();
+  if (inBrackets && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inBrackets)) {
+    return inBrackets;
+  }
+  const plain = value.trim();
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(plain)) {
+    return plain;
+  }
+  return null;
+}
+
+function sanitizeHeaderPart(value: string): string {
+  return value.replace(/[\r\n<>"]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function isValidEmail(value: string | null | undefined): value is string {
+  return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()));
+}
+
+function buildFromHeader(displayName?: string | null): string {
+  const baseAddress = extractFromAddress(DEFAULT_FROM);
+  const safeName = sanitizeHeaderPart(String(displayName || ""));
+  if (baseAddress && safeName) {
+    return `${safeName} <${baseAddress}>`;
+  }
+  return DEFAULT_FROM;
+}
+
+function htmlToText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n\s+/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function buildEmailHeaders() {
+  const headers: Record<string, string> = {
+    "X-Auto-Response-Suppress": "All",
+  };
+
+  const unsubscribeTargets: string[] = [];
+  if (isValidEmail(EMAIL_UNSUBSCRIBE_MAILTO)) {
+    const subject = encodeURIComponent("Unsubscribe");
+    unsubscribeTargets.push(`<mailto:${EMAIL_UNSUBSCRIBE_MAILTO}?subject=${subject}>`);
+  }
+
+  if (unsubscribeTargets.length > 0) {
+    headers["List-Unsubscribe"] = unsubscribeTargets.join(", ");
+  }
+
+  return headers;
 }
 
 function baseEmailLayout(opts: {
@@ -238,9 +306,17 @@ function emailReminder24h(opts: {
   };
 }
 
-async function sendWithResend(to: string, subject: string, html: string) {
+async function sendWithResend(
+  to: string,
+  subject: string,
+  html: string,
+  options: { fromName?: string | null } = {}
+) {
   const apiKey = env("RESEND_API_KEY");
-  const from = env("EMAIL_FROM");
+  const from = buildFromHeader(options.fromName);
+  const text = htmlToText(html);
+  const replyTo = isValidEmail(EMAIL_REPLY_TO) ? EMAIL_REPLY_TO : undefined;
+  const headers = buildEmailHeaders();
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -253,6 +329,9 @@ async function sendWithResend(to: string, subject: string, html: string) {
       to,
       subject,
       html,
+      text,
+      ...(replyTo ? { reply_to: replyTo } : {}),
+      headers,
     }),
   });
 
@@ -312,7 +391,7 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRole);
     const appBaseDomain = getBaseDomain(appUrl);
-    const tenantSlugCache = new Map<string, string | null>();
+    const tenantMetaCache = new Map<string, { slug: string | null; name: string | null }>();
 
     // 1) Traer pendientes
     const { data, error } = await supabase
@@ -401,23 +480,26 @@ serve(async (req) => {
         }
 
         let ctaUrl: string | null = null;
-        if (appBaseDomain) {
-          let tenantSlug = tenantSlugCache.get(row.tenant_id);
+        let tenantName: string | null = null;
+        let tenantMeta = tenantMetaCache.get(row.tenant_id);
+        if (!tenantMeta) {
+          const { data: tenantRow } = await supabase
+            .from("tenants")
+            .select("slug, name")
+            .eq("id", row.tenant_id)
+            .maybeSingle();
 
-          if (tenantSlug === undefined) {
-            const { data: tenantRow } = await supabase
-              .from("tenants")
-              .select("slug")
-              .eq("id", row.tenant_id)
-              .maybeSingle();
+          const tenant = (tenantRow as { slug?: string | null; name?: string | null } | null) || null;
+          tenantMeta = {
+            slug: normalizeSlug(tenant?.slug || null),
+            name: tenant?.name || null,
+          };
+          tenantMetaCache.set(row.tenant_id, tenantMeta);
+        }
 
-            tenantSlug = normalizeSlug((tenantRow as { slug?: string | null } | null)?.slug || null);
-            tenantSlugCache.set(row.tenant_id, tenantSlug);
-          }
-
-          if (tenantSlug) {
-            ctaUrl = `https://${tenantSlug}.${appBaseDomain}/matches`;
-          }
+        tenantName = tenantMeta.name;
+        if (appBaseDomain && tenantMeta.slug) {
+          ctaUrl = `https://${tenantMeta.slug}.${appBaseDomain}/matches`;
         }
 
         let subject = "";
@@ -448,7 +530,9 @@ serve(async (req) => {
           throw new Error(`template no soportado: ${row.template}`);
         }
 
-        await sendWithResend(row.to_email, subject, html);
+        await sendWithResend(row.to_email, subject, html, {
+          fromName: tenantName || "PadelX",
+        });
 
         // marcar sent
         const { error: upErr } = await supabase

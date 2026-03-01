@@ -5,8 +5,18 @@ const RESEND_MAX_RETRIES = Number(process.env.RESEND_MAX_RETRIES || "3");
 const RESEND_MIN_REQUEST_INTERVAL_MS = Number(
   process.env.RESEND_MIN_REQUEST_INTERVAL_MS || "600"
 );
+const EMAIL_REPLY_TO = String(process.env.EMAIL_REPLY_TO || "").trim();
+const EMAIL_UNSUBSCRIBE_MAILTO = String(process.env.EMAIL_UNSUBSCRIBE_MAILTO || "").trim();
 
 let lastResendRequestAt = 0;
+
+type EmailTag = { name: string; value: string };
+type SendEmailOptions = {
+  fromName?: string | null;
+  replyTo?: string | null;
+  textBody?: string | null;
+  tags?: EmailTag[];
+};
 
 function esc(str: string | null | undefined): string {
   if (!str) return "";
@@ -24,6 +34,73 @@ function sleep(ms: number) {
 function toInt(value: string | null, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function extractFromAddress(value: string): string | null {
+  const inBrackets = value.match(/<([^<>]+)>/)?.[1]?.trim();
+  if (inBrackets && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inBrackets)) {
+    return inBrackets;
+  }
+
+  const plain = value.trim();
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(plain)) {
+    return plain;
+  }
+
+  return null;
+}
+
+function sanitizeHeaderPart(value: string): string {
+  return value.replace(/[\r\n<>"]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function isValidEmail(value: string | null | undefined): value is string {
+  return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()));
+}
+
+function buildFromHeader(displayName?: string | null): string {
+  const baseAddress = extractFromAddress(FROM_EMAIL);
+  const safeName = sanitizeHeaderPart(String(displayName || ""));
+  if (baseAddress && safeName) {
+    return `${safeName} <${baseAddress}>`;
+  }
+  return FROM_EMAIL;
+}
+
+function htmlToText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n\s+/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function buildEmailHeaders() {
+  const headers: Record<string, string> = {
+    "X-Auto-Response-Suppress": "All",
+  };
+
+  const unsubscribeTargets: string[] = [];
+  if (isValidEmail(EMAIL_UNSUBSCRIBE_MAILTO)) {
+    const subject = encodeURIComponent("Unsubscribe");
+    unsubscribeTargets.push(`<mailto:${EMAIL_UNSUBSCRIBE_MAILTO}?subject=${subject}>`);
+  }
+
+  if (unsubscribeTargets.length > 0) {
+    headers["List-Unsubscribe"] = unsubscribeTargets.join(", ");
+  }
+
+  return headers;
 }
 
 async function waitForResendRateWindow() {
@@ -129,12 +206,25 @@ function baseLayout(title: string, bodyHtml: string) {
 </html>`;
 }
 
-export async function sendEmail(to: string, subject: string, htmlBody: string): Promise<boolean> {
+export async function sendEmail(
+  to: string,
+  subject: string,
+  htmlBody: string,
+  options: SendEmailOptions = {}
+): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.warn("[email] RESEND_API_KEY not configured, skipping email to:", to);
     return false;
   }
+
+  const from = buildFromHeader(options.fromName);
+  const text = String(options.textBody || "").trim() || htmlToText(htmlBody);
+  const replyTo = isValidEmail(options.replyTo || EMAIL_REPLY_TO)
+    ? String(options.replyTo || EMAIL_REPLY_TO).trim()
+    : undefined;
+  const tags = (options.tags || []).filter((t) => t?.name && t?.value).slice(0, 10);
+  const headers = buildEmailHeaders();
 
   for (let attempt = 1; attempt <= RESEND_MAX_RETRIES; attempt++) {
     try {
@@ -147,10 +237,14 @@ export async function sendEmail(to: string, subject: string, htmlBody: string): 
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: FROM_EMAIL,
+          from,
           to,
           subject,
           html: htmlBody,
+          text,
+          ...(replyTo ? { reply_to: replyTo } : {}),
+          ...(tags.length ? { tags } : {}),
+          headers,
         }),
       });
 
@@ -230,7 +324,8 @@ function emptyResult(): MatchNotificationResult {
 async function sendMatchEmails(
   playerEmails: { name: string; email: string | null }[],
   subject: string,
-  buildBody: (playerName: string) => string
+  buildBody: (playerName: string) => string,
+  emailOptions: SendEmailOptions = {}
 ): Promise<MatchNotificationResult> {
   const result = emptyResult();
 
@@ -238,7 +333,7 @@ async function sendMatchEmails(
     if (!player.email) continue;
 
     result.attempted += 1;
-    const ok = await sendEmail(player.email, subject, buildBody(player.name));
+    const ok = await sendEmail(player.email, subject, buildBody(player.name), emailOptions);
     if (ok) {
       result.sent += 1;
     } else {
@@ -299,7 +394,10 @@ export async function sendChallengeNotification(opts: {
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
       <a class="btn" href="${DEFAULT_APP_URL}/challenges">Ver desafío</a>`
     );
-    await sendEmail(challengerEmail, subjectChallenger, body);
+    await sendEmail(challengerEmail, subjectChallenger, body, {
+      fromName: clubName,
+      tags: [{ name: "template", value: "challenge_created" }],
+    });
   }
 
   // Email al compañero del retador
@@ -312,7 +410,10 @@ export async function sendChallengeNotification(opts: {
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
       <a class="btn" href="${DEFAULT_APP_URL}/challenges">Ver desafío</a>`
     );
-    await sendEmail(challengerPartnerEmail, subjectPartner, body);
+    await sendEmail(challengerPartnerEmail, subjectPartner, body, {
+      fromName: clubName,
+      tags: [{ name: "template", value: "challenge_created" }],
+    });
   }
 
   // Email al desafiado principal
@@ -327,7 +428,10 @@ export async function sendChallengeNotification(opts: {
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
       <a class="btn" href="${DEFAULT_APP_URL}/challenges">Ver desafío</a>`
     );
-    await sendEmail(challengedEmail, subjectChallenged, body);
+    await sendEmail(challengedEmail, subjectChallenged, body, {
+      fromName: clubName,
+      tags: [{ name: "template", value: "challenge_created" }],
+    });
   }
 
   // Email al compañero del desafiado
@@ -342,7 +446,10 @@ export async function sendChallengeNotification(opts: {
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
       <a class="btn" href="${DEFAULT_APP_URL}/challenges">Ver desafío</a>`
     );
-    await sendEmail(challengedPartnerEmail, subjectPartner, body);
+    await sendEmail(challengedPartnerEmail, subjectPartner, body, {
+      fromName: clubName,
+      tags: [{ name: "template", value: "challenge_created" }],
+    });
   }
 }
 
@@ -373,21 +480,29 @@ export async function sendMatchNotification(opts: {
   const matchUrl = resolveTenantPathUrl("/matches", tenantSlug);
   const subject = `Nuevo partido programado en ${safeClub}`;
 
-  return sendMatchEmails(playerEmails, subject, (playerName) => {
-    const safeName = esc(playerName);
-    return baseLayout(
-      subject,
-      `<h2>¡Nuevo Partido!</h2>
-      <p>Hola <strong>${safeName}</strong>, tenés un nuevo partido programado.</p>
-      <table class="info-table">
-        <tr><td>Equipo A</td><td>${safeTeamA}</td></tr>
-        <tr><td>Equipo B</td><td>${safeTeamB}</td></tr>
-        <tr><td>Fecha</td><td>${safeDate}</td></tr>
-        ${court ? `<tr><td>Pista</td><td>${safeCourt}</td></tr>` : ""}
-      </table>
-      ${renderMatchCta(matchUrl, "Ver partido")}`
-    );
-  });
+  return sendMatchEmails(
+    playerEmails,
+    subject,
+    (playerName) => {
+      const safeName = esc(playerName);
+      return baseLayout(
+        subject,
+        `<h2>¡Nuevo Partido!</h2>
+        <p>Hola <strong>${safeName}</strong>, tenés un nuevo partido programado.</p>
+        <table class="info-table">
+          <tr><td>Equipo A</td><td>${safeTeamA}</td></tr>
+          <tr><td>Equipo B</td><td>${safeTeamB}</td></tr>
+          <tr><td>Fecha</td><td>${safeDate}</td></tr>
+          ${court ? `<tr><td>Pista</td><td>${safeCourt}</td></tr>` : ""}
+        </table>
+        ${renderMatchCta(matchUrl, "Ver partido")}`
+      );
+    },
+    {
+      fromName: clubName,
+      tags: [{ name: "template", value: "match_created" }],
+    }
+  );
 }
 
 export async function sendMatchReminderNotification(opts: {
@@ -417,21 +532,29 @@ export async function sendMatchReminderNotification(opts: {
   const matchUrl = resolveTenantPathUrl("/matches", tenantSlug);
   const subject = `Recordatorio de partido en ${safeClub}`;
 
-  return sendMatchEmails(playerEmails, subject, (playerName) => {
-    const safeName = esc(playerName);
-    return baseLayout(
-      subject,
-      `<h2>Recordatorio de Partido</h2>
-      <p>Hola <strong>${safeName}</strong>, este es un recordatorio de tu partido.</p>
-      <table class="info-table">
-        <tr><td>Equipo A</td><td>${safeTeamA}</td></tr>
-        <tr><td>Equipo B</td><td>${safeTeamB}</td></tr>
-        <tr><td>Fecha</td><td>${safeDate}</td></tr>
-        ${court ? `<tr><td>Pista</td><td>${safeCourt}</td></tr>` : ""}
-      </table>
-      ${renderMatchCta(matchUrl, "Ver partido")}`
-    );
-  });
+  return sendMatchEmails(
+    playerEmails,
+    subject,
+    (playerName) => {
+      const safeName = esc(playerName);
+      return baseLayout(
+        subject,
+        `<h2>Recordatorio de Partido</h2>
+        <p>Hola <strong>${safeName}</strong>, este es un recordatorio de tu partido.</p>
+        <table class="info-table">
+          <tr><td>Equipo A</td><td>${safeTeamA}</td></tr>
+          <tr><td>Equipo B</td><td>${safeTeamB}</td></tr>
+          <tr><td>Fecha</td><td>${safeDate}</td></tr>
+          ${court ? `<tr><td>Pista</td><td>${safeCourt}</td></tr>` : ""}
+        </table>
+        ${renderMatchCta(matchUrl, "Ver partido")}`
+      );
+    },
+    {
+      fromName: clubName,
+      tags: [{ name: "template", value: "match_reminder" }],
+    }
+  );
 }
 
 export async function sendMatchFinishedNotification(opts: {
@@ -467,24 +590,32 @@ export async function sendMatchFinishedNotification(opts: {
   const matchUrl = resolveTenantPathUrl("/matches", tenantSlug);
   const subject = `Partido finalizado en ${safeClub}`;
 
-  return sendMatchEmails(playerEmails, subject, (playerName) => {
-    const safeName = esc(playerName);
-    return baseLayout(
-      subject,
-      `<h2>Partido finalizado</h2>
-      <p>Hola <strong>${safeName}</strong>.</p>
-      <p><strong>Felicitaciones ${safeWinners}</strong>.</p>
-      <table class="info-table">
-        <tr><td>Ganadores</td><td>${safeWinners}</td></tr>
-        <tr><td>Perdedores</td><td>${safeLosers}</td></tr>
-        <tr><td>Resultado</td><td>${safeScore}</td></tr>
-        <tr><td>Fecha</td><td>${safeDate}</td></tr>
-        ${safeRound ? `<tr><td>Ronda</td><td>${safeRound}</td></tr>` : ""}
-        ${court ? `<tr><td>Pista</td><td>${safeCourt}</td></tr>` : ""}
-      </table>
-      ${renderMatchCta(matchUrl, "Ver partido")}`
-    );
-  });
+  return sendMatchEmails(
+    playerEmails,
+    subject,
+    (playerName) => {
+      const safeName = esc(playerName);
+      return baseLayout(
+        subject,
+        `<h2>Partido finalizado</h2>
+        <p>Hola <strong>${safeName}</strong>.</p>
+        <p><strong>Felicitaciones ${safeWinners}</strong>.</p>
+        <table class="info-table">
+          <tr><td>Ganadores</td><td>${safeWinners}</td></tr>
+          <tr><td>Perdedores</td><td>${safeLosers}</td></tr>
+          <tr><td>Resultado</td><td>${safeScore}</td></tr>
+          <tr><td>Fecha</td><td>${safeDate}</td></tr>
+          ${safeRound ? `<tr><td>Ronda</td><td>${safeRound}</td></tr>` : ""}
+          ${court ? `<tr><td>Pista</td><td>${safeCourt}</td></tr>` : ""}
+        </table>
+        ${renderMatchCta(matchUrl, "Ver partido")}`
+      );
+    },
+    {
+      fromName: clubName,
+      tags: [{ name: "template", value: "match_finished" }],
+    }
+  );
 }
 
 export async function sendMatchProposalNotification(opts: {
@@ -520,6 +651,9 @@ export async function sendMatchProposalNotification(opts: {
       <a class="btn" href="${DEFAULT_APP_URL}/matches/friendly/create">Crear Partido Amistoso</a>`
     );
 
-    await sendEmail(admin.email, subject, body);
+    await sendEmail(admin.email, subject, body, {
+      fromName: clubName,
+      tags: [{ name: "template", value: "match_proposal" }],
+    });
   }
 }
