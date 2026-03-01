@@ -31,18 +31,6 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
-  const [tenantSlugFromHost, setTenantSlugFromHost] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const host = window.location.hostname.trim().toLowerCase();
-    const parts = host.split(".");
-    if (parts.length < 3) {
-      setTenantSlugFromHost(null);
-      return;
-    }
-    setTenantSlugFromHost(parts[0] || null);
-  }, []);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -195,23 +183,13 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
     );
   };
 
-  const isTwincoTenant = tenantSlugFromHost === "twinco";
-
   return (
     <aside className="w-56 h-screen flex flex-col overflow-hidden text-white bg-gradient-to-b from-[#0b1220] via-[#0e1626] to-[#0a1020] border-r border-white/5">
       {/* HEADER / LOGO */}
       <div className="px-5 py-6 border-b border-white/10 text-center">
-        {isTwincoTenant ? (
-          <img
-            src="/logo-fondo.png"
-            alt="TWINCO"
-            className="h-8 w-auto mx-auto object-contain"
-          />
-        ) : (
-          <h1 className="text-[26px] font-extrabold italic tracking-tight">
-            TWINCO
-          </h1>
-        )}
+        <h1 className="text-[26px] font-extrabold italic tracking-tight">
+          TWINCO
+        </h1>
         <p className="mt-1 text-[10px] font-bold tracking-[0.3em] text-[#ccff00] uppercase">
           Pádel Manager
         </p>
