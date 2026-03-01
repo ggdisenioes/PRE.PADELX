@@ -12,6 +12,34 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 type NotificationType = "match_created" | "match_finished" | "match_reminder";
 
+type MatchRow = {
+  id: number;
+  player_1_a: number | null;
+  player_2_a: number | null;
+  player_1_b: number | null;
+  player_2_b: number | null;
+  start_time: string | null;
+  court: string | null;
+  place: string | null;
+  tenant_id: string;
+  score: string | null;
+  winner: string | null;
+  round_name: string | null;
+};
+
+type PlayerRow = {
+  id: number;
+  name: string | null;
+  email: string | null;
+  notify_email: boolean | null;
+};
+
+type TenantRow = {
+  id: string;
+  name: string | null;
+  slug: string | null;
+};
+
 export async function POST(req: Request) {
   try {
     if (!supabaseUrl || !serviceRoleKey) {
@@ -72,20 +100,21 @@ export async function POST(req: Request) {
       .select("id, player_1_a, player_2_a, player_1_b, player_2_b, start_time, court, place, tenant_id, score, winner, round_name")
       .in("id", ids);
 
-    if (matchError || !matches || matches.length === 0) {
-      return NextResponse.json({ ok: true, sent: 0 });
+    const matchRows = (matches || []) as MatchRow[];
+    if (matchError || matchRows.length === 0) {
+      return NextResponse.json({ ok: true, attempted: 0, sent: 0, failed: 0 });
     }
 
     // Collect all unique player IDs
     const allPlayerIds = new Set<number>();
-    for (const m of matches) {
+    for (const m of matchRows) {
       [m.player_1_a, m.player_2_a, m.player_1_b, m.player_2_b]
         .filter((id): id is number => id != null)
         .forEach((id) => allPlayerIds.add(id));
     }
 
     if (allPlayerIds.size === 0) {
-      return NextResponse.json({ ok: true, sent: 0 });
+      return NextResponse.json({ ok: true, attempted: 0, sent: 0, failed: 0 });
     }
 
     // Fetch all players at once
@@ -94,22 +123,28 @@ export async function POST(req: Request) {
       .select("id, name, email, notify_email")
       .in("id", Array.from(allPlayerIds));
 
-    if (!players || players.length === 0) {
-      return NextResponse.json({ ok: true, sent: 0 });
+    const playerRows = (players || []) as PlayerRow[];
+    if (playerRows.length === 0) {
+      return NextResponse.json({ ok: true, attempted: 0, sent: 0, failed: 0 });
     }
 
-    // Get tenant name (from first match)
-    const { data: tenant } = await supabaseAdmin
+    // Load tenant metadata for URL resolution and subject branding
+    const tenantIds = Array.from(new Set(matchRows.map((m) => m.tenant_id).filter(Boolean)));
+    const { data: tenants } = await supabaseAdmin
       .from("tenants")
-      .select("name")
-      .eq("id", matches[0].tenant_id)
-      .single();
+      .select("id, name, slug")
+      .in("id", tenantIds);
 
+    const tenantRows = (tenants || []) as TenantRow[];
+    const tenantById = new Map(tenantRows.map((t) => [String(t.id), t]));
+
+    let totalAttempted = 0;
     let totalSent = 0;
+    let totalFailed = 0;
 
     // Send notifications for each match
-    for (const match of matches) {
-      const getName = (id: number | null) => players.find((p: any) => p.id === id)?.name || "—";
+    for (const match of matchRows) {
+      const getName = (id: number | null) => playerRows.find((p) => p.id === id)?.name || "—";
 
       const teamA = `${getName(match.player_1_a)} y ${getName(match.player_2_a)}`;
       const teamB = `${getName(match.player_1_b)} y ${getName(match.player_2_b)}`;
@@ -136,10 +171,10 @@ export async function POST(req: Request) {
         .filter((id): id is number => id != null);
 
       // Log all players and their notification flags for debugging
-      const matchPlayers = players.filter((p: any) => matchPlayerIds.includes(p.id));
+      const matchPlayers = playerRows.filter((p) => matchPlayerIds.includes(p.id));
       console.log(
         `[notifications] Match ${match.id}: All players in match:`,
-        matchPlayers.map((p: any) => ({
+        matchPlayers.map((p) => ({
           id: p.id,
           name: p.name,
           email: p.email || "(vacío)",
@@ -148,19 +183,19 @@ export async function POST(req: Request) {
       );
 
       const skipped = matchPlayers.filter(
-        (p: any) => p.notify_email === false || !p.email
+        (p) => p.notify_email === false || !p.email
       );
       if (skipped.length > 0) {
         console.warn(
           `[notifications] Match ${match.id}: Skipped players:`,
-          skipped.map((p: any) => ({ id: p.id, name: p.name, reason: !p.email ? "sin email" : "notify_email=false" }))
+          skipped.map((p) => ({ id: p.id, name: p.name, reason: !p.email ? "sin email" : "notify_email=false" }))
         );
       }
 
       // Send to ALL eligible players (one email per player, even if same email address)
-      const playerEmails = players
-        .filter((p: any) => matchPlayerIds.includes(p.id) && p.notify_email !== false && p.email)
-        .map((p: any) => ({ name: p.name, email: p.email as string }));
+      const playerEmails = playerRows
+        .filter((p) => matchPlayerIds.includes(p.id) && p.notify_email !== false && p.email)
+        .map((p) => ({ name: p.name || "Jugador", email: p.email as string }));
 
       console.log(
         `[notifications] Match ${match.id}: Sending ${playerEmails.length} emails:`,
@@ -168,23 +203,28 @@ export async function POST(req: Request) {
       );
 
       if (playerEmails.length > 0) {
+        const tenant = tenantById.get(String(match.tenant_id));
+        let result = { attempted: 0, sent: 0, failed: 0 };
+
         if (type === "match_created") {
-          await sendMatchNotification({
+          result = await sendMatchNotification({
             playerEmails,
             teamA,
             teamB,
             matchDate,
             court: courtText,
             clubName: tenant?.name || "TWINCO",
+            tenantSlug: tenant?.slug || null,
           });
         } else if (type === "match_reminder") {
-          await sendMatchReminderNotification({
+          result = await sendMatchReminderNotification({
             playerEmails,
             teamA,
             teamB,
             matchDate,
             court: courtText,
             clubName: tenant?.name || "TWINCO",
+            tenantSlug: tenant?.slug || null,
           });
         } else {
           if (!winners) {
@@ -192,7 +232,7 @@ export async function POST(req: Request) {
             continue;
           }
 
-          await sendMatchFinishedNotification({
+          result = await sendMatchFinishedNotification({
             playerEmails,
             winners,
             losers,
@@ -201,13 +241,26 @@ export async function POST(req: Request) {
             court: courtText,
             roundName: match.round_name || undefined,
             clubName: tenant?.name || "TWINCO",
+            tenantSlug: tenant?.slug || null,
           });
         }
-        totalSent += playerEmails.length;
+
+        totalAttempted += result.attempted;
+        totalSent += result.sent;
+        totalFailed += result.failed;
+
+        console.log(
+          `[notifications] Match ${match.id}: attempted=${result.attempted} sent=${result.sent} failed=${result.failed}`
+        );
       }
     }
 
-    return NextResponse.json({ ok: true, sent: totalSent });
+    return NextResponse.json({
+      ok: true,
+      attempted: totalAttempted,
+      sent: totalSent,
+      failed: totalFailed,
+    });
   } catch (error) {
     console.error("Notification error:", error);
     return NextResponse.json({ error: "Error sending notifications" }, { status: 500 });

@@ -1,12 +1,12 @@
-import { Resend } from "resend";
-
-let _resend: Resend | null = null;
-function getResend() {
-  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
-  return _resend;
-}
 const FROM_EMAIL = process.env.EMAIL_FROM || "PadelX <noreply@padelx.es>";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://twinco.padelx.es";
+const DEFAULT_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://twinco.padelx.es";
+const RESEND_API_URL = "https://api.resend.com/emails";
+const RESEND_MAX_RETRIES = Number(process.env.RESEND_MAX_RETRIES || "3");
+const RESEND_MIN_REQUEST_INTERVAL_MS = Number(
+  process.env.RESEND_MIN_REQUEST_INTERVAL_MS || "600"
+);
+
+let lastResendRequestAt = 0;
 
 function esc(str: string | null | undefined): string {
   if (!str) return "";
@@ -15,6 +15,74 @@ function esc(str: string | null | undefined): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function toInt(value: string | null, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+async function waitForResendRateWindow() {
+  const now = Date.now();
+  const waitMs = lastResendRequestAt + RESEND_MIN_REQUEST_INTERVAL_MS - now;
+  if (waitMs > 0) {
+    await sleep(waitMs);
+  }
+  lastResendRequestAt = Date.now();
+}
+
+function getTenantBaseDomain(): string | null {
+  const explicit =
+    process.env.EMAIL_TENANT_BASE_DOMAIN ||
+    process.env.NEXT_PUBLIC_BASE_DOMAIN ||
+    "";
+
+  if (explicit.trim()) {
+    return explicit
+      .trim()
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/.*$/, "")
+      .toLowerCase();
+  }
+
+  try {
+    const host = new URL(DEFAULT_APP_URL).hostname.toLowerCase();
+    if (
+      host === "localhost" ||
+      host.endsWith(".localhost") ||
+      /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)
+    ) {
+      return null;
+    }
+
+    const parts = host.split(".");
+    if (parts.length < 2) return null;
+    return `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
+  } catch {
+    return null;
+  }
+}
+
+function resolveTenantPathUrl(path: string, tenantSlug?: string | null): string | null {
+  const slug = String(tenantSlug || "")
+    .trim()
+    .toLowerCase();
+
+  if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
+    return null;
+  }
+
+  const baseDomain = getTenantBaseDomain();
+  if (!baseDomain) {
+    return null;
+  }
+
+  const safePath = path.startsWith("/") ? path : `/${path}`;
+  return `https://${slug}.${baseDomain}${safePath}`;
 }
 
 function baseLayout(title: string, bodyHtml: string) {
@@ -61,28 +129,124 @@ function baseLayout(title: string, bodyHtml: string) {
 </html>`;
 }
 
-export async function sendEmail(to: string, subject: string, htmlBody: string) {
-  if (!process.env.RESEND_API_KEY) {
+export async function sendEmail(to: string, subject: string, htmlBody: string): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
     console.warn("[email] RESEND_API_KEY not configured, skipping email to:", to);
-    return;
+    return false;
   }
 
-  try {
-    const { data, error } = await getResend().emails.send({
-      from: FROM_EMAIL,
-      to,
-      subject,
-      html: htmlBody,
-    });
+  for (let attempt = 1; attempt <= RESEND_MAX_RETRIES; attempt++) {
+    try {
+      await waitForResendRateWindow();
 
-    if (error) {
-      console.error(`[email] Resend error sending to ${to}:`, error);
-    } else {
-      console.log(`[email] Sent to ${to} (id: ${data?.id})`);
+      const response = await fetch(RESEND_API_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: FROM_EMAIL,
+          to,
+          subject,
+          html: htmlBody,
+        }),
+      });
+
+      const raw = await response.text();
+      let payload: { id?: string; message?: string; error?: { message?: string } } = {};
+      if (raw) {
+        try {
+          payload = JSON.parse(raw);
+        } catch {
+          payload = {};
+        }
+      }
+
+      if (response.ok) {
+        console.log(`[email] Sent to ${to} (id: ${payload?.id || "n/a"})`);
+        return true;
+      }
+
+      const status = response.status;
+      const retryAfterMs = toInt(response.headers.get("retry-after")) * 1000;
+      const message =
+        payload?.message ||
+        payload?.error?.message ||
+        raw ||
+        `HTTP ${status}`;
+
+      const shouldRetry =
+        (status === 429 || status >= 500) && attempt < RESEND_MAX_RETRIES;
+
+      if (shouldRetry) {
+        const backoffMs = Math.max(retryAfterMs, 600 * attempt);
+        console.warn(
+          `[email] Resend transient error to ${to} (status ${status}). Retry ${attempt}/${RESEND_MAX_RETRIES} in ${backoffMs}ms.`
+        );
+        await sleep(backoffMs);
+        continue;
+      }
+
+      console.error(
+        `[email] Resend error sending to ${to} (status ${status}): ${message}`
+      );
+      return false;
+    } catch (err) {
+      const transient = attempt < RESEND_MAX_RETRIES;
+      console.error(
+        `[email] Failed to send to ${to} (attempt ${attempt}/${RESEND_MAX_RETRIES}):`,
+        err
+      );
+      if (transient) {
+        await sleep(600 * attempt);
+        continue;
+      }
+      return false;
     }
-  } catch (err) {
-    console.error(`[email] Failed to send to ${to}:`, err);
   }
+
+  return false;
+}
+
+function renderMatchCta(url: string | null, label: string) {
+  if (!url) {
+    return `<p class="muted">Este correo es informativo. Ingresá desde el enlace habitual de tu club para ver el detalle.</p>`;
+  }
+  return `<a class="btn" href="${esc(url)}">${esc(label)}</a>`;
+}
+
+export type MatchNotificationResult = {
+  attempted: number;
+  sent: number;
+  failed: number;
+};
+
+function emptyResult(): MatchNotificationResult {
+  return { attempted: 0, sent: 0, failed: 0 };
+}
+
+async function sendMatchEmails(
+  playerEmails: { name: string; email: string | null }[],
+  subject: string,
+  buildBody: (playerName: string) => string
+): Promise<MatchNotificationResult> {
+  const result = emptyResult();
+
+  for (const player of playerEmails) {
+    if (!player.email) continue;
+
+    result.attempted += 1;
+    const ok = await sendEmail(player.email, subject, buildBody(player.name));
+    if (ok) {
+      result.sent += 1;
+    } else {
+      result.failed += 1;
+    }
+  }
+
+  return result;
 }
 
 export async function sendChallengeNotification(opts: {
@@ -133,7 +297,7 @@ export async function sendChallengeNotification(opts: {
       `<h2>¡Desafío Enviado!</h2>
       <p>Hola <strong>${safeChallenger}</strong>, tu desafío a <strong>${retados}</strong> ha sido enviado en <strong>${safeClub}</strong>.</p>
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
-      <a class="btn" href="${APP_URL}/challenges">Ver desafío</a>`
+      <a class="btn" href="${DEFAULT_APP_URL}/challenges">Ver desafío</a>`
     );
     await sendEmail(challengerEmail, subjectChallenger, body);
   }
@@ -146,7 +310,7 @@ export async function sendChallengeNotification(opts: {
       `<h2>¡Desafío Enviado!</h2>
       <p>Hola, <strong>${safeChallenger}</strong> te ha incluido en un desafío contra <strong>${retados}</strong> en <strong>${safeClub}</strong>.</p>
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
-      <a class="btn" href="${APP_URL}/challenges">Ver desafío</a>`
+      <a class="btn" href="${DEFAULT_APP_URL}/challenges">Ver desafío</a>`
     );
     await sendEmail(challengerPartnerEmail, subjectPartner, body);
   }
@@ -161,7 +325,7 @@ export async function sendChallengeNotification(opts: {
       <p><strong>${retadores}</strong> te ${safePartner ? "han" : "ha"} retado${safeChallengedPartner ? ` junto con <strong>${safeChallengedPartner}</strong>` : ""} en <strong>${safeClub}</strong>.</p>
       <p style="font-size:16px;font-weight:700;color:#0f172a;">¿Aceptás el desafío?</p>
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
-      <a class="btn" href="${APP_URL}/challenges">Ver desafío</a>`
+      <a class="btn" href="${DEFAULT_APP_URL}/challenges">Ver desafío</a>`
     );
     await sendEmail(challengedEmail, subjectChallenged, body);
   }
@@ -176,7 +340,7 @@ export async function sendChallengeNotification(opts: {
       <p><strong>${retadores}</strong> te ${safePartner ? "han" : "ha"} retado junto con <strong>${safeChallenged}</strong> en <strong>${safeClub}</strong>.</p>
       <p style="font-size:16px;font-weight:700;color:#0f172a;">¿Aceptás el desafío?</p>
       ${safeMessage ? `<p style="background:#f8fafc;padding:12px;border-radius:8px;border-left:3px solid #16a34a;"><em>"${safeMessage}"</em></p>` : ""}
-      <a class="btn" href="${APP_URL}/challenges">Ver desafío</a>`
+      <a class="btn" href="${DEFAULT_APP_URL}/challenges">Ver desafío</a>`
     );
     await sendEmail(challengedPartnerEmail, subjectPartner, body);
   }
@@ -189,21 +353,29 @@ export async function sendMatchNotification(opts: {
   matchDate: string;
   court?: string;
   clubName?: string;
-}) {
-  const { playerEmails, teamA, teamB, matchDate, court, clubName = "TWINCO" } = opts;
+  tenantSlug?: string | null;
+}): Promise<MatchNotificationResult> {
+  const {
+    playerEmails,
+    teamA,
+    teamB,
+    matchDate,
+    court,
+    clubName = "TWINCO",
+    tenantSlug,
+  } = opts;
 
   const safeClub = esc(clubName);
   const safeTeamA = esc(teamA);
   const safeTeamB = esc(teamB);
   const safeDate = esc(matchDate);
   const safeCourt = esc(court);
+  const matchUrl = resolveTenantPathUrl("/matches", tenantSlug);
   const subject = `Nuevo partido programado en ${safeClub}`;
 
-  for (const player of playerEmails) {
-    if (!player.email) continue;
-
-    const safeName = esc(player.name);
-    const body = baseLayout(
+  return sendMatchEmails(playerEmails, subject, (playerName) => {
+    const safeName = esc(playerName);
+    return baseLayout(
       subject,
       `<h2>¡Nuevo Partido!</h2>
       <p>Hola <strong>${safeName}</strong>, tenés un nuevo partido programado.</p>
@@ -213,11 +385,9 @@ export async function sendMatchNotification(opts: {
         <tr><td>Fecha</td><td>${safeDate}</td></tr>
         ${court ? `<tr><td>Pista</td><td>${safeCourt}</td></tr>` : ""}
       </table>
-      <a class="btn" href="${APP_URL}/matches">Ver partido</a>`
+      ${renderMatchCta(matchUrl, "Ver partido")}`
     );
-
-    await sendEmail(player.email, subject, body);
-  }
+  });
 }
 
 export async function sendMatchReminderNotification(opts: {
@@ -227,21 +397,29 @@ export async function sendMatchReminderNotification(opts: {
   matchDate: string;
   court?: string;
   clubName?: string;
-}) {
-  const { playerEmails, teamA, teamB, matchDate, court, clubName = "TWINCO" } = opts;
+  tenantSlug?: string | null;
+}): Promise<MatchNotificationResult> {
+  const {
+    playerEmails,
+    teamA,
+    teamB,
+    matchDate,
+    court,
+    clubName = "TWINCO",
+    tenantSlug,
+  } = opts;
 
   const safeClub = esc(clubName);
   const safeTeamA = esc(teamA);
   const safeTeamB = esc(teamB);
   const safeDate = esc(matchDate);
   const safeCourt = esc(court);
+  const matchUrl = resolveTenantPathUrl("/matches", tenantSlug);
   const subject = `Recordatorio de partido en ${safeClub}`;
 
-  for (const player of playerEmails) {
-    if (!player.email) continue;
-
-    const safeName = esc(player.name);
-    const body = baseLayout(
+  return sendMatchEmails(playerEmails, subject, (playerName) => {
+    const safeName = esc(playerName);
+    return baseLayout(
       subject,
       `<h2>Recordatorio de Partido</h2>
       <p>Hola <strong>${safeName}</strong>, este es un recordatorio de tu partido.</p>
@@ -251,11 +429,9 @@ export async function sendMatchReminderNotification(opts: {
         <tr><td>Fecha</td><td>${safeDate}</td></tr>
         ${court ? `<tr><td>Pista</td><td>${safeCourt}</td></tr>` : ""}
       </table>
-      <a class="btn" href="${APP_URL}/matches">Ver partido</a>`
+      ${renderMatchCta(matchUrl, "Ver partido")}`
     );
-
-    await sendEmail(player.email, subject, body);
-  }
+  });
 }
 
 export async function sendMatchFinishedNotification(opts: {
@@ -267,7 +443,8 @@ export async function sendMatchFinishedNotification(opts: {
   court?: string;
   roundName?: string;
   clubName?: string;
-}) {
+  tenantSlug?: string | null;
+}): Promise<MatchNotificationResult> {
   const {
     playerEmails,
     winners,
@@ -277,6 +454,7 @@ export async function sendMatchFinishedNotification(opts: {
     court,
     roundName,
     clubName = "TWINCO",
+    tenantSlug,
   } = opts;
 
   const safeClub = esc(clubName);
@@ -286,13 +464,12 @@ export async function sendMatchFinishedNotification(opts: {
   const safeDate = esc(matchDate);
   const safeCourt = esc(court);
   const safeRound = esc(roundName);
+  const matchUrl = resolveTenantPathUrl("/matches", tenantSlug);
   const subject = `Partido finalizado en ${safeClub}`;
 
-  for (const player of playerEmails) {
-    if (!player.email) continue;
-
-    const safeName = esc(player.name);
-    const body = baseLayout(
+  return sendMatchEmails(playerEmails, subject, (playerName) => {
+    const safeName = esc(playerName);
+    return baseLayout(
       subject,
       `<h2>Partido finalizado</h2>
       <p>Hola <strong>${safeName}</strong>.</p>
@@ -305,11 +482,9 @@ export async function sendMatchFinishedNotification(opts: {
         ${safeRound ? `<tr><td>Ronda</td><td>${safeRound}</td></tr>` : ""}
         ${court ? `<tr><td>Pista</td><td>${safeCourt}</td></tr>` : ""}
       </table>
-      <a class="btn" href="${APP_URL}/matches">Ver partido</a>`
+      ${renderMatchCta(matchUrl, "Ver partido")}`
     );
-
-    await sendEmail(player.email, subject, body);
-  }
+  });
 }
 
 export async function sendMatchProposalNotification(opts: {
@@ -342,7 +517,7 @@ export async function sendMatchProposalNotification(opts: {
         ${court ? `<tr><td>Pista</td><td>${safeCourt}</td></tr>` : ""}
       </table>
       <p>Por favor, revisá la propuesta y creá el partido desde el panel de administración.</p>
-      <a class="btn" href="${APP_URL}/matches/friendly/create">Crear Partido Amistoso</a>`
+      <a class="btn" href="${DEFAULT_APP_URL}/matches/friendly/create">Crear Partido Amistoso</a>`
     );
 
     await sendEmail(admin.email, subject, body);

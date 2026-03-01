@@ -57,6 +57,23 @@ function escapeHtml(s: string) {
     .replaceAll("'", "&#039;");
 }
 
+function getBaseDomain(appUrl: string): string | null {
+  try {
+    const host = new URL(appUrl).hostname.toLowerCase();
+    const parts = host.split(".");
+    if (parts.length < 2) return null;
+    return `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeSlug(value: string | null | undefined): string | null {
+  const slug = String(value || "").trim().toLowerCase();
+  if (!slug || !/^[a-z0-9-]+$/.test(slug)) return null;
+  return slug;
+}
+
 function baseEmailLayout(opts: {
   title: string;
   preheader: string;
@@ -117,7 +134,7 @@ function emailMatchCreated(opts: {
   whereText: string;
   teamsText: string;
   moreInfo?: string;
-  ctaUrl: string;
+  ctaUrl?: string | null;
 }) {
   const when = formatDateTimeES(opts.matchWhen);
   const title = "Partido creado ✅";
@@ -150,9 +167,15 @@ function emailMatchCreated(opts: {
       }
     </div>
 
-    <div style="margin-top:16px;">
-      <a class="cta" href="${opts.ctaUrl}">Ver partido</a>
-    </div>
+    ${
+      opts.ctaUrl
+        ? `<div style="margin-top:16px;">
+             <a class="cta" href="${escapeHtml(opts.ctaUrl)}">Ver partido</a>
+           </div>`
+        : `<div class="p muted" style="margin-top:14px;">
+             Este email es informativo. Ingresá desde el enlace habitual de tu club para ver el detalle.
+           </div>`
+    }
 
     <div class="p muted" style="margin-top:14px;">
       Tip: si algo cambió (pista/horario), vas a recibir una actualización.
@@ -169,7 +192,7 @@ function emailReminder24h(opts: {
   matchWhen: string;
   whereText: string;
   teamsText: string;
-  ctaUrl: string;
+  ctaUrl?: string | null;
 }) {
   const when = formatDateTimeES(opts.matchWhen);
   const title = "Recordatorio: tu partido es mañana 🎾";
@@ -194,9 +217,15 @@ function emailReminder24h(opts: {
       </div>
     </div>
 
-    <div style="margin-top:16px;">
-      <a class="cta" href="${opts.ctaUrl}">Ver partido</a>
-    </div>
+    ${
+      opts.ctaUrl
+        ? `<div style="margin-top:16px;">
+             <a class="cta" href="${escapeHtml(opts.ctaUrl)}">Ver partido</a>
+           </div>`
+        : `<div class="p muted" style="margin-top:14px;">
+             Este email es informativo. Ingresá desde el enlace habitual de tu club para ver el detalle.
+           </div>`
+    }
 
     <div class="p muted" style="margin-top:14px;">
       Recomendación: llegá 10 minutos antes para calentar.
@@ -282,6 +311,8 @@ serve(async (req) => {
     const appUrl = env("APP_PUBLIC_URL");
 
     const supabase = createClient(supabaseUrl, serviceRole);
+    const appBaseDomain = getBaseDomain(appUrl);
+    const tenantSlugCache = new Map<string, string | null>();
 
     // 1) Traer pendientes
     const { data, error } = await supabase
@@ -369,7 +400,25 @@ serve(async (req) => {
             "Partido programado";
         }
 
-        const ctaUrl = `${appUrl}/matches`;
+        let ctaUrl: string | null = null;
+        if (appBaseDomain) {
+          let tenantSlug = tenantSlugCache.get(row.tenant_id);
+
+          if (tenantSlug === undefined) {
+            const { data: tenantRow } = await supabase
+              .from("tenants")
+              .select("slug")
+              .eq("id", row.tenant_id)
+              .maybeSingle();
+
+            tenantSlug = normalizeSlug((tenantRow as { slug?: string | null } | null)?.slug || null);
+            tenantSlugCache.set(row.tenant_id, tenantSlug);
+          }
+
+          if (tenantSlug) {
+            ctaUrl = `https://${tenantSlug}.${appBaseDomain}/matches`;
+          }
+        }
 
         let subject = "";
         let html = "";
