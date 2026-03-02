@@ -62,7 +62,7 @@ export default function CreateMatch() {
               </button>
               <button
                 disabled={!selectedTournamentId}
-                onClick={() => selectedTournamentId && router.push(`/matches/create/random?tournament=${selectedTournamentId}`)}
+                onClick={() => selectedTournamentId && router.push(`/tournaments/${selectedTournamentId}/generate-matches`)}
                 className={`flex-1 px-6 py-3 text-white rounded font-bold text-lg shadow-lg ${selectedTournamentId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 cursor-not-allowed'}`}
               >
                 🎲 Generar partidos aleatorios

@@ -322,7 +322,7 @@ export default function EditTournament() {
 
               <button
                 type="button"
-                onClick={() => router.push(`/matches/create/random?tournament=${idNumber}`)}
+                onClick={() => router.push(`/tournaments/${idNumber}/generate-matches`)}
                 className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-indigo-700 transition"
               >
                 Crear partidos aleatorios

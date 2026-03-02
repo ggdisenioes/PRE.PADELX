@@ -43,10 +43,20 @@ function nextPowerOfTwo(n: number) {
   return 1 << count;
 }
 
-function shuffleArray<T>(array: T[]): T[] {
+function createSeededRandom(seed: number) {
+  let t = seed >>> 0;
+  return () => {
+    t += 0x6d2b79f5;
+    let n = Math.imul(t ^ (t >>> 15), 1 | t);
+    n ^= n + Math.imul(n ^ (n >>> 7), 61 | n);
+    return ((n ^ (n >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffleArray<T>(array: T[], randomFn: () => number = Math.random): T[] {
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(randomFn() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
@@ -83,6 +93,7 @@ export default function GenerateMatchesPage() {
   // Eliminación
   // También se usa para armar parejas “balanceadas” por nivel
   const [seeded, setSeeded] = useState(false);
+  const [pairingSeed, setPairingSeed] = useState<number>(() => (Date.now() % 2147483647) | 0);
 
   const tournamentId = useMemo(() => Number(id), [id]);
 
@@ -105,6 +116,7 @@ export default function GenerateMatchesPage() {
         .from("players")
         .select("id, name, level")
         .eq("is_approved", true)
+        .is("deleted_at", null)
         .order("name");
 
       if (error) {
@@ -166,8 +178,8 @@ export default function GenerateMatchesPage() {
       return teams;
     }
 
-    // Aleatorio
-    list = shuffleArray(list);
+    // Aleatorio (determinista para que preview y generación coincidan)
+    list = shuffleArray(list, createSeededRandom(pairingSeed));
     const teams: Team[] = [];
     for (let i = 0; i < list.length; i += 2) {
       teams.push({ a: list[i].id, b: list[i + 1].id });
@@ -175,7 +187,7 @@ export default function GenerateMatchesPage() {
     return teams;
   };
 
-  const teamsPreview = useMemo(() => buildTeams(), [selectedPlayerObjs, seeded]);
+  const teamsPreview = useMemo(() => buildTeams(), [selectedPlayerObjs, seeded, pairingSeed]);
 
   const formatLabel = (f: Format) => {
     if (f === "liga") return "Liga (todos contra todos)";
@@ -212,14 +224,14 @@ export default function GenerateMatchesPage() {
         return;
       }
       // grupos no puede ser mayor que cantidad de PAREJAS
-      const teamsCount = buildTeams().length;
+      const teamsCount = teamsPreview.length;
       if (groupsCount > Math.max(2, teamsCount)) {
         toast.error("La cantidad de grupos no puede ser mayor que la cantidad de parejas");
         return;
       }
     }
 
-    const teams = buildTeams();
+    const teams = teamsPreview;
     if (teams.length < 2) {
       toast.error("No se pudieron armar parejas. Revisá la selección de jugadores.");
       return;
@@ -268,6 +280,7 @@ export default function GenerateMatchesPage() {
 
     let newMatches: any[] = [];
     let matchIndex = 0;
+    let skippedExisting = 0;
 
     if (format === "liga") {
       // Liga (todos contra todos) ENTRE PAREJAS
@@ -275,7 +288,10 @@ export default function GenerateMatchesPage() {
         for (let j = i + 1; j < teams.length; j++) {
           const t1 = teams[i];
           const t2 = teams[j];
-          if (matchupExists(t1, t2)) continue;
+          if (matchupExists(t1, t2)) {
+            skippedExisting++;
+            continue;
+          }
 
           newMatches.push({
             tournament_id: tournamentId,
@@ -296,7 +312,7 @@ export default function GenerateMatchesPage() {
     }
 
     if (format === "grupos") {
-      const shuffledTeams = shuffleArray(teams);
+      const shuffledTeams = shuffleArray(teams, createSeededRandom(pairingSeed + 1));
       const groups: Team[][] = Array.from({ length: groupsCount }, () => []);
       shuffledTeams.forEach((t, idx) => {
         groups[idx % groupsCount].push(t);
@@ -309,7 +325,10 @@ export default function GenerateMatchesPage() {
           for (let j = i + 1; j < groupTeams.length; j++) {
             const t1 = groupTeams[i];
             const t2 = groupTeams[j];
-            if (matchupExists(t1, t2)) continue;
+            if (matchupExists(t1, t2)) {
+              skippedExisting++;
+              continue;
+            }
 
             newMatches.push({
               tournament_id: tournamentId,
@@ -362,7 +381,7 @@ export default function GenerateMatchesPage() {
           return teamKey(t1).localeCompare(teamKey(t2));
         });
       } else {
-        elimTeams = shuffleArray(elimTeams);
+        elimTeams = shuffleArray(elimTeams, createSeededRandom(pairingSeed + 2));
       }
 
       const n = elimTeams.length;
@@ -383,7 +402,10 @@ export default function GenerateMatchesPage() {
         const t1 = slots[i];
         const t2 = slots[slots.length - 1 - i];
         if (!t1 || !t2) continue; // BYE => no se crea partido
-        if (matchupExists(t1, t2)) continue;
+        if (matchupExists(t1, t2)) {
+          skippedExisting++;
+          continue;
+        }
 
         newMatches.push({
           tournament_id: tournamentId,
@@ -441,7 +463,11 @@ export default function GenerateMatchesPage() {
       },
     });
 
-    toast.success(`Se generaron ${newMatches.length} partidos (2vs2)`);
+    toast.success(
+      skippedExisting > 0
+        ? `Se generaron ${newMatches.length} partidos (2vs2). ${skippedExisting} cruces ya existían y se omitieron.`
+        : `Se generaron ${newMatches.length} partidos (2vs2)`
+    );
     setCreating(false);
     router.push(`/tournaments/edit/${id}`);
   };
@@ -500,6 +526,21 @@ export default function GenerateMatchesPage() {
               Armar parejas por nivel (balanceadas)
             </label>
           </div>
+
+          {!seeded && (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-gray-500">
+                La generación usará exactamente las parejas que ves en la vista previa.
+              </p>
+              <button
+                type="button"
+                onClick={() => setPairingSeed((prev) => (prev + 1) % 2147483647)}
+                className="px-3 py-2 text-xs rounded-md border border-gray-300 hover:bg-gray-50"
+              >
+                Rearmar parejas
+              </button>
+            </div>
+          )}
 
           {/* Opciones según formato */}
           {format === "grupos" && (
