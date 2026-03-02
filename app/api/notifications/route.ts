@@ -213,7 +213,7 @@ export async function POST(req: Request) {
             teamB,
             matchDate,
             court: courtText,
-            clubName: tenant?.name || "TWINCO",
+            clubName: tenant?.name || "PADELX QA",
             tenantSlug: tenant?.slug || null,
           });
         } else if (type === "match_reminder") {
@@ -223,7 +223,7 @@ export async function POST(req: Request) {
             teamB,
             matchDate,
             court: courtText,
-            clubName: tenant?.name || "TWINCO",
+            clubName: tenant?.name || "PADELX QA",
             tenantSlug: tenant?.slug || null,
           });
         } else {
@@ -240,7 +240,7 @@ export async function POST(req: Request) {
             matchDate,
             court: courtText,
             roundName: match.round_name || undefined,
-            clubName: tenant?.name || "TWINCO",
+            clubName: tenant?.name || "PADELX QA",
             tenantSlug: tenant?.slug || null,
           });
         }

@@ -124,7 +124,7 @@
   },
   "dashboard": {
     "title": "Panel General",
-    "welcome": "Bienvenido a Twinco",
+    "welcome": "Bienvenido a PadelX QA",
     "loading": "Cargando datos del panel...",
     "errorLoading": "Error cargando datos",
     "totalPlayers": "Jugadores",
@@ -735,7 +735,7 @@
     },
     "dashboard": {
       "title": "Super Admin Dashboard",
-      "subtitle": "Bienvenido a Twinco — Control total de tu SaaS",
+      "subtitle": "Bienvenido a PadelX QA — Control total de tu SaaS",
       "loading": "Cargando métricas...",
       "errorLoading": "Error cargando métricas",
       "mrrSubtitle": "Monthly Recurring Revenue",

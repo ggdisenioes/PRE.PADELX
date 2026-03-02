@@ -594,7 +594,7 @@ export default function MatchesPage() {
                   <div style={{ textAlign: "center" }}>
                     <img
                       src="/logo.svg"
-                      alt="TWINCO"
+                      alt="PADELX QA"
                       style={{ height: 44, width: "auto", margin: "0 auto", objectFit: "contain" }}
                     />
                   </div>
@@ -670,7 +670,7 @@ export default function MatchesPage() {
                       const { toPng } = await import("html-to-image");
                       const dataUrl = await toPng(el, { cacheBust: true, pixelRatio: 2, width: 480, height: 520 });
                       const link = document.createElement("a");
-                      link.download = `Twinco_Partido_${m.id}.png`;
+                      link.download = `PadelXQA_Partido_${m.id}.png`;
                       link.href = dataUrl;
                       link.click();
                       toast.success(t("matches.imageDownloaded"));

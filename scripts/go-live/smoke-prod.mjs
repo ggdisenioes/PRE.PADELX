@@ -2,7 +2,7 @@ import https from "node:https";
 import http from "node:http";
 import { URL } from "node:url";
 
-const base = process.env.GO_LIVE_BASE_URL || "https://twinco.padelx.es";
+const base = process.env.GO_LIVE_BASE_URL || "https://qa.padelx.es";
 const checks = ["/", "/login", "/api/health"];
 
 function requestJsonOrText(url) {

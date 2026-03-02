@@ -1,6 +1,6 @@
 import fs from "node:fs";
 
-const baseUrl = (process.env.GO_LIVE_BASE_URL || "https://twinco.padelx.es").replace(/\/+$/, "");
+const baseUrl = (process.env.GO_LIVE_BASE_URL || "https://qa.padelx.es").replace(/\/+$/, "");
 const endpoint = `${baseUrl}/api/health`;
 const attempts = Number(process.env.HEALTH_ATTEMPTS || 3);
 const timeoutMs = Number(process.env.HEALTH_TIMEOUT_MS || 15000);

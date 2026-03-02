@@ -129,8 +129,8 @@ export default function AdminNewsPage() {
     featured: locale === "en" ? "Featured" : "Destacado",
     fallbackCover:
       locale === "en"
-        ? "If no image is provided, Twinco logo will be used."
-        : "Si no cargas imagen, se usa logo Twinco por defecto.",
+        ? "If no image is provided, PadelX QA logo will be used."
+        : "Si no cargas imagen, se usa logo PadelX QA por defecto.",
     formats:
       locale === "en"
         ? "Supported: JPG, PNG, WEBP. Max 5MB each."

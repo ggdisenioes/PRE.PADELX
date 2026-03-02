@@ -203,7 +203,7 @@ export async function POST(req: Request) {
           challengedPartnerName: challengedPartner?.name,
           challengedPartnerEmail: challengedPartner?.notify_email !== false ? challengedPartner?.email : null,
           message: validated.message,
-          clubName: tenant?.name || "TWINCO",
+          clubName: tenant?.name || "PADELX QA",
         });
       }
     } catch (notifError) {

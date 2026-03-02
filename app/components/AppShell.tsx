@@ -177,7 +177,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="text-center">
               <img
                 src="/logo.svg"
-                alt="TWINCO"
+                alt="PADELX QA"
                 className="h-7 w-auto mx-auto object-contain"
               />
             </div>

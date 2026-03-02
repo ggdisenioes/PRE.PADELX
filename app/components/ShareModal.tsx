@@ -29,7 +29,7 @@ export default function ShareModal({ match, onClose }: ShareModalProps) {
       // Truco para descargar el archivo
       const link = document.createElement('a');
       link.href = image;
-      link.download = `Partido-Twinco-${match.id}.jpg`;
+      link.download = `Partido-PadelXQA-${match.id}.jpg`;
       link.click();
     } catch (err) {
       console.error("Error generando imagen", err);
@@ -57,7 +57,7 @@ export default function ShareModal({ match, onClose }: ShareModalProps) {
 
                 {/* Header */}
                 <div className="p-6 text-center border-b border-gray-800 z-10">
-                    <h1 className="text-3xl font-black italic tracking-tighter mb-1">TWINCO</h1>
+                    <h1 className="text-3xl font-black italic tracking-tighter mb-1">PADELX QA</h1>
                     <p className="text-[#ccff00] text-[10px] font-bold tracking-[0.3em] uppercase">PÁDEL MANAGER</p>
                 </div>
 
@@ -95,7 +95,7 @@ export default function ShareModal({ match, onClose }: ShareModalProps) {
 
                 {/* Footer */}
                 <div className="p-4 text-center border-t border-gray-800 z-10">
-                    <p className="text-gray-600 text-[10px]">Resultado oficial gestionado por TWINCO Pádel Manager</p>
+                    <p className="text-gray-600 text-[10px]">Resultado oficial gestionado por PADELX QA Pádel Manager</p>
                 </div>
             </div>
         </div>

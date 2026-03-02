@@ -102,7 +102,7 @@ export default function DashboardPage() {
         <div className="text-center mb-6">
           <img
             src="/logo-fondo.png"
-            alt="TWINCO"
+            alt="PADELX QA"
             className="h-10 w-auto mx-auto object-contain"
           />
           <span className="inline-block bg-gray-900 text-[#ccff00] px-2 py-0.5 text-xs font-bold tracking-[0.2em] uppercase rounded-sm mt-1">
@@ -124,7 +124,7 @@ export default function DashboardPage() {
               type="email"
               required
               className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#ccff00] focus:border-transparent outline-none transition bg-gray-50"
-              placeholder="admin@twinco.com"
+              placeholder="admin@qa.padelx.es"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
