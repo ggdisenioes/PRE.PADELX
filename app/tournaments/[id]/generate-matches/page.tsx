@@ -527,20 +527,24 @@ export default function GenerateMatchesPage() {
             </label>
           </div>
 
-          {!seeded && (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-gray-500">
-                La generación usará exactamente las parejas que ves en la vista previa.
-              </p>
-              <button
-                type="button"
-                onClick={() => setPairingSeed((prev) => (prev + 1) % 2147483647)}
-                className="px-3 py-2 text-xs rounded-md border border-gray-300 hover:bg-gray-50"
-              >
-                Rearmar parejas
-              </button>
-            </div>
-          )}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-gray-500">
+              {seeded
+                ? "Con parejas por nivel no se rearman manualmente."
+                : "La generación usará exactamente las parejas que ves en la vista previa."}
+            </p>
+            <button
+              type="button"
+              onClick={() => setPairingSeed((prev) => (prev + 1) % 2147483647)}
+              disabled={seeded}
+              className={`px-3 py-2 text-xs rounded-md border border-gray-300 ${
+                seeded ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50"
+              }`}
+              title={seeded ? "Disponible solo en modo aleatorio" : "Generar una nueva combinación aleatoria"}
+            >
+              Rearmar parejas
+            </button>
+          </div>
 
           {/* Opciones según formato */}
           {format === "grupos" && (

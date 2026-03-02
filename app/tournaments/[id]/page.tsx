@@ -7,6 +7,7 @@ import Badge from "../../components/Badge";
 import toast from "react-hot-toast";
 import MatchCard, { type Match } from "../../components/matches/MatchCard";
 import { useTranslation } from "../../i18n";
+import { useRole } from "../../hooks/useRole";
 
 type Tournament = {
   id: number;
@@ -24,6 +25,7 @@ export default function TournamentDetail() {
   const params = useParams();
   const router = useRouter();
   const { t, locale } = useTranslation();
+  const { isAdmin, isManager, loading: roleLoading } = useRole();
 
   const rawId = (params as any)?.id;
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
@@ -240,6 +242,32 @@ export default function TournamentDetail() {
               <Badge label={t("tournaments.bracket")} />
             </div>
           </div>
+
+          {!roleLoading && (isAdmin || isManager) && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => router.push(`/matches/create/manual?tournament=${idNum}`)}
+                className="bg-green-600 text-white px-3 py-2 rounded-md text-sm font-semibold hover:bg-green-700 transition"
+              >
+                + Crear partido
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(`/tournaments/${idNum}/generate-matches`)}
+                className="bg-indigo-600 text-white px-3 py-2 rounded-md text-sm font-semibold hover:bg-indigo-700 transition"
+              >
+                Crear partidos aleatorios
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(`/tournaments/edit/${idNum}`)}
+                className="bg-gray-900 text-white px-3 py-2 rounded-md text-sm font-semibold hover:bg-gray-800 transition"
+              >
+                Editar torneo
+              </button>
+            </div>
+          )}
         </section>
 
         {/* Cuadro por rondas */}
