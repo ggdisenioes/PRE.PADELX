@@ -74,6 +74,7 @@ export default function AdminUsersPage() {
   const [mainTab, setMainTab] = useState<MainTabKey>("manage");
   const [pendingInvitations, setPendingInvitations] = useState<PendingInvitationRow[]>([]);
   const [loadingInvitations, setLoadingInvitations] = useState(false);
+  const [invitationActionKey, setInvitationActionKey] = useState<string | null>(null);
 
   const [inviteForm, setInviteForm] = useState({
     name: "",
@@ -312,6 +313,113 @@ export default function AdminUsersPage() {
       }
     } finally {
       setLoadingInvitations(false);
+    }
+  };
+
+  const getInvitationKey = (inv: PendingInvitationRow) =>
+    inv.user_id || inv.email.trim().toLowerCase();
+
+  const handleResendInvitation = async (inv: PendingInvitationRow) => {
+    if (!canAdminActions) {
+      toast.error("Solo admins pueden reenviar invitaciones.");
+      return;
+    }
+
+    const key = getInvitationKey(inv);
+    setInvitationActionKey(`resend:${key}`);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Sesión inválida.");
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const response = await fetch("/api/admin/invitations/resend", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          user_id: inv.user_id || undefined,
+          email: inv.email.trim().toLowerCase(),
+        }),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "No se pudo reenviar la invitación.");
+      }
+
+      toast.success("Invitación reenviada.");
+      await loadPendingInvitations();
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        toast.error("El reenvío tardó demasiado. Reintentá.");
+      } else {
+        toast.error(error instanceof Error ? error.message : "Error reenviando invitación.");
+      }
+    } finally {
+      setInvitationActionKey(null);
+    }
+  };
+
+  const handleCancelInvitation = async (inv: PendingInvitationRow) => {
+    if (!canAdminActions) {
+      toast.error("Solo admins pueden cancelar invitaciones.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `¿Cancelar la invitación para ${inv.email}? Esta acción deshabilita el acceso hasta que se vuelva a invitar.`
+    );
+    if (!confirmed) return;
+
+    const key = getInvitationKey(inv);
+    setInvitationActionKey(`cancel:${key}`);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Sesión inválida.");
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const response = await fetch("/api/admin/invitations/cancel", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          user_id: inv.user_id || undefined,
+          email: inv.email.trim().toLowerCase(),
+        }),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "No se pudo cancelar la invitación.");
+      }
+
+      toast.success(payload.already_cancelled ? "La invitación ya estaba cancelada." : "Invitación cancelada.");
+      await loadPendingInvitations();
+      void load();
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        toast.error("La cancelación tardó demasiado. Reintentá.");
+      } else {
+        toast.error(error instanceof Error ? error.message : "Error cancelando invitación.");
+      }
+    } finally {
+      setInvitationActionKey(null);
     }
   };
 
@@ -617,48 +725,80 @@ export default function AdminUsersPage() {
             <>
               <div className="hidden md:grid grid-cols-12 px-4 py-3 text-xs font-bold text-gray-500 uppercase bg-gray-50 border-b border-gray-100">
                 <div className="col-span-3">Nombre</div>
-                <div className="col-span-4">Email</div>
+                <div className="col-span-3">Email</div>
                 <div className="col-span-1">Rol</div>
                 <div className="col-span-2">Invitación</div>
-                <div className="col-span-2">Estado</div>
+                <div className="col-span-1">Estado</div>
+                <div className="col-span-2">Acciones</div>
               </div>
 
-              {pendingInvitations.map((inv) => (
-                <div
-                  key={`${inv.user_id || inv.email}-${inv.invited_at}`}
-                  className="grid grid-cols-1 md:grid-cols-12 px-4 py-4 border-b border-gray-100 gap-3 md:items-center"
-                >
-                  <div className="md:col-span-3">
-                    <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Nombre</p>
-                    <p className="text-sm font-semibold text-gray-900">{inv.name || "Sin nombre"}</p>
-                    <p className="text-xs text-gray-500 break-all">{inv.user_id || "Sin user_id"}</p>
-                  </div>
+              {pendingInvitations.map((inv) => {
+                const rowKey = getInvitationKey(inv);
+                const isResending = invitationActionKey === `resend:${rowKey}`;
+                const isCancelling = invitationActionKey === `cancel:${rowKey}`;
+                const isBusy = isResending || isCancelling;
 
-                  <div className="md:col-span-4 text-sm text-gray-700 break-all">
-                    <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Email</p>
-                    {inv.email}
-                  </div>
+                return (
+                  <div
+                    key={`${inv.user_id || inv.email}-${inv.invited_at}`}
+                    className="grid grid-cols-1 md:grid-cols-12 px-4 py-4 border-b border-gray-100 gap-3 md:items-center"
+                  >
+                    <div className="md:col-span-3">
+                      <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Nombre</p>
+                      <p className="text-sm font-semibold text-gray-900">{inv.name || "Sin nombre"}</p>
+                      <p className="text-xs text-gray-500 break-all">{inv.user_id || "Sin user_id"}</p>
+                    </div>
 
-                  <div className="md:col-span-1">
-                    <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Rol</p>
-                    <span className="text-xs font-semibold px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 uppercase">
-                      {inv.role === "manager" ? "Manager" : "Usuario"}
-                    </span>
-                  </div>
+                    <div className="md:col-span-3 text-sm text-gray-700 break-all">
+                      <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Email</p>
+                      {inv.email}
+                    </div>
 
-                  <div className="md:col-span-2 text-sm text-gray-700">
-                    <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Invitación</p>
-                    {new Date(inv.invited_at).toLocaleString()}
-                  </div>
+                    <div className="md:col-span-1">
+                      <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Rol</p>
+                      <span className="text-xs font-semibold px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 uppercase">
+                        {inv.role === "manager" ? "Manager" : "Usuario"}
+                      </span>
+                    </div>
 
-                  <div className="md:col-span-2">
-                    <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Estado</p>
-                    <span className="text-xs font-semibold px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
-                      Pendiente de activación
-                    </span>
+                    <div className="md:col-span-2 text-sm text-gray-700">
+                      <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Invitación</p>
+                      {new Date(inv.invited_at).toLocaleString()}
+                    </div>
+
+                    <div className="md:col-span-1">
+                      <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Estado</p>
+                      <span className="text-xs font-semibold px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                        Pendiente
+                      </span>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Acciones</p>
+                      {canAdminActions ? (
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <button
+                            onClick={() => void handleResendInvitation(inv)}
+                            disabled={isBusy}
+                            className="w-full sm:w-auto bg-blue-600 text-white px-3 py-2 rounded-md text-xs font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+                          >
+                            {isResending ? "Reenviando..." : "Reenviar"}
+                          </button>
+                          <button
+                            onClick={() => void handleCancelInvitation(inv)}
+                            disabled={isBusy}
+                            className="w-full sm:w-auto bg-white text-red-700 border border-red-200 px-3 py-2 rounded-md text-xs font-semibold hover:bg-red-50 transition disabled:opacity-50"
+                          >
+                            {isCancelling ? "Cancelando..." : "Cancelar"}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-500">Solo admin</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </>
           )}
         </div>
