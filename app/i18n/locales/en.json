@@ -109,6 +109,7 @@
     "passkeyRemoved": "Biometric device removed.",
     "forgotPassword": "Recover password",
     "forgotPasswordLink": "Forgot my password",
+    "rememberUser": "Remember user",
     "forgotPasswordSubtitle": "Enter your email and we will send you a reset link.",
     "sendResetLink": "Send reset link",
     "sendingResetLink": "Sending link...",

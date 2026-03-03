@@ -5,6 +5,8 @@ import { supabase } from "../lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "../i18n";
 
+const REMEMBERED_EMAIL_KEY = "padelx.rememberedEmail";
+
 function getBaseDomain(hostname: string) {
   const parts = hostname.split(".");
   if (parts.length < 2) return hostname;
@@ -37,6 +39,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberUser, setRememberUser] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
@@ -74,6 +77,16 @@ export default function LoginPage() {
     setInfoMsg(null);
   }, [resetStatus, t]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const savedEmail = window.localStorage.getItem(REMEMBERED_EMAIL_KEY);
+    if (!savedEmail) return;
+
+    setEmail(savedEmail);
+    setRememberUser(true);
+  }, []);
+
   const validateProfileAndRedirect = async (userId: string, fallbackError: string) => {
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -101,8 +114,10 @@ export default function LoginPage() {
     setErrorMsg(null);
     setInfoMsg(null);
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: normalizedEmail,
       password,
     });
 
@@ -114,6 +129,14 @@ export default function LoginPage() {
       );
       setLoading(false);
       return;
+    }
+
+    if (typeof window !== "undefined") {
+      if (rememberUser) {
+        window.localStorage.setItem(REMEMBERED_EMAIL_KEY, normalizedEmail);
+      } else {
+        window.localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+      }
     }
 
     await validateProfileAndRedirect(data.user.id, t("auth.userDisabled"));
@@ -200,6 +223,16 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
+
+          <label className="flex items-center gap-2 text-sm text-gray-600 select-none">
+            <input
+              type="checkbox"
+              checked={rememberUser}
+              onChange={(e) => setRememberUser(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-[#00b4ff] focus:ring-[#00b4ff]"
+            />
+            {t("auth.rememberUser")}
+          </label>
 
           <button
             type="submit"

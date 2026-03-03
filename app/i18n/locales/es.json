@@ -109,6 +109,7 @@
     "passkeyRemoved": "Dispositivo biométrico eliminado.",
     "forgotPassword": "Recuperar contraseña",
     "forgotPasswordLink": "Olvidé mi contraseña",
+    "rememberUser": "Recordar usuario",
     "forgotPasswordSubtitle": "Ingresá tu email y te enviaremos un enlace para restablecerla.",
     "sendResetLink": "Enviar enlace de recuperación",
     "sendingResetLink": "Enviando enlace...",
