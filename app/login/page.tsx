@@ -27,6 +27,8 @@ function getLoginMessage(errorCode: string | null, t: (key: string) => string) {
       return t("errors.tenantInvalido");
     case "aprobacion_en_curso":
       return t("auth.pendingApproval");
+    case "session_expired":
+      return t("auth.sessionExpired");
     default:
       return null;
   }

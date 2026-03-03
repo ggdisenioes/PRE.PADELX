@@ -92,6 +92,7 @@
     "noClubHint": "Si no ves tu club en el registro, contactá al administrador.",
     "accountDeactivated": "Tu cuenta fue desactivada. Contactá al administrador.",
     "sessionInvalid": "Sesión inválida",
+    "sessionExpired": "Tu sesión expiró por seguridad. Volvé a iniciar sesión.",
     "passkeySignIn": "Ingresar con biometría",
     "passkeyNeedEmail": "Ingresá tu email para usar biometría.",
     "passkeyUnavailable": "Tu navegador o dispositivo no soporta biometría web.",

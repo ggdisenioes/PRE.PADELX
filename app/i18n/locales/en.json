@@ -92,6 +92,7 @@
     "noClubHint": "If you don't see your club in registration, contact the administrator.",
     "accountDeactivated": "Your account has been deactivated. Contact the administrator.",
     "sessionInvalid": "Invalid session",
+    "sessionExpired": "Your session expired for security reasons. Please sign in again.",
     "passkeySignIn": "Sign in with biometrics",
     "passkeyNeedEmail": "Enter your email to use biometrics.",
     "passkeyUnavailable": "Your browser or device does not support WebAuthn biometrics.",

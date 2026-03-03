@@ -12,6 +12,12 @@ import { useTranslation } from "../i18n";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SESSION_MAX_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const SESSION_INACTIVITY_TIMEOUT_MS = 8 * 60 * 60 * 1000; // 8 hours
+const ACTIVITY_WRITE_THROTTLE_MS = 30 * 1000; // 30 seconds
+const SESSION_STARTED_AT_KEY = "padelx.sessionStartedAt";
+const SESSION_LAST_ACTIVITY_AT_KEY = "padelx.sessionLastActivityAt";
+const SESSION_USER_ID_KEY = "padelx.sessionUserId";
 
 function getSupabaseClient() {
   // Importante: NO crear el cliente si faltan envs.
@@ -32,6 +38,7 @@ const ERROR_KEYS: Record<string, string> = {
   perfil_no_encontrado: "errors.perfilNoEncontrado",
   tenant_invalido: "errors.tenantInvalido",
   config_supabase: "errors.configSupabase",
+  session_expired: "auth.sessionExpired",
 };
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -51,6 +58,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     pathname === "/reset-password";
 
   const supabaseRef = useRef<SupabaseClient | null>(null);
+  const lastActivityWriteRef = useRef(0);
 
   // Evita duplicar toasts en re-renders
   const lastToastKeyRef = useRef<string>("");
@@ -103,7 +111,125 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     checkSession();
   }, [isAuthPage, router]);
 
-  // 2) Sidebar slide-in transition after login
+  // 2) Security timeout guard (inactivity + max session age)
+  useEffect(() => {
+    if (isAuthPage || typeof window === "undefined") return;
+
+    let active = true;
+
+    const writeSessionTimestamps = (userId: string) => {
+      const now = Date.now();
+      window.localStorage.setItem(SESSION_USER_ID_KEY, userId);
+      window.localStorage.setItem(SESSION_STARTED_AT_KEY, String(now));
+      window.localStorage.setItem(SESSION_LAST_ACTIVITY_AT_KEY, String(now));
+      lastActivityWriteRef.current = now;
+    };
+
+    const removeSessionTimestamps = () => {
+      window.localStorage.removeItem(SESSION_USER_ID_KEY);
+      window.localStorage.removeItem(SESSION_STARTED_AT_KEY);
+      window.localStorage.removeItem(SESSION_LAST_ACTIVITY_AT_KEY);
+    };
+
+    const touchActivity = () => {
+      const now = Date.now();
+      if (now - lastActivityWriteRef.current < ACTIVITY_WRITE_THROTTLE_MS) return;
+      window.localStorage.setItem(SESSION_LAST_ACTIVITY_AT_KEY, String(now));
+      lastActivityWriteRef.current = now;
+    };
+
+    const checkTimeout = async () => {
+      if (!active) return;
+      if (!supabaseRef.current) {
+        supabaseRef.current = getSupabaseClient();
+      }
+      if (!supabaseRef.current) return;
+
+      const {
+        data: { session },
+      } = await supabaseRef.current.auth.getSession();
+      if (!session?.user?.id) return;
+
+      const now = Date.now();
+      const userId = session.user.id;
+      const storedUserId = window.localStorage.getItem(SESSION_USER_ID_KEY);
+      const startedAt = Number(window.localStorage.getItem(SESSION_STARTED_AT_KEY));
+      const lastActivityAt = Number(
+        window.localStorage.getItem(SESSION_LAST_ACTIVITY_AT_KEY)
+      );
+
+      if (storedUserId !== userId || !Number.isFinite(startedAt) || !Number.isFinite(lastActivityAt)) {
+        writeSessionTimestamps(userId);
+        return;
+      }
+
+      const maxAgeExceeded = now - startedAt > SESSION_MAX_DURATION_MS;
+      const inactivityExceeded = now - lastActivityAt > SESSION_INACTIVITY_TIMEOUT_MS;
+      if (!maxAgeExceeded && !inactivityExceeded) return;
+
+      removeSessionTimestamps();
+      await supabaseRef.current.auth.signOut();
+      if (active) {
+        router.replace("/login?error=session_expired");
+      }
+    };
+
+    const activityEvents = ["pointerdown", "keydown", "scroll", "touchstart"];
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, touchActivity, { passive: true });
+    });
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        touchActivity();
+        void checkTimeout();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    const intervalId = window.setInterval(() => {
+      void checkTimeout();
+    }, 60_000);
+
+    if (supabaseRef.current) {
+      void supabaseRef.current.auth.getSession().then(({ data }) => {
+        const userId = data.session?.user?.id;
+        if (userId) {
+          const storedUserId = window.localStorage.getItem(SESSION_USER_ID_KEY);
+          if (storedUserId !== userId) {
+            writeSessionTimestamps(userId);
+          }
+        }
+      });
+    }
+
+    const {
+      data: { subscription },
+    } =
+      supabaseRef.current?.auth.onAuthStateChange((event, session) => {
+        if (event === "SIGNED_OUT") {
+          removeSessionTimestamps();
+          return;
+        }
+        if (event === "SIGNED_IN" && session?.user?.id) {
+          writeSessionTimestamps(session.user.id);
+        }
+      }) || { data: { subscription: null } };
+
+    void checkTimeout();
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, touchActivity);
+      });
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      subscription?.unsubscribe();
+    };
+  }, [isAuthPage, router]);
+
+  // 3) Sidebar slide-in transition after login
   useEffect(() => {
     if (!checkingSession && !isAuthPage) {
       // Small delay to trigger CSS transition
@@ -114,7 +240,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [checkingSession, isAuthPage]);
 
-  // 3) Mejora PRO: toast + limpieza de URL para errores "soft"
+  // 4) Mejora PRO: toast + limpieza de URL para errores "soft"
   useEffect(() => {
     const error = searchParams.get("error");
     const tenant = searchParams.get("tenant");
