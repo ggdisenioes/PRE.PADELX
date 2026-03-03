@@ -39,9 +39,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [infoMsg, setInfoMsg] = useState<string | null>(null);
 
   const errorCode = searchParams.get("error");
   const tenantSlug = searchParams.get("tenant");
+  const resetStatus = searchParams.get("reset");
 
   const tenantRedirectUrl = useMemo(() => {
     if (!tenantSlug) return null;
@@ -55,6 +57,22 @@ export default function LoginPage() {
     const msg = getLoginMessage(errorCode, t);
     if (msg) setErrorMsg(msg);
   }, [errorCode, t]);
+
+  useEffect(() => {
+    if (resetStatus === "sent") {
+      setInfoMsg(t("auth.resetEmailSent"));
+      return;
+    }
+    if (resetStatus === "ok") {
+      setInfoMsg(t("auth.passwordResetSuccess"));
+      return;
+    }
+    if (resetStatus === "invalid") {
+      setErrorMsg(t("auth.resetLinkInvalid"));
+      return;
+    }
+    setInfoMsg(null);
+  }, [resetStatus, t]);
 
   const validateProfileAndRedirect = async (userId: string, fallbackError: string) => {
     const { data: profile, error: profileError } = await supabase
@@ -81,6 +99,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setErrorMsg(null);
+    setInfoMsg(null);
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -140,6 +159,11 @@ export default function LoginPage() {
             {errorMsg}
           </div>
         )}
+        {infoMsg && (
+          <div className="bg-emerald-50 border-l-4 border-emerald-500 text-emerald-700 p-3 mb-6 text-sm rounded-r">
+            {infoMsg}
+          </div>
+        )}
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
@@ -166,6 +190,15 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            <div className="mt-2 text-right">
+              <button
+                type="button"
+                onClick={() => router.push("/forgot-password")}
+                className="text-sm font-semibold text-gray-700 hover:text-black underline underline-offset-2"
+              >
+                {t("auth.forgotPasswordLink")}
+              </button>
+            </div>
           </div>
 
           <button

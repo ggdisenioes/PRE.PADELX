@@ -44,7 +44,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [checkingSession, setCheckingSession] = useState(true);
   const [sidebarVisible, setSidebarVisible] = useState(false);
 
-  const isAuthPage = pathname === "/login" || pathname === "/register";
+  const isAuthPage =
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password";
 
   const supabaseRef = useRef<SupabaseClient | null>(null);
 
