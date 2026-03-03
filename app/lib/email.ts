@@ -304,6 +304,32 @@ export async function sendEmail(
   return false;
 }
 
+export async function sendPasswordResetEmail(opts: {
+  to: string;
+  resetUrl: string;
+  clubName?: string | null;
+}) {
+  const { to, resetUrl, clubName } = opts;
+  const safeClub = esc(clubName || "PadelX");
+  const safeUrl = esc(resetUrl);
+  const subject = `Recuperar contraseña · ${safeClub}`;
+
+  const body = baseLayout(
+    subject,
+    `<h2>Restablecer contraseña</h2>
+    <p>Recibimos una solicitud para cambiar la contraseña de tu cuenta en <strong>${safeClub}</strong>.</p>
+    <p>Para continuar, hacé clic en el siguiente botón:</p>
+    <a class="btn" href="${safeUrl}">Restablecer contraseña</a>
+    <p style="margin-top:14px;">Si no solicitaste este cambio, podés ignorar este correo.</p>
+    <p class="muted">Por seguridad, este enlace vence automáticamente.</p>`
+  );
+
+  return sendEmail(to, subject, body, {
+    fromName: clubName || "PadelX",
+    tags: [{ name: "template", value: "password_reset" }],
+  });
+}
+
 function renderMatchCta(url: string | null, label: string) {
   if (!url) {
     return `<p class="muted">Este correo es informativo. Ingresá desde el enlace habitual de tu club para ver el detalle.</p>`;
