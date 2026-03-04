@@ -21,6 +21,13 @@ type PlayerMap = {
   [key: number]: string;
 };
 
+type TournamentRound = {
+  id: number;
+  round_number: number;
+  round_name: string;
+  start_at: string;
+};
+
 export default function TournamentDetail() {
   const params = useParams();
   const router = useRouter();
@@ -33,6 +40,7 @@ export default function TournamentDetail() {
 
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [tournamentRounds, setTournamentRounds] = useState<TournamentRound[]>([]);
   const [playersMap, setPlayersMap] = useState<PlayerMap>({});
   const [openResultMatch, setOpenResultMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,7 +59,12 @@ export default function TournamentDetail() {
       setLoading(true);
 
       try {
-        const [{ data: tData, error: tError }, { data: mData, error: mError }, { data: pData, error: pError }] =
+        const [
+          { data: tData, error: tError },
+          { data: mData, error: mError },
+          { data: pData, error: pError },
+          { data: roundsData, error: roundsError },
+        ] =
           await Promise.all([
             supabase
               .from("tournaments")
@@ -67,6 +80,11 @@ export default function TournamentDetail() {
               .order("start_time", { ascending: true })
               .returns<Match[]>(),
             supabase.from("players").select("id, name"),
+            supabase
+              .from("tournament_rounds")
+              .select("id, round_number, round_name, start_at")
+              .eq("tournament_id", idNum)
+              .order("round_number", { ascending: true }),
           ]);
 
         if (tError) {
@@ -105,6 +123,13 @@ export default function TournamentDetail() {
           });
           setPlayersMap(map);
         }
+
+        if (roundsError) {
+          console.error("Error cargando jornadas:", roundsError);
+          setTournamentRounds([]);
+        } else {
+          setTournamentRounds((roundsData || []) as TournamentRound[]);
+        }
       } finally {
         setLoading(false);
       }
@@ -117,6 +142,17 @@ export default function TournamentDetail() {
   const formatDate = (iso: string | null) => {
     if (!iso) return "-";
     return new Date(iso).toLocaleDateString(dateLocale);
+  };
+
+  const formatRoundStart = (iso: string | null | undefined) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString(dateLocale, {
+      timeZone: "Europe/Madrid",
+      dateStyle: "short",
+      timeStyle: "short",
+    });
   };
 
   const translateRoundName = (roundName: string) => {
@@ -201,6 +237,16 @@ export default function TournamentDetail() {
     });
   }, [matchesByRound]);
 
+  const configuredRoundNames = useMemo(
+    () => tournamentRounds.map((round) => round.round_name),
+    [tournamentRounds]
+  );
+
+  const adHocRounds = useMemo(
+    () => sortedRounds.filter((roundName) => !configuredRoundNames.includes(roundName)),
+    [configuredRoundNames, sortedRounds]
+  );
+
   if (loading) {
     return (
       <main className="p-10 text-center">
@@ -272,44 +318,100 @@ export default function TournamentDetail() {
 
         {/* Cuadro por rondas */}
         <section className="space-y-6">
-          {sortedRounds.length === 0 ? (
+          {tournamentRounds.length === 0 && sortedRounds.length === 0 ? (
             <p className="text-sm text-gray-500">
               {t("tournaments.noMatchesYet")}
             </p>
           ) : (
-            sortedRounds.map((roundName) => (
-              <div key={roundName} className="space-y-3">
-                <h2 className="text-sm md:text-base font-semibold text-gray-800">
-                  {translateRoundName(roundName)}
-                </h2>
+            <>
+              {tournamentRounds.map((round) => {
+                const roundMatches = matchesByRound[round.round_name] || [];
+                return (
+                  <div key={round.id} className="space-y-3">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                      <h2 className="text-sm md:text-base font-semibold text-gray-800">
+                        {round.round_name}
+                      </h2>
+                      <span className="text-xs text-gray-500">
+                        {formatRoundStart(round.start_at)}
+                      </span>
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {matchesByRound[roundName].map((m) => (
-                    <div
-                      key={m.id}
-                      onClick={() => {
-                        if (!isPlayed(m)) {
-                          toast.error(
-                            locale === "en"
-                              ? "This match has no result yet."
-                              : "Este partido todavia no tiene resultado."
-                          );
-                          return;
-                        }
-                        setOpenResultMatch(m);
-                      }}
-                      className={isPlayed(m) ? "cursor-pointer" : "cursor-default"}
-                    >
-                      <MatchCard
-                        match={m}
-                        playersMap={playersMap}
-                        showActions={false}
-                      />
+                    {roundMatches.length === 0 ? (
+                      <p className="text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg p-3">
+                        Todavía no hay partidos en esta jornada.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {roundMatches.map((m) => (
+                          <div
+                            key={m.id}
+                            onClick={() => {
+                              if (!isPlayed(m)) {
+                                toast.error(
+                                  locale === "en"
+                                    ? "This match has no result yet."
+                                    : "Este partido todavia no tiene resultado."
+                                );
+                                return;
+                              }
+                              setOpenResultMatch(m);
+                            }}
+                            className={isPlayed(m) ? "cursor-pointer" : "cursor-default"}
+                          >
+                            <MatchCard
+                              match={m}
+                              playersMap={playersMap}
+                              showActions={false}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {adHocRounds.length > 0 && (
+                <div className="space-y-3">
+                  <h2 className="text-sm md:text-base font-semibold text-gray-700">
+                    Otras rondas
+                  </h2>
+                  {adHocRounds.map((roundName) => (
+                    <div key={roundName} className="space-y-3">
+                      <h3 className="text-sm font-semibold text-gray-700">
+                        {translateRoundName(roundName)}
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {matchesByRound[roundName].map((m) => (
+                          <div
+                            key={m.id}
+                            onClick={() => {
+                              if (!isPlayed(m)) {
+                                toast.error(
+                                  locale === "en"
+                                    ? "This match has no result yet."
+                                    : "Este partido todavia no tiene resultado."
+                                );
+                                return;
+                              }
+                              setOpenResultMatch(m);
+                            }}
+                            className={isPlayed(m) ? "cursor-pointer" : "cursor-default"}
+                          >
+                            <MatchCard
+                              match={m}
+                              playersMap={playersMap}
+                              showActions={false}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            ))
+              )}
+            </>
           )}
         </section>
       </div>

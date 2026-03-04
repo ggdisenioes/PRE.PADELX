@@ -15,6 +15,11 @@ type TournamentInsert = {
   category: string;
   status: string;
   start_date: string | null;
+  rounds: Array<{
+    round_number: number;
+    round_name: string;
+    start_at: string;
+  }>;
 };
 
 export default function CreateTournament() {
@@ -26,9 +31,31 @@ export default function CreateTournament() {
   const [category, setCategory] = useState("Mixto A");
   const [status, setStatus] = useState("open");
   const [startDate, setStartDate] = useState<string>("");
+  const [roundsCount, setRoundsCount] = useState<number>(1);
+  const [roundStarts, setRoundStarts] = useState<string[]>([""]);
   const [loading, setLoading] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
   const [isCustomCategory, setIsCustomCategory] = useState(false);
+
+  useEffect(() => {
+    setRoundStarts((prev) => {
+      const desired = Math.max(1, Math.min(40, roundsCount));
+      const next = [...prev];
+      while (next.length < desired) next.push("");
+      return next.slice(0, desired);
+    });
+  }, [roundsCount]);
+
+  useEffect(() => {
+    if (!startDate) return;
+    setRoundStarts((prev) => {
+      if (!prev.length || prev[0]) return prev;
+      const firstStart = `${startDate}T20:00`;
+      const next = [...prev];
+      next[0] = firstStart;
+      return next;
+    });
+  }, [startDate]);
 
   useEffect(() => {
     if (roleLoading) return;
@@ -71,7 +98,35 @@ export default function CreateTournament() {
       category: finalCategory,
       status,
       start_date: startDate ? startDate : null,
+      rounds: [],
     };
+
+    const normalizedRoundCount = Math.max(1, Math.min(40, roundsCount));
+    const roundsPayload: TournamentInsert["rounds"] = [];
+
+    for (let index = 0; index < normalizedRoundCount; index += 1) {
+      const localDateTime = String(roundStarts[index] || "").trim();
+      if (!localDateTime) {
+        toast.error(`Completá la fecha de inicio de la jornada ${index + 1}`);
+        setLoading(false);
+        return;
+      }
+
+      const parsed = new Date(localDateTime);
+      if (Number.isNaN(parsed.getTime())) {
+        toast.error(`La fecha de la jornada ${index + 1} es inválida`);
+        setLoading(false);
+        return;
+      }
+
+      roundsPayload.push({
+        round_number: index + 1,
+        round_name: `Fecha ${index + 1}`,
+        start_at: parsed.toISOString(),
+      });
+    }
+
+    payload.rounds = roundsPayload;
 
     const {
       data: { session },
@@ -106,7 +161,7 @@ export default function CreateTournament() {
       await logAction({
         action: "CREATE_TOURNAMENT",
         entity: "tournament",
-        entityId: data.id,
+        entityId: result.data.id,
         metadata: payload,
       });
     } catch (e) {
@@ -118,7 +173,7 @@ export default function CreateTournament() {
     setLoading(false);
 
     // Redirigir a edición del torneo recién creado
-    router.push(`/tournaments/edit/${data.id}`);
+    router.push(`/tournaments/edit/${result.data.id}`);
   };
 
   if (roleLoading) {
@@ -212,6 +267,50 @@ export default function CreateTournament() {
               onChange={(e) => setStartDate(e.target.value)}
               className="w-full border border-gray-300 rounded px-3 py-2"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Cantidad de jornadas</label>
+            <input
+              type="number"
+              min={1}
+              max={40}
+              value={roundsCount}
+              onChange={(e) => {
+                const parsed = Number(e.target.value);
+                if (!Number.isFinite(parsed)) {
+                  setRoundsCount(1);
+                  return;
+                }
+                setRoundsCount(Math.max(1, Math.min(40, Math.trunc(parsed))));
+              }}
+              className="w-full border border-gray-300 rounded px-3 py-2"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Definí cuántas fechas (jornadas) tendrá este torneo.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-gray-700">Fechas de inicio por jornada</p>
+            {Array.from({ length: Math.max(1, Math.min(40, roundsCount)) }).map((_, index) => (
+              <div key={index} className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-2 items-center">
+                <label className="text-sm text-gray-600">{`Jornada ${index + 1}`}</label>
+                <input
+                  type="datetime-local"
+                  value={roundStarts[index] || ""}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setRoundStarts((prev) => {
+                      const next = [...prev];
+                      next[index] = value;
+                      return next;
+                    });
+                  }}
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                />
+              </div>
+            ))}
           </div>
 
           <div className="flex items-center gap-3 justify-end pt-2">

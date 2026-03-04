@@ -19,6 +19,26 @@ type Court = {
   is_covered: boolean;
 };
 
+type TournamentRound = {
+  id: number;
+  round_number: number;
+  round_name: string;
+  start_at: string;
+};
+
+function toDateTimeLocalValue(iso: string | null | undefined) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 export default function CreateMatchManualPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,9 +52,12 @@ export default function CreateMatchManualPage() {
   const [courts, setCourts] = useState<Court[]>([]);
   const [occupiedCourtIds, setOccupiedCourtIds] = useState<Set<number>>(new Set());
   const [loadingCourts, setLoadingCourts] = useState(true);
+  const [rounds, setRounds] = useState<TournamentRound[]>([]);
+  const [loadingRounds, setLoadingRounds] = useState(true);
 
   const [form, setForm] = useState({
     round_name: "",
+    round_id: "",
     place: "",
     start_time: "",
     duration_minutes: "60",
@@ -79,6 +102,29 @@ export default function CreateMatchManualPage() {
       }
 
       setLoadingCourts(false);
+
+      const { data: roundsData, error: roundsError } = await supabase
+        .from("tournament_rounds")
+        .select("id, round_number, round_name, start_at")
+        .eq("tournament_id", Number(tournamentId))
+        .order("round_number", { ascending: true });
+
+      if (roundsError) {
+        console.error("[manual-create] error cargando jornadas:", roundsError);
+        setRounds([]);
+      } else {
+        const nextRounds = (roundsData || []) as TournamentRound[];
+        setRounds(nextRounds);
+        if (nextRounds.length > 0) {
+          setForm((prev) => ({
+            ...prev,
+            round_id: String(nextRounds[0].id),
+            round_name: nextRounds[0].round_name,
+            start_time: prev.start_time || toDateTimeLocalValue(nextRounds[0].start_at),
+          }));
+        }
+      }
+      setLoadingRounds(false);
     };
 
     loadPlayers();
@@ -148,7 +194,7 @@ export default function CreateMatchManualPage() {
     );
   }
 
-  if (roleLoading || loading || loadingCourts) {
+  if (roleLoading || loading || loadingCourts || loadingRounds) {
     return (
       <main className="p-8">
         <p className="text-gray-500 animate-pulse">Cargando…</p>
@@ -169,7 +215,20 @@ export default function CreateMatchManualPage() {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    if (name === "round_id") {
+      const selectedRound = rounds.find((round) => String(round.id) === value);
+      setForm((prev) => ({
+        ...prev,
+        round_id: value,
+        round_name: selectedRound?.round_name || prev.round_name,
+        start_time: selectedRound
+          ? toDateTimeLocalValue(selectedRound.start_at)
+          : prev.start_time,
+      }));
+      return;
+    }
+    setForm({ ...form, [name]: value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -199,16 +258,22 @@ export default function CreateMatchManualPage() {
       return;
     }
 
+    if (rounds.length > 0 && !form.round_id) {
+      toast.error("Seleccioná una jornada para el partido");
+      return;
+    }
+
     if (!form.court_id) {
       toast.error("Seleccioná una pista disponible");
       return;
     }
 
     const selectedCourt = courts.find((c) => c.id === Number(form.court_id));
+    const selectedRound = rounds.find((round) => String(round.id) === form.round_id);
 
     const { data: created, error } = await supabase.from("matches").insert({
       tournament_id: Number(tournamentId),
-      round_name: form.round_name || "Partido",
+      round_name: selectedRound?.round_name || form.round_name || "Partido",
       place: form.place || null,
       court_id: Number(form.court_id),
       duration_minutes: Number(form.duration_minutes || 60),
@@ -229,7 +294,7 @@ export default function CreateMatchManualPage() {
 
     toast.success("Partido creado correctamente");
     if (created) notifyMatchCreated(created.map((m: any) => m.id));
-    router.push("/matches");
+    router.push(`/tournaments/${tournamentId}`);
   };
 
   return (
@@ -241,9 +306,30 @@ export default function CreateMatchManualPage() {
       <div className="bg-white rounded-2xl shadow-md p-8 space-y-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="bg-gray-50 rounded-xl p-6 space-y-4">
+            {rounds.length > 0 && (
+              <select
+                name="round_id"
+                value={form.round_id}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
+                onChange={handleChange}
+              >
+                <option value="">Seleccionar jornada</option>
+                {rounds.map((round) => (
+                  <option key={round.id} value={round.id}>
+                    {`${round.round_name} · ${new Date(round.start_at).toLocaleString("es-ES", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                      timeZone: "Europe/Madrid",
+                    })}`}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <input
               name="round_name"
-              placeholder="Ronda (opcional)"
+              placeholder={rounds.length > 0 ? "Nombre de jornada" : "Ronda (opcional)"}
+              value={form.round_name}
               className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
               onChange={handleChange}
             />
