@@ -20,6 +20,23 @@ type TokenClaims = {
   };
 };
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function getSessionWithRetry(retries = 12, delayMs = 180) {
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session) return session;
+    if (attempt < retries) {
+      await sleep(delayMs);
+    }
+  }
+  return null;
+}
+
 function decodeJwtPayload<T = unknown>(token: string): T | null {
   try {
     const parts = token.split(".");
@@ -57,9 +74,7 @@ export function useRole() {
 
     const loadRole = async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const session = await getSessionWithRetry(12, 180);
 
         if (!session?.user?.id) {
           if (active) {
@@ -145,10 +160,25 @@ export function useRole() {
       }
     };
 
-    loadRole();
+    void loadRole();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (
+        event === "INITIAL_SESSION" ||
+        event === "SIGNED_IN" ||
+        event === "TOKEN_REFRESHED" ||
+        event === "USER_UPDATED" ||
+        event === "SIGNED_OUT"
+      ) {
+        void loadRole();
+      }
+    });
 
     return () => {
       active = false;
+      subscription.unsubscribe();
     };
   }, []);
 
