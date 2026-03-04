@@ -647,6 +647,41 @@ export default function MiCuentaPage() {
     const pendingTotal =
       staffTasks.pendingUsers + staffTasks.pendingMatches + staffTasks.overdueMatches;
 
+    const staffNotifications = [
+      {
+        id: "pending-users",
+        title: "Solicitudes de usuario pendientes",
+        description: "Nuevos registros esperando aprobación manual.",
+        count: staffTasks.pendingUsers,
+        href: "/admin/users",
+        tone: "indigo" as const,
+      },
+      {
+        id: "pending-matches",
+        title: "Partidos pendientes de resultado",
+        description: "Encuentros cargados sin marcador final.",
+        count: staffTasks.pendingMatches,
+        href: "/matches?status=pending",
+        tone: "yellow" as const,
+      },
+      {
+        id: "overdue-matches",
+        title: "Partidos atrasados",
+        description: "Pendientes con fecha pasada que requieren gestión.",
+        count: staffTasks.overdueMatches,
+        href: "/matches?status=pending",
+        tone: "red" as const,
+      },
+      {
+        id: "upcoming-week",
+        title: "Actividad próxima semana",
+        description: "Partidos previstos a confirmar en los próximos 7 días.",
+        count: staffTasks.upcomingThisWeek,
+        href: "/matches?status=pending",
+        tone: "green" as const,
+      },
+    ];
+
     return (
       <main className="max-w-6xl mx-auto p-6 md:p-10 space-y-6">
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8 space-y-6">
@@ -765,6 +800,61 @@ export default function MiCuentaPage() {
             <p className="text-3xl font-bold text-green-900 mt-2">{staffTasks.upcomingThisWeek}</p>
             <p className="text-xs text-green-700 mt-2">Partidos previstos a confirmar</p>
           </Link>
+        </section>
+
+        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 md:p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500">
+              Notificaciones
+            </h2>
+            <span className="text-xs text-gray-500">
+              {staffNotifications.filter((item) => item.count > 0).length} categoría(s) con actividad
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {staffNotifications.map((notification) => {
+              const toneClasses =
+                notification.tone === "indigo"
+                  ? "border-indigo-200 bg-indigo-50 text-indigo-900"
+                  : notification.tone === "yellow"
+                  ? "border-yellow-200 bg-yellow-50 text-yellow-900"
+                  : notification.tone === "red"
+                  ? "border-red-200 bg-red-50 text-red-900"
+                  : "border-green-200 bg-green-50 text-green-900";
+
+              const descriptionToneClasses =
+                notification.tone === "indigo"
+                  ? "text-indigo-700"
+                  : notification.tone === "yellow"
+                  ? "text-yellow-700"
+                  : notification.tone === "red"
+                  ? "text-red-700"
+                  : "text-green-700";
+
+              return (
+                <Link
+                  key={notification.id}
+                  href={notification.href}
+                  className={`rounded-xl border p-4 hover:brightness-95 transition ${toneClasses}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold break-words">{notification.title}</p>
+                      <p className={`text-xs mt-1 ${descriptionToneClasses}`}>
+                        {notification.description}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-2xl font-bold leading-none">{notification.count}</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+
+          <p className="text-xs text-gray-500">
+            Recomendación: revisá este panel al inicio del día para priorizar aprobaciones y carga de resultados.
+          </p>
         </section>
 
         <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
