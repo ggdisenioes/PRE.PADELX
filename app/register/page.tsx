@@ -34,7 +34,7 @@ export default function RegisterPage() {
     // Reglas:
     // - Mostrar solo tenants activos (si existe is_active)
     // - Excluir tenants de pruebas (por slug)
-    // Para este momento (según tu consigna), debería quedar solo PADELX QA.
+    // Para este momento (según tu consigna), debería quedar solo TWINCO.
     return tenants
       .filter((t) => (t.is_active ?? true) === true)
       .filter((t) => {
@@ -69,7 +69,7 @@ export default function RegisterPage() {
       const list = (data as Tenant[]) || [];
       setTenants(list);
 
-      // Auto-seleccionar si solo hay 1 visible (por ejemplo, PadelX QA)
+      // Auto-seleccionar si solo hay 1 visible (por ejemplo, Twinco)
       const filtered = (list as Tenant[])
         .filter((t) => (t.is_active ?? true) === true)
         .filter((t) => {
@@ -117,8 +117,10 @@ export default function RegisterPage() {
     // IMPORTANTE: acá NO asignamos roles.
     // El rol SIEMPRE lo define el backend (trigger en auth.users -> profiles)
     // y debe ser 'user' + active=false (pendiente) para registro libre.
-    const { error } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const { data, error } = await supabase.auth.signUp({
+      email: normalizedEmail,
       password,
       options: {
         data: {
@@ -134,6 +136,28 @@ export default function RegisterPage() {
       toast.error(error.message || "No se pudo crear la cuenta.");
       setLoading(false);
       return;
+    }
+
+    // Best-effort: notificar por email a todos los admins del tenant.
+    try {
+      const notifyController = new AbortController();
+      const notifyTimeout = setTimeout(() => notifyController.abort(), 9000);
+
+      await fetch("/api/auth/register/admin-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          email: normalizedEmail,
+          first_name: firstName.trim() || null,
+          last_name: lastName.trim() || null,
+          user_id: data.user?.id || null,
+        }),
+        signal: notifyController.signal,
+      }).finally(() => clearTimeout(notifyTimeout));
+    } catch (notifyErr) {
+      // No bloquea el registro del usuario.
+      console.warn("[register] admin notify failed", notifyErr);
     }
 
     toast.success(

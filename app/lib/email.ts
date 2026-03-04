@@ -1,10 +1,11 @@
 const FROM_EMAIL = process.env.EMAIL_FROM || "PadelX <noreply@padelx.es>";
-const DEFAULT_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://qa.padelx.es";
+const DEFAULT_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://twinco.padelx.es";
 const RESEND_API_URL = "https://api.resend.com/emails";
 const RESEND_MAX_RETRIES = Number(process.env.RESEND_MAX_RETRIES || "3");
 const RESEND_MIN_REQUEST_INTERVAL_MS = Number(
   process.env.RESEND_MIN_REQUEST_INTERVAL_MS || "600"
 );
+const RESEND_REQUEST_TIMEOUT_MS = Number(process.env.RESEND_REQUEST_TIMEOUT_MS || "12000");
 const EMAIL_REPLY_TO = String(process.env.EMAIL_REPLY_TO || "").trim();
 const EMAIL_UNSUBSCRIBE_MAILTO = String(process.env.EMAIL_UNSUBSCRIBE_MAILTO || "").trim();
 
@@ -191,14 +192,14 @@ function baseLayout(title: string, bodyHtml: string) {
   <div class="wrap">
     <div class="card">
       <div class="header">
-        <div class="brand">PADELX QA</div>
+        <div class="brand">TWINCO</div>
         <div class="sub">PÁDEL MANAGER</div>
       </div>
       <div class="content">
         ${bodyHtml}
       </div>
       <div class="footer">
-        Este email fue enviado automáticamente por PADELX QA Pádel Manager.
+        Este email fue enviado automáticamente por TWINCO Pádel Manager.
       </div>
     </div>
   </div>
@@ -230,25 +231,40 @@ export async function sendEmail(
     try {
       await waitForResendRateWindow();
 
-      const response = await fetch(RESEND_API_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from,
-          to,
-          subject,
-          html: htmlBody,
-          text,
-          ...(replyTo ? { reply_to: replyTo } : {}),
-          ...(tags.length ? { tags } : {}),
-          headers,
-        }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), RESEND_REQUEST_TIMEOUT_MS);
 
-      const raw = await response.text();
+      let response: Response;
+      let raw = "";
+      try {
+        response = await fetch(RESEND_API_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from,
+            to,
+            subject,
+            html: htmlBody,
+            text,
+            ...(replyTo ? { reply_to: replyTo } : {}),
+            ...(tags.length ? { tags } : {}),
+            headers,
+          }),
+          signal: controller.signal,
+        });
+        raw = await response.text();
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          throw new Error(`Resend timeout (${RESEND_REQUEST_TIMEOUT_MS}ms)`);
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
       let payload: { id?: string; message?: string; error?: { message?: string } } = {};
       if (raw) {
         try {
@@ -363,6 +379,52 @@ export async function sendUserInvitationEmail(opts: {
   });
 }
 
+export async function sendAdminPendingRegistrationEmail(opts: {
+  to: string;
+  adminName?: string | null;
+  clubName?: string | null;
+  registrantName?: string | null;
+  registrantEmail: string;
+  manageUrl?: string | null;
+}) {
+  const {
+    to,
+    adminName,
+    clubName,
+    registrantName,
+    registrantEmail,
+    manageUrl,
+  } = opts;
+
+  const safeClub = esc(clubName || "PadelX");
+  const safeAdminName = esc(adminName || "Admin");
+  const safeRegistrantName = esc(registrantName || "Sin nombre");
+  const safeRegistrantEmail = esc(registrantEmail);
+  const safeManageUrl = esc(manageUrl || "");
+  const subject = `Nuevo registro pendiente de aprobación · ${safeClub}`;
+  const cta = manageUrl
+    ? `<a class="btn" href="${safeManageUrl}">Revisar y aprobar/rechazar</a>`
+    : `<p class="muted">Ingresá al panel de gestión de usuarios para aprobar o rechazar la solicitud.</p>`;
+
+  const body = baseLayout(
+    subject,
+    `<h2>Nuevo usuario pendiente de aprobación</h2>
+    <p>Hola <strong>${safeAdminName}</strong>, se registró un nuevo usuario en <strong>${safeClub}</strong>.</p>
+    <table class="info-table">
+      <tr><td>Nombre</td><td>${safeRegistrantName}</td></tr>
+      <tr><td>Email</td><td>${safeRegistrantEmail}</td></tr>
+      <tr><td>Estado</td><td>Pendiente de aprobación</td></tr>
+    </table>
+    <p>Podés aprobar o rechazar esta solicitud desde la sección de gestión de usuarios.</p>
+    ${cta}`
+  );
+
+  return sendEmail(to, subject, body, {
+    fromName: clubName || "PadelX",
+    tags: [{ name: "template", value: "admin_pending_registration" }],
+  });
+}
+
 function renderMatchCta(url: string | null, label: string) {
   if (!url) {
     return `<p class="muted">Este correo es informativo. Ingresá desde el enlace habitual de tu club para ver el detalle.</p>`;
@@ -425,7 +487,7 @@ export async function sendChallengeNotification(opts: {
     challengedPartnerName,
     challengedPartnerEmail,
     message,
-    clubName = "PADELX QA",
+    clubName = "TWINCO",
   } = opts;
 
   const safeChallenger = esc(challengerName);
@@ -527,7 +589,7 @@ export async function sendMatchNotification(opts: {
     teamB,
     matchDate,
     court,
-    clubName = "PADELX QA",
+    clubName = "TWINCO",
     tenantSlug,
   } = opts;
 
@@ -579,7 +641,7 @@ export async function sendMatchReminderNotification(opts: {
     teamB,
     matchDate,
     court,
-    clubName = "PADELX QA",
+    clubName = "TWINCO",
     tenantSlug,
   } = opts;
 
@@ -635,7 +697,7 @@ export async function sendMatchFinishedNotification(opts: {
     matchDate,
     court,
     roundName,
-    clubName = "PADELX QA",
+    clubName = "TWINCO",
     tenantSlug,
   } = opts;
 
@@ -685,7 +747,7 @@ export async function sendMatchProposalNotification(opts: {
   court?: string;
   clubName?: string;
 }) {
-  const { adminEmails, teamA, teamB, matchDate, court, clubName = "PADELX QA" } = opts;
+  const { adminEmails, teamA, teamB, matchDate, court, clubName = "TWINCO" } = opts;
 
   const safeClub = esc(clubName);
   const safeTeamA = esc(teamA);
