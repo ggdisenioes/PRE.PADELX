@@ -291,20 +291,6 @@ export default function TournamentDetail() {
             <div className="flex flex-wrap gap-2 mt-3">
               <button
                 type="button"
-                onClick={() => router.push(`/matches/create/manual?tournament=${idNum}`)}
-                className="bg-green-600 text-white px-3 py-2 rounded-md text-sm font-semibold hover:bg-green-700 transition"
-              >
-                + Crear partido
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push(`/tournaments/${idNum}/generate-matches`)}
-                className="bg-indigo-600 text-white px-3 py-2 rounded-md text-sm font-semibold hover:bg-indigo-700 transition"
-              >
-                Crear partidos aleatorios
-              </button>
-              <button
-                type="button"
                 onClick={() => router.push(`/tournaments/edit/${idNum}`)}
                 className="bg-gray-900 text-white px-3 py-2 rounded-md text-sm font-semibold hover:bg-gray-800 transition"
               >
@@ -334,6 +320,33 @@ export default function TournamentDetail() {
                         {formatRoundStart(round.start_at)}
                       </span>
                     </div>
+
+                    {!roleLoading && (isAdmin || isManager) && (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            router.push(
+                              `/matches/create/manual?tournament=${idNum}&round_id=${round.id}`
+                            )
+                          }
+                          className="bg-green-600 text-white px-3 py-2 rounded-md text-sm font-semibold hover:bg-green-700 transition"
+                        >
+                          + Crear partido
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            router.push(
+                              `/tournaments/${idNum}/generate-matches?round_id=${round.id}`
+                            )
+                          }
+                          className="bg-indigo-600 text-white px-3 py-2 rounded-md text-sm font-semibold hover:bg-indigo-700 transition"
+                        >
+                          Crear partidos aleatorios
+                        </button>
+                      </div>
+                    )}
 
                     {roundMatches.length === 0 ? (
                       <p className="text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg p-3">

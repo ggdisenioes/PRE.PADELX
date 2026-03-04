@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 
 import { supabase } from "../../../lib/supabase";
@@ -82,7 +82,9 @@ function matchupKey(t1: Team, t2: Team) {
 export default function GenerateMatchesPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAdmin, isManager, loading: roleLoading } = useRole();
+  const requestedRoundId = searchParams.get("round_id") || searchParams.get("round");
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedPlayers, setSelectedPlayers] = useState<number[]>([]);
@@ -155,15 +157,17 @@ export default function GenerateMatchesPage() {
         const nextRounds = (roundsData || []) as TournamentRound[];
         setRounds(nextRounds);
         if (nextRounds.length > 0) {
-          setSelectedRoundId(String(nextRounds[0].id));
-          setStartDate(nextRounds[0].start_at.slice(0, 10));
+          const initialRound =
+            nextRounds.find((round) => String(round.id) === requestedRoundId) || nextRounds[0];
+          setSelectedRoundId(String(initialRound.id));
+          setStartDate(initialRound.start_at.slice(0, 10));
         }
       }
       setLoading(false);
     };
 
     loadPlayers();
-  }, [tournamentId]);
+  }, [tournamentId, requestedRoundId]);
 
   const togglePlayer = (playerId: number) => {
     setSelectedPlayers((prev) =>

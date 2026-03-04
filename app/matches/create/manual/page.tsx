@@ -45,6 +45,7 @@ export default function CreateMatchManualPage() {
   const { isAdmin, isManager, loading: roleLoading } = useRole();
 
   const tournamentId = searchParams.get("tournament");
+  const requestedRoundId = searchParams.get("round_id") || searchParams.get("round");
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,11 +117,13 @@ export default function CreateMatchManualPage() {
         const nextRounds = (roundsData || []) as TournamentRound[];
         setRounds(nextRounds);
         if (nextRounds.length > 0) {
+          const initialRound =
+            nextRounds.find((round) => String(round.id) === requestedRoundId) || nextRounds[0];
           setForm((prev) => ({
             ...prev,
-            round_id: String(nextRounds[0].id),
-            round_name: nextRounds[0].round_name,
-            start_time: prev.start_time || toDateTimeLocalValue(nextRounds[0].start_at),
+            round_id: String(initialRound.id),
+            round_name: initialRound.round_name,
+            start_time: prev.start_time || toDateTimeLocalValue(initialRound.start_at),
           }));
         }
       }
@@ -128,7 +131,7 @@ export default function CreateMatchManualPage() {
     };
 
     loadPlayers();
-  }, [tournamentId]);
+  }, [tournamentId, requestedRoundId]);
 
   useEffect(() => {
     const computeAvailability = async () => {
