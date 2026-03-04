@@ -73,17 +73,29 @@ export default function CreateTournament() {
       start_date: startDate ? startDate : null,
     };
 
-    const { data, error } = await supabase
-      .from("tournaments")
-      .insert(payload)
-      .select("id")
-      .single();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      toast.error("Sesión no válida. Volvé a iniciar sesión.");
+      setLoading(false);
+      return;
+    }
 
-    if (error) {
-      console.error(error);
-      const msg = error.message?.includes('PLAN_LIMIT')
-        ? error.message.replace('PLAN_LIMIT: ', '')
-        : "Error al crear el torneo";
+    const response = await fetch("/api/tournaments/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok || !result?.data?.id) {
+      const msg = result?.error || "Error al crear el torneo";
+      console.error("[CreateTournament] API error:", msg);
       toast.error(msg);
       setLoading(false);
       return;
