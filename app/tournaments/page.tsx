@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { supabase } from "../lib/supabase";
-import { isAdminSession } from "../lib/admin";
 import { useTranslation } from "../i18n";
+import { useRole } from "../hooks/useRole";
 
 type Tournament = {
   id: number;
@@ -23,10 +23,11 @@ type Tournament = {
 
 export default function TournamentsPage() {
   const { t, locale } = useTranslation();
+  const { isAdmin, isManager, loading: roleLoading } = useRole();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const dateLocale = locale === "en" ? "en-US" : "es-ES";
+  const canManageTournaments = isAdmin || isManager;
 
   const STATUS_MAP = {
     en_curso: {
@@ -45,11 +46,6 @@ export default function TournamentsPage() {
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setIsAdmin(isAdminSession(session));
-
       const { data, error } = await supabase
         .from("tournaments")
         .select("*")
@@ -108,7 +104,7 @@ export default function TournamentsPage() {
             </p>
           </div>
 
-          {isAdmin && (
+          {!roleLoading && canManageTournaments && (
             <Link
               href="/tournaments/create"
               className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition"
@@ -252,7 +248,7 @@ export default function TournamentsPage() {
                       {t("common.details")} →
                     </Link>
 
-                    {isAdmin && (
+                    {!roleLoading && canManageTournaments && (
                       <div className="flex gap-3 text-sm">
                         <Link
                           href={`/tournaments/edit/${tournament.id}`}
