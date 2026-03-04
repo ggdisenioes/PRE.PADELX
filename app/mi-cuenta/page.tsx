@@ -80,6 +80,15 @@ type StaffLogRow = {
   created_at: string;
 };
 
+type StaffNotificationItem = {
+  id: string;
+  title: string;
+  description: string;
+  count: number;
+  href: string;
+  tone: "indigo" | "yellow" | "red" | "green";
+};
+
 function detectDevicePlatform(userAgent: string) {
   const ua = userAgent.toLowerCase();
   if (ua.includes("iphone")) return "iPhone";
@@ -186,6 +195,114 @@ export default function MiCuentaPage() {
     if (!response.ok) return;
     const payload = (await response.json()) as { credentials?: PasskeyDevice[] };
     setPasskeyDevices(payload.credentials || []);
+  };
+
+  const loadStaffSnapshot = async (user: {
+    id: string;
+    email?: string | null;
+    last_sign_in_at?: string | null;
+  }): Promise<{
+    account: StaffAccountData;
+    tasks: StaffTaskSummary;
+    logs: StaffLogRow[];
+  } | null> => {
+    const { data: profileData, error: profileErr } = await supabase
+      .from("profiles")
+      .select("id, email, first_name, last_name, role, active, tenant_id, created_at")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileErr || !profileData) {
+      return null;
+    }
+
+    const tenantId = profileData.tenant_id;
+    const nowIso = new Date().toISOString();
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+
+    let tenantName = "Sin club";
+    let pendingUsers = 0;
+    let pendingMatches = 0;
+    let overdueMatches = 0;
+    let upcomingThisWeek = 0;
+    let recentLogs: StaffLogRow[] = [];
+
+    if (tenantId) {
+      const [
+        { data: tenantData },
+        { count: pendingUsersCount },
+        { count: pendingMatchesCount },
+        { count: overdueMatchesCount },
+        { count: upcomingThisWeekCount },
+        { data: logsData },
+      ] = await Promise.all([
+        supabase.from("tenants").select("name").eq("id", tenantId).maybeSingle(),
+        supabase
+          .from("profiles")
+          .select("id", { head: true, count: "exact" })
+          .eq("tenant_id", tenantId)
+          .eq("approval_status", "pending")
+          .is("deleted_at", null),
+        supabase
+          .from("matches")
+          .select("id", { head: true, count: "exact" })
+          .eq("tenant_id", tenantId)
+          .eq("winner", "pending"),
+        supabase
+          .from("matches")
+          .select("id", { head: true, count: "exact" })
+          .eq("tenant_id", tenantId)
+          .eq("winner", "pending")
+          .lt("start_time", nowIso),
+        supabase
+          .from("matches")
+          .select("id", { head: true, count: "exact" })
+          .eq("tenant_id", tenantId)
+          .eq("winner", "pending")
+          .gte("start_time", nowIso)
+          .lt("start_time", nextWeek.toISOString()),
+        supabase
+          .from("action_logs")
+          .select("id, action, entity, user_email, created_at")
+          .eq("tenant_id", tenantId)
+          .order("created_at", { ascending: false })
+          .limit(6),
+      ]);
+
+      tenantName = String(tenantData?.name || "Sin club");
+      pendingUsers = pendingUsersCount || 0;
+      pendingMatches = pendingMatchesCount || 0;
+      overdueMatches = overdueMatchesCount || 0;
+      upcomingThisWeek = upcomingThisWeekCount || 0;
+      recentLogs = (logsData || []) as StaffLogRow[];
+    }
+
+    const fullName = [profileData.first_name, profileData.last_name]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    return {
+      account: {
+        id: profileData.id,
+        fullName: fullName || user.email || "Usuario",
+        email: String(profileData.email || user.email || "—"),
+        role: role,
+        tenantId: tenantId || null,
+        tenantName,
+        active: profileData.active === true,
+        createdAt: profileData.created_at || null,
+        lastSignInAt: user.last_sign_in_at || null,
+      },
+      tasks: {
+        pendingUsers,
+        pendingMatches,
+        overdueMatches,
+        upcomingThisWeek,
+      },
+      logs: recentLogs,
+    };
   };
 
   useEffect(() => {
@@ -295,6 +412,16 @@ export default function MiCuentaPage() {
         setStats({ wins, losses, total: wins + losses });
         historyData.sort((a, b) => b.ts - a.ts);
         setHistory(historyData.slice(0, 20));
+
+        if (isStaffUser) {
+          const staffSnapshot = await loadStaffSnapshot(user);
+          if (active && staffSnapshot) {
+            setStaffAccount(staffSnapshot.account);
+            setStaffTasks(staffSnapshot.tasks);
+            setStaffLogs(staffSnapshot.logs);
+          }
+        }
+
         await loadPasskeyDevices();
         if (!active) return;
         setLoading(false);
@@ -309,105 +436,18 @@ export default function MiCuentaPage() {
         return;
       }
 
-      const { data: profileData, error: profileErr } = await supabase
-        .from("profiles")
-        .select("id, email, first_name, last_name, role, active, tenant_id, created_at")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (profileErr || !profileData) {
+      const staffSnapshot = await loadStaffSnapshot(user);
+      if (!staffSnapshot) {
         if (!active) return;
         setLoading(false);
         setNotLinked(true);
         return;
       }
 
-      const tenantId = profileData.tenant_id;
-      const nowIso = new Date().toISOString();
-      const nextWeek = new Date();
-      nextWeek.setDate(nextWeek.getDate() + 7);
-
-      let tenantName = "Sin club";
-      let pendingUsers = 0;
-      let pendingMatches = 0;
-      let overdueMatches = 0;
-      let upcomingThisWeek = 0;
-      let recentLogs: StaffLogRow[] = [];
-
-      if (tenantId) {
-        const [
-          { data: tenantData },
-          { count: pendingUsersCount },
-          { count: pendingMatchesCount },
-          { count: overdueMatchesCount },
-          { count: upcomingThisWeekCount },
-          { data: logsData },
-        ] = await Promise.all([
-          supabase.from("tenants").select("name").eq("id", tenantId).maybeSingle(),
-          supabase
-            .from("profiles")
-            .select("id", { head: true, count: "exact" })
-            .eq("tenant_id", tenantId)
-            .eq("approval_status", "pending")
-            .is("deleted_at", null),
-          supabase
-            .from("matches")
-            .select("id", { head: true, count: "exact" })
-            .eq("tenant_id", tenantId)
-            .eq("winner", "pending"),
-          supabase
-            .from("matches")
-            .select("id", { head: true, count: "exact" })
-            .eq("tenant_id", tenantId)
-            .eq("winner", "pending")
-            .lt("start_time", nowIso),
-          supabase
-            .from("matches")
-            .select("id", { head: true, count: "exact" })
-            .eq("tenant_id", tenantId)
-            .eq("winner", "pending")
-            .gte("start_time", nowIso)
-            .lt("start_time", nextWeek.toISOString()),
-          supabase
-            .from("action_logs")
-            .select("id, action, entity, user_email, created_at")
-            .eq("tenant_id", tenantId)
-            .order("created_at", { ascending: false })
-            .limit(6),
-        ]);
-
-        tenantName = String(tenantData?.name || "Sin club");
-        pendingUsers = pendingUsersCount || 0;
-        pendingMatches = pendingMatchesCount || 0;
-        overdueMatches = overdueMatchesCount || 0;
-        upcomingThisWeek = upcomingThisWeekCount || 0;
-        recentLogs = (logsData || []) as StaffLogRow[];
-      }
-
-      const fullName = [profileData.first_name, profileData.last_name]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
-
       if (!active) return;
-      setStaffAccount({
-        id: profileData.id,
-        fullName: fullName || user.email || "Usuario",
-        email: String(profileData.email || user.email || "—"),
-        role: role,
-        tenantId: tenantId || null,
-        tenantName,
-        active: profileData.active === true,
-        createdAt: profileData.created_at || null,
-        lastSignInAt: user.last_sign_in_at || null,
-      });
-      setStaffTasks({
-        pendingUsers,
-        pendingMatches,
-        overdueMatches,
-        upcomingThisWeek,
-      });
-      setStaffLogs(recentLogs);
+      setStaffAccount(staffSnapshot.account);
+      setStaffTasks(staffSnapshot.tasks);
+      setStaffLogs(staffSnapshot.logs);
       await loadPasskeyDevices();
       if (!active) return;
       setNotLinked(true);
@@ -568,6 +608,98 @@ export default function MiCuentaPage() {
     setSaving(false);
   };
 
+  const staffNotifications: StaffNotificationItem[] = [
+    {
+      id: "pending-users",
+      title: "Solicitudes de usuario pendientes",
+      description: "Nuevos registros esperando aprobación manual.",
+      count: staffTasks.pendingUsers,
+      href: "/admin/users",
+      tone: "indigo",
+    },
+    {
+      id: "pending-matches",
+      title: "Partidos pendientes de resultado",
+      description: "Encuentros cargados sin marcador final.",
+      count: staffTasks.pendingMatches,
+      href: "/matches?status=pending",
+      tone: "yellow",
+    },
+    {
+      id: "overdue-matches",
+      title: "Partidos atrasados",
+      description: "Pendientes con fecha pasada que requieren gestión.",
+      count: staffTasks.overdueMatches,
+      href: "/matches?status=pending",
+      tone: "red",
+    },
+    {
+      id: "upcoming-week",
+      title: "Actividad próxima semana",
+      description: "Partidos previstos a confirmar en los próximos 7 días.",
+      count: staffTasks.upcomingThisWeek,
+      href: "/matches?status=pending",
+      tone: "green",
+    },
+  ];
+
+  const renderStaffNotificationsSection = () => (
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 md:p-6 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500">
+          Notificaciones
+        </h2>
+        <span className="text-xs text-gray-500">
+          {staffNotifications.filter((item) => item.count > 0).length} categoría(s) con actividad
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {staffNotifications.map((notification) => {
+          const toneClasses =
+            notification.tone === "indigo"
+              ? "border-indigo-200 bg-indigo-50 text-indigo-900"
+              : notification.tone === "yellow"
+              ? "border-yellow-200 bg-yellow-50 text-yellow-900"
+              : notification.tone === "red"
+              ? "border-red-200 bg-red-50 text-red-900"
+              : "border-green-200 bg-green-50 text-green-900";
+
+          const descriptionToneClasses =
+            notification.tone === "indigo"
+              ? "text-indigo-700"
+              : notification.tone === "yellow"
+              ? "text-yellow-700"
+              : notification.tone === "red"
+              ? "text-red-700"
+              : "text-green-700";
+
+          return (
+            <Link
+              key={notification.id}
+              href={notification.href}
+              className={`rounded-xl border p-4 hover:brightness-95 transition ${toneClasses}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold break-words">{notification.title}</p>
+                  <p className={`text-xs mt-1 ${descriptionToneClasses}`}>
+                    {notification.description}
+                  </p>
+                </div>
+                <span className="shrink-0 text-2xl font-bold leading-none">{notification.count}</span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+
+      <p className="text-xs text-gray-500">
+        Recomendación: revisá este panel al inicio del día para priorizar aprobaciones y carga de resultados.
+      </p>
+    </section>
+  );
+
   const renderPasskeySection = () => (
     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -646,41 +778,6 @@ export default function MiCuentaPage() {
 
     const pendingTotal =
       staffTasks.pendingUsers + staffTasks.pendingMatches + staffTasks.overdueMatches;
-
-    const staffNotifications = [
-      {
-        id: "pending-users",
-        title: "Solicitudes de usuario pendientes",
-        description: "Nuevos registros esperando aprobación manual.",
-        count: staffTasks.pendingUsers,
-        href: "/admin/users",
-        tone: "indigo" as const,
-      },
-      {
-        id: "pending-matches",
-        title: "Partidos pendientes de resultado",
-        description: "Encuentros cargados sin marcador final.",
-        count: staffTasks.pendingMatches,
-        href: "/matches?status=pending",
-        tone: "yellow" as const,
-      },
-      {
-        id: "overdue-matches",
-        title: "Partidos atrasados",
-        description: "Pendientes con fecha pasada que requieren gestión.",
-        count: staffTasks.overdueMatches,
-        href: "/matches?status=pending",
-        tone: "red" as const,
-      },
-      {
-        id: "upcoming-week",
-        title: "Actividad próxima semana",
-        description: "Partidos previstos a confirmar en los próximos 7 días.",
-        count: staffTasks.upcomingThisWeek,
-        href: "/matches?status=pending",
-        tone: "green" as const,
-      },
-    ];
 
     return (
       <main className="max-w-6xl mx-auto p-6 md:p-10 space-y-6">
@@ -802,60 +899,7 @@ export default function MiCuentaPage() {
           </Link>
         </section>
 
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 md:p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500">
-              Notificaciones
-            </h2>
-            <span className="text-xs text-gray-500">
-              {staffNotifications.filter((item) => item.count > 0).length} categoría(s) con actividad
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {staffNotifications.map((notification) => {
-              const toneClasses =
-                notification.tone === "indigo"
-                  ? "border-indigo-200 bg-indigo-50 text-indigo-900"
-                  : notification.tone === "yellow"
-                  ? "border-yellow-200 bg-yellow-50 text-yellow-900"
-                  : notification.tone === "red"
-                  ? "border-red-200 bg-red-50 text-red-900"
-                  : "border-green-200 bg-green-50 text-green-900";
-
-              const descriptionToneClasses =
-                notification.tone === "indigo"
-                  ? "text-indigo-700"
-                  : notification.tone === "yellow"
-                  ? "text-yellow-700"
-                  : notification.tone === "red"
-                  ? "text-red-700"
-                  : "text-green-700";
-
-              return (
-                <Link
-                  key={notification.id}
-                  href={notification.href}
-                  className={`rounded-xl border p-4 hover:brightness-95 transition ${toneClasses}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold break-words">{notification.title}</p>
-                      <p className={`text-xs mt-1 ${descriptionToneClasses}`}>
-                        {notification.description}
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-2xl font-bold leading-none">{notification.count}</span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-
-          <p className="text-xs text-gray-500">
-            Recomendación: revisá este panel al inicio del día para priorizar aprobaciones y carga de resultados.
-          </p>
-        </section>
+        {renderStaffNotificationsSection()}
 
         <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-2">
@@ -1114,6 +1158,8 @@ export default function MiCuentaPage() {
           </div>
         </div>
       </section>
+
+      {isStaffUser && staffAccount && renderStaffNotificationsSection()}
 
       {renderPasskeySection()}
 
