@@ -775,9 +775,23 @@ export default function RankingPage() {
 
             <Card className="!p-0 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.18em]">
-                  Tabla Pro
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.18em]">
+                    Tabla Pro
+                  </h2>
+                  <div className="relative group">
+                    <button
+                      type="button"
+                      aria-label="Cómo se calcula el rendimiento"
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white text-[11px] font-bold text-slate-700"
+                    >
+                      i
+                    </button>
+                    <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-72 -translate-x-1/2 rounded-md border border-slate-200 bg-white p-2 text-[11px] normal-case font-medium text-slate-700 shadow-lg group-hover:block group-focus-within:block">
+                      {performanceTooltip}
+                    </div>
+                  </div>
+                </div>
                 <input
                   type="text"
                   value={tableSearch}
@@ -799,14 +813,7 @@ export default function RankingPage() {
                         <tr className="text-xs uppercase text-gray-500">
                           <th className="py-3 px-3 text-left font-semibold">Pos</th>
                           <th className="py-3 px-3 text-left font-semibold">Jugador</th>
-                          <th className="py-3 px-3 text-center font-semibold">
-                            <span className="inline-flex items-center gap-1" title={performanceTooltip}>
-                              Rendimiento
-                              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700">
-                                i
-                              </span>
-                            </span>
-                          </th>
+                          <th className="py-3 px-3 text-center font-semibold">Rendimiento</th>
                           <th className="py-3 px-3 text-center font-semibold">PJ</th>
                           <th className="py-3 px-3 text-center font-semibold">PG</th>
                           <th className="py-3 px-3 text-center font-semibold">PP</th>
