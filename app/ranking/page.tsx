@@ -44,8 +44,47 @@ function getMonthOptions(count: number) {
   });
 }
 
+function getScopeDescription(isGeneralView: boolean, isMonthlyView: boolean, selectedMonthLabel: string) {
+  if (isGeneralView) {
+    return "Top 10 general histórico (sin filtro por fecha).";
+  }
+  if (isMonthlyView) {
+    return `Top 10 mensual de ${selectedMonthLabel}.`;
+  }
+  return "Ranking del torneo seleccionado (solo jugadores con partidos asociados).";
+}
+
+function getPodiumStyle(position: number) {
+  if (position === 1) {
+    return {
+      card: "border-amber-300 bg-amber-50",
+      position: "bg-amber-500 text-white",
+      points: "text-amber-700",
+      avatar: "border-amber-300",
+      emoji: "🥇",
+    };
+  }
+  if (position === 2) {
+    return {
+      card: "border-slate-300 bg-slate-50",
+      position: "bg-slate-500 text-white",
+      points: "text-slate-700",
+      avatar: "border-slate-300",
+      emoji: "🥈",
+    };
+  }
+  return {
+    card: "border-orange-300 bg-orange-50",
+    position: "bg-orange-500 text-white",
+    points: "text-orange-700",
+    avatar: "border-orange-300",
+    emoji: "🥉",
+  };
+}
+
 export default function RankingPage() {
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
+  const [matchCount, setMatchCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -131,6 +170,8 @@ export default function RankingPage() {
       setLoading(false);
       return;
     }
+
+    setMatchCount((matches || []).length);
 
     (matches || []).forEach((match: any) => {
       if (!match.player_1_a || !match.player_2_a || !match.player_1_b || !match.player_2_b) return;
@@ -267,211 +308,250 @@ export default function RankingPage() {
   }, [loadRanking]);
 
   const podium = players.slice(0, 3);
-  const rest = players.slice(3);
+  const totalPoints = players.reduce((acc, player) => acc + player.points, 0);
+  const leader = players[0] || null;
+  const scopeDescription = getScopeDescription(isGeneralView, isMonthlyView, selectedMonthLabel);
 
   const handleRowClick = (id: number) => {
     // Lleva al perfil de jugador, accesible para cualquier usuario
     router.push(`/players/${id}`);
   };
 
+  const renderAvatar = (player: RankedPlayer, sizeClass: string, textClass: string, borderClass?: string) => {
+    if (player.avatar_url) {
+      return (
+        <img
+          src={player.avatar_url}
+          alt={player.name}
+          className={`${sizeClass} rounded-full object-cover ${borderClass || ""}`}
+          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = `https://placehold.co/120x120/111827/ccff00?text=${player.name
+              .slice(0, 1)
+              .toUpperCase()}`;
+          }}
+        />
+      );
+    }
+
+    return (
+      <div className={`${sizeClass} rounded-full bg-[#ccff00] text-gray-900 flex items-center justify-center font-bold ${textClass}`}>
+        {player.name.slice(0, 1).toUpperCase()}
+      </div>
+    );
+  };
+
   return (
     <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-20">
-      <section className="max-w-5xl mx-auto">
-        <div className="mb-6 text-center">
-          <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-wide">
+      <section className="max-w-6xl mx-auto space-y-5">
+        <div className="rounded-2xl bg-gradient-to-r from-slate-900 to-slate-700 px-5 py-6 md:px-7 md:py-7 shadow-sm">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-300 font-semibold">Ranking</p>
+          <h1 className="mt-2 text-2xl md:text-3xl font-extrabold text-white tracking-wide">
             Ranking de Jugadores
           </h1>
-          <div className="mt-4 flex justify-center">
-            <select
-              value={selectedScope}
-              onChange={(e) => setSelectedScope(e.target.value)}
-              className="border rounded-md px-3 py-2 text-sm"
-            >
-              <option value="general">Top 10 general (histórico)</option>
-              <optgroup label="Top 10 mensual">
-                {monthOptions.map((month) => (
-                  <option key={month.key} value={`month:${month.key}`}>
-                    {`Top 10 - ${month.label}`}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Ranking por torneo">
-              {tournaments.map((t) => (
-                <option key={t.id} value={`tournament:${t.id}`}>
-                  {t.name}
-                </option>
-              ))}
-              </optgroup>
-            </select>
-          </div>
-          <p className="text-sm text-gray-600 mt-1">
-            {isGeneralView
-              ? "Mostrando el Top 10 general histórico (sin filtro por fecha)."
-              : isMonthlyView
-              ? `Mostrando el Top 10 de ${selectedMonthLabel}.`
-              : "Mostrando solo jugadores con partidos en el torneo seleccionado."}
+          <p className="mt-2 text-sm text-slate-200">
+            Vista comparativa con puntaje, rendimiento y tendencia de cada jugador.
           </p>
         </div>
 
+        <Card className="!p-4 md:!p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.16em] text-gray-500 font-semibold">Filtro activo</p>
+              <p className="mt-1 text-sm text-gray-700">{scopeDescription}</p>
+            </div>
+            <div className="w-full md:w-[380px]">
+              <select
+                value={selectedScope}
+                onChange={(e) => setSelectedScope(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300"
+              >
+                <option value="general">Top 10 general (histórico)</option>
+                <optgroup label="Top 10 mensual">
+                  {monthOptions.map((month) => (
+                    <option key={month.key} value={`month:${month.key}`}>
+                      {`Top 10 - ${month.label}`}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Ranking por torneo">
+                  {tournaments.map((t) => (
+                    <option key={t.id} value={`tournament:${t.id}`}>
+                      {t.name}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+          </div>
+        </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.14em] text-gray-500 font-semibold">Jugadores en ranking</p>
+            <p className="mt-2 text-2xl font-extrabold text-slate-900">{players.length}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.14em] text-gray-500 font-semibold">Partidos evaluados</p>
+            <p className="mt-2 text-2xl font-extrabold text-slate-900">{matchCount}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.14em] text-gray-500 font-semibold">Puntos acumulados</p>
+            <p className="mt-2 text-2xl font-extrabold text-slate-900">{totalPoints}</p>
+            {leader && (
+              <p className="mt-1 text-xs text-gray-500">Líder: {leader.name}</p>
+            )}
+          </div>
+        </div>
+
         {loading ? (
-          <p className="text-gray-400 text-center animate-pulse">
-            Cargando ranking...
-          </p>
+          <Card className="text-center text-gray-500">
+            <p className="animate-pulse">Cargando ranking...</p>
+          </Card>
         ) : players.length === 0 ? (
-          <p className="text-gray-400 text-center">
-            {isGeneralView
-              ? "No hay jugadores con puntos todavía. Registrá algunos partidos."
-              : isMonthlyView
-              ? "No hay jugadores con puntos en ese mes. Elegí otro mes del selector."
-              : "No hay jugadores con puntos en ese torneo. Registrá algunos partidos."}
-          </p>
+          <Card className="text-center text-gray-500">
+            <p>
+              {isGeneralView
+                ? "No hay jugadores con puntos todavía. Registrá algunos partidos."
+                : isMonthlyView
+                ? "No hay jugadores con puntos en ese mes. Elegí otro mes del selector."
+                : "No hay jugadores con puntos en ese torneo. Registrá algunos partidos."}
+            </p>
+          </Card>
         ) : (
           <>
-            {/* 🔝 PODIO TOP 3 */}
-            <Card className="mb-8">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.18em] mb-4 text-center">
-                Podio
-              </h2>
-              <div className="grid grid-cols-3 gap-3 items-end">
-                {podium.map((player, index) => (
-                  <button
-                    key={player.id}
-                    onClick={() => handleRowClick(player.id)}
-                    className={`flex flex-col items-center rounded-2xl px-3 py-4 transition hover:bg-gray-100 hover:scale-[1.02] ${
-                      index === 0 ? "md:scale-105" : ""
-                    }`}
-                  >
-                    <div className="text-sm font-bold text-[#ccff00] mb-1">
-                      {index + 1}º
-                    </div>
-                    <div className="text-2xl mb-1">
-                      {index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}
-                    </div>
+            <Card>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.18em]">
+                  Podio
+                </h2>
+                <span className="text-xs text-gray-500">Top 3</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {podium.map((player, index) => {
+                  const position = index + 1;
+                  const style = getPodiumStyle(position);
 
-                    {player.avatar_url ? (
-                      <img
-                        src={player.avatar_url}
-                        alt={player.name}
-                        className="w-12 h-12 rounded-full object-cover border-2 border-[#ccff00]"
-                        onError={(e: any) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = `https://placehold.co/80x80/111827/ccff00?text=${player.name
-                            .slice(0, 1)
-                            .toUpperCase()}`;
-                        }}
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-[#ccff00] text-gray-900 flex items-center justify-center font-bold">
-                        {player.name.slice(0, 1).toUpperCase()}
+                  return (
+                    <button
+                      key={player.id}
+                      onClick={() => handleRowClick(player.id)}
+                      className={`rounded-xl border p-4 text-left transition hover:shadow-md ${style.card}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`inline-flex items-center justify-center h-7 min-w-7 px-2 rounded-full text-xs font-bold ${style.position}`}>
+                          {position}°
+                        </span>
+                        <span className="text-xl">{style.emoji}</span>
                       </div>
-                    )}
-
-                    <span className="mt-2 text-sm font-semibold text-gray-900 text-center">
-                      {player.name}
-                    </span>
-                    <span className="mt-1 text-xs text-gray-600">
-                      {player.points} pts · {player.wins} victoria
-                      {player.wins === 1 ? "" : "s"}
-                    </span>
-                  </button>
-                ))}
+                      <div className="mt-3 flex items-center gap-3">
+                        {renderAvatar(player, "w-12 h-12 border-2", "text-sm", style.avatar)}
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-900 truncate">{player.name}</p>
+                          <p className={`text-xs font-semibold ${style.points}`}>{player.points} pts</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-gray-600">
+                        <div>
+                          <p className="uppercase tracking-wide">PJ</p>
+                          <p className="font-bold text-slate-900">{player.played}</p>
+                        </div>
+                        <div>
+                          <p className="uppercase tracking-wide">PG</p>
+                          <p className="font-bold text-slate-900">{player.wins}</p>
+                        </div>
+                        <div>
+                          <p className="uppercase tracking-wide">PP</p>
+                          <p className="font-bold text-slate-900">{player.losses}</p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
                 {podium.length === 0 && (
-                  <p className="col-span-3 text-center text-gray-400 text-sm">
+                  <p className="text-sm text-gray-500 md:col-span-3 text-center py-2">
                     Aún no hay jugadores en el podio.
                   </p>
                 )}
               </div>
             </Card>
 
-            {/* 📋 TABLA DEL 4º EN ADELANTE */}
-            {rest.length > 0 && (
-              <Card>
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.18em] mb-3">
-                  Resto del ranking
-                </h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-800 text-xs uppercase text-gray-400">
-                        <th className="py-2 pr-2 text-left font-semibold">
-                          Posición
-                        </th>
-                        <th className="py-2 pr-2 text-left font-semibold">
-                          Jugador
-                        </th>
-                        <th className="py-2 pr-2 text-center font-semibold">
-                          PJ
-                        </th>
-                        <th className="py-2 pr-2 text-center font-semibold">
-                          PG
-                        </th>
-                        <th className="py-2 pr-2 text-center font-semibold">
-                          PP
-                        </th>
-                        <th className="py-2 pr-2 text-center font-semibold">
-                          +/-
-                        </th>
-                        <th className="py-2 text-center font-semibold">
-                          Puntos
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rest.map((player, idx) => (
+            <Card>
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.18em] mb-4">
+                Tabla completa
+              </h2>
+
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-xs uppercase text-gray-500">
+                      <th className="py-2 px-2 text-left font-semibold">Pos</th>
+                      <th className="py-2 px-2 text-left font-semibold">Jugador</th>
+                      <th className="py-2 px-2 text-center font-semibold">PJ</th>
+                      <th className="py-2 px-2 text-center font-semibold">PG</th>
+                      <th className="py-2 px-2 text-center font-semibold">PP</th>
+                      <th className="py-2 px-2 text-center font-semibold">+/-</th>
+                      <th className="py-2 px-2 text-center font-semibold">Puntos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {players.map((player, index) => {
+                      const position = index + 1;
+                      const isTop3 = position <= 3;
+                      return (
                         <tr
                           key={player.id}
-                          className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-900/70 cursor-pointer transition"
+                          className={`border-b border-gray-100 cursor-pointer transition hover:bg-gray-50 ${
+                            isTop3 ? "bg-slate-50" : ""
+                          }`}
                           onClick={() => handleRowClick(player.id)}
                         >
-                          <td className="py-2 pr-2 text-gray-400">
-                            {idx + 4}º
-                          </td>
-                          <td className="py-2 pr-2">
+                          <td className="py-3 px-2 font-semibold text-slate-700">{position}º</td>
+                          <td className="py-3 px-2">
                             <div className="flex items-center gap-2">
-                              {player.avatar_url ? (
-                                <img
-                                  src={player.avatar_url}
-                                  alt={player.name}
-                                  className="w-7 h-7 rounded-full object-cover"
-                                  onError={(e: any) => {
-                                    e.currentTarget.onerror = null;
-                                    e.currentTarget.src = `https://placehold.co/60x60/111827/ccff00?text=${player.name
-                                      .slice(0, 1)
-                                      .toUpperCase()}`;
-                                  }}
-                                />
-                              ) : (
-                                <div className="w-7 h-7 rounded-full bg-[#ccff00] text-gray-900 flex items-center justify-center text-xs font-bold">
-                                  {player.name.slice(0, 1).toUpperCase()}
-                                </div>
-                              )}
-                              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                {player.name}
-                              </span>
+                              {renderAvatar(player, "w-8 h-8", "text-xs")}
+                              <span className="font-medium text-slate-900">{player.name}</span>
                             </div>
                           </td>
-                          <td className="py-2 pr-2 text-center text-gray-700 dark:text-gray-200">
-                            {player.played}
-                          </td>
-                          <td className="py-2 pr-2 text-center text-gray-700 dark:text-gray-200">
-                            {player.wins}
-                          </td>
-                          <td className="py-2 pr-2 text-center text-gray-700 dark:text-gray-200">
-                            {player.losses}
-                          </td>
-                          <td className="py-2 pr-2 text-center text-gray-700 dark:text-gray-200">
-                            {player.games_for - player.games_against}
-                          </td>
-                          <td className="py-2 text-center font-bold text-gray-900 dark:text-white">
-                            {player.points}
-                          </td>
+                          <td className="py-3 px-2 text-center text-slate-700">{player.played}</td>
+                          <td className="py-3 px-2 text-center text-slate-700">{player.wins}</td>
+                          <td className="py-3 px-2 text-center text-slate-700">{player.losses}</td>
+                          <td className="py-3 px-2 text-center text-slate-700">{player.games_for - player.games_against}</td>
+                          <td className="py-3 px-2 text-center font-bold text-slate-900">{player.points}</td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            )}
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="md:hidden space-y-2">
+                {players.map((player, index) => (
+                  <button
+                    key={player.id}
+                    onClick={() => handleRowClick(player.id)}
+                    className="w-full rounded-xl border border-gray-200 bg-white p-3 text-left"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="inline-flex items-center justify-center h-6 min-w-6 px-2 rounded-full bg-slate-900 text-white text-xs font-semibold">
+                          {index + 1}
+                        </span>
+                        {renderAvatar(player, "w-9 h-9", "text-xs")}
+                        <p className="text-sm font-semibold text-slate-900 truncate">{player.name}</p>
+                      </div>
+                      <p className="text-sm font-bold text-slate-900">{player.points} pts</p>
+                    </div>
+                    <div className="mt-2 grid grid-cols-4 gap-2 text-[11px] text-gray-600">
+                      <p>PJ: <span className="font-semibold text-slate-900">{player.played}</span></p>
+                      <p>PG: <span className="font-semibold text-slate-900">{player.wins}</span></p>
+                      <p>PP: <span className="font-semibold text-slate-900">{player.losses}</span></p>
+                      <p>+/-: <span className="font-semibold text-slate-900">{player.games_for - player.games_against}</span></p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </Card>
           </>
         )}
       </section>
