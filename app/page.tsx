@@ -2,7 +2,7 @@
 // ./app/page.tsx
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useRole } from "@/hooks/useRole";
@@ -868,6 +868,16 @@ export default function DashboardPage() {
   const isPlayed = (m: FinishedMatch) =>
     !!m.score && !!m.winner && String(m.winner).toLowerCase() !== "pending";
 
+  const userRankingSummary = useMemo(() => {
+    if (!userLinkedPlayer?.id || topRanking.length === 0) return null;
+    const idx = topRanking.findIndex((row) => row.player_id === userLinkedPlayer.id);
+    if (idx === -1) return null;
+    return {
+      position: idx + 1,
+      stats: topRanking[idx],
+    };
+  }, [topRanking, userLinkedPlayer?.id]);
+
   const formatScoreForDisplay = (raw: string | null) => {
     if (!raw) return "";
     return raw.replace(/\s+/g, " ").trim();
@@ -1280,49 +1290,194 @@ export default function DashboardPage() {
           {/* COLUMNA DERECHA */}
           <aside className="order-1 lg:order-2 lg:col-span-4 space-y-6">
             {isUser && (
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                <div className="flex items-center justify-between mb-4 gap-2">
-                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                    {t("dashboard.userNextMatchTitle")}
-                  </h2>
-                  {userLinkedPlayer && (
-                    <span className="text-[11px] font-semibold text-indigo-600 truncate">
-                      {userLinkedPlayer.name}
-                    </span>
+              <>
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <div className="flex items-center justify-between mb-4 gap-2">
+                    <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                      {t("dashboard.userNextMatchTitle")}
+                    </h2>
+                    {userLinkedPlayer && (
+                      <span className="text-[11px] font-semibold text-indigo-600 truncate">
+                        {userLinkedPlayer.name}
+                      </span>
+                    )}
+                  </div>
+
+                  {!userLinkedPlayer ? (
+                    <p className="rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
+                      {t("dashboard.noLinkedPlayer")}
+                    </p>
+                  ) : !userNextMatch ? (
+                    <p className="rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
+                      {t("dashboard.noUpcomingMatchesForPlayer")}
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      <MatchCard
+                        match={{
+                          ...userNextMatch,
+                          tournament_name: userNextMatch.tournament_id
+                            ? tournamentMap[userNextMatch.tournament_id]
+                            : undefined,
+                        }}
+                        playersMap={playerMap}
+                        showActions={false}
+                      />
+                      <div className="flex justify-end">
+                        <Link
+                          href="/matches"
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                        >
+                          {t("dashboard.viewAllMatches")} →
+                        </Link>
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                {!userLinkedPlayer ? (
-                  <p className="rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
-                    {t("dashboard.noLinkedPlayer")}
-                  </p>
-                ) : !userNextMatch ? (
-                  <p className="rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
-                    {t("dashboard.noUpcomingMatchesForPlayer")}
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    <MatchCard
-                      match={{
-                        ...userNextMatch,
-                        tournament_name: userNextMatch.tournament_id
-                          ? tournamentMap[userNextMatch.tournament_id]
-                          : undefined,
-                      }}
-                      playersMap={playerMap}
-                      showActions={false}
-                    />
-                    <div className="flex justify-end">
-                      <Link
-                        href="/matches"
-                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
-                      >
-                        {t("dashboard.viewAllMatches")} →
-                      </Link>
-                    </div>
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                      Mi resumen
+                    </h2>
+                    <Link
+                      href="/ranking"
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                    >
+                      Ver ranking →
+                    </Link>
                   </div>
-                )}
-              </div>
+
+                  {!userLinkedPlayer ? (
+                    <p className="rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
+                      Vinculá tu usuario a un jugador para ver estadísticas.
+                    </p>
+                  ) : !userRankingSummary ? (
+                    <p className="rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
+                      Todavía no tenés estadísticas suficientes en el ranking.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                        <p className="text-[11px] text-gray-500">Posición</p>
+                        <p className="text-lg font-extrabold text-gray-900">
+                          #{userRankingSummary.position}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                        <p className="text-[11px] text-gray-500">Puntos</p>
+                        <p className="text-lg font-extrabold text-gray-900">
+                          {userRankingSummary.stats.points}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                        <p className="text-[11px] text-gray-500">PJ / PG / PP</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {userRankingSummary.stats.played} / {userRankingSummary.stats.wins} /{" "}
+                          {userRankingSummary.stats.losses}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                        <p className="text-[11px] text-gray-500">Balance juegos</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {userRankingSummary.stats.games_for -
+                            userRankingSummary.stats.games_against >=
+                          0
+                            ? "+"
+                            : ""}
+                          {userRankingSummary.stats.games_for -
+                            userRankingSummary.stats.games_against}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                    Accesos rápidos
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
+                    <Link
+                      href="/matches"
+                      className="inline-flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
+                    >
+                      <span>🎾 Ver partidos</span>
+                      <span className="text-gray-400">→</span>
+                    </Link>
+                    <Link
+                      href="/ranking"
+                      className="inline-flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
+                    >
+                      <span>🏆 Ranking</span>
+                      <span className="text-gray-400">→</span>
+                    </Link>
+                    <Link
+                      href="/news"
+                      className="inline-flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
+                    >
+                      <span>📰 Noticias</span>
+                      <span className="text-gray-400">→</span>
+                    </Link>
+                    <Link
+                      href="/mi-cuenta"
+                      className="inline-flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 transition"
+                    >
+                      <span>👤 Mi cuenta</span>
+                      <span className="text-gray-400">→</span>
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                      Últimos resultados
+                    </h2>
+                    <Link
+                      href="/matches?status=finished"
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                    >
+                      Ver más →
+                    </Link>
+                  </div>
+
+                  {recentResults.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
+                      Todavía no hay resultados recientes.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {recentResults.slice(0, 3).map((m) => {
+                        const result = getWinnerLoserTeams(m);
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => setOpenResultMatch(m)}
+                            className="w-full text-left rounded-lg border border-gray-200 p-3 hover:bg-gray-50 transition"
+                          >
+                            <p className="text-xs font-semibold text-gray-900 truncate">
+                              {result.winnerTeam}
+                            </p>
+                            <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                              {result.loserTeam}
+                            </p>
+                            <div className="mt-1 flex items-center justify-between">
+                              <span className="text-sm font-extrabold text-indigo-700">
+                                {result.score || "-"}
+                              </span>
+                              <span className="text-[11px] text-gray-500">
+                                {m.start_time ? formatDateMadrid(m.start_time) : "-"}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
 
             {/* CENTRO DE TAREAS */}
