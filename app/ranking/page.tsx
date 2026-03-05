@@ -445,6 +445,7 @@ export default function RankingPage() {
         return best;
       }, players[0])
     : null;
+  const leader = leaderByPoints;
   const totalPoints = players.reduce((acc, player) => acc + player.points, 0);
 
   const handleRowClick = (id: number) => {
