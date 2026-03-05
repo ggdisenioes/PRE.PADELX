@@ -19,15 +19,23 @@ type RankedPlayer = {
   points: number;
 };
 
+type RankingFilter = "month" | number;
+
 export default function RankingPage() {
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   const [tournaments, setTournaments] = useState<{ id: number; name: string }[]>([]);
-  const [selectedTournament, setSelectedTournament] = useState<number | "all">("all");
+  const [selectedTournament, setSelectedTournament] = useState<RankingFilter>("month");
 
-  // Cargar ranking desde Supabase (jugadores + partidos)
+  const currentMonthLabel = new Date().toLocaleDateString("es-ES", {
+    month: "long",
+    year: "numeric",
+  });
+
+  // Cargar ranking desde Supabase usando solo partidos para garantizar
+  // que aparezcan unicamente jugadores que tengan partidos en el filtro activo.
   const loadRanking = useCallback(async () => {
     setLoading(true);
 
@@ -51,126 +59,100 @@ export default function RankingPage() {
 
     setTournaments(tournamentData || []);
 
-    let rankingsQuery = supabase
-      .from("tournament_rankings")
-      .select("tournament_id, player_id, matches_won, matches_lost, points, games_for, games_against");
-
-    if (selectedTournament !== "all") {
-      rankingsQuery = rankingsQuery.eq("tournament_id", selectedTournament);
-    }
-
     const statsMap: Record<
       number,
       { wins: number; losses: number; played: number; games_for: number; games_against: number; points: number }
     > = {};
 
-    const { data: rankingRows, error: rankingError } = await rankingsQuery;
+    let matchQuery = supabase
+      .from("matches")
+      .select("winner, player_1_a, player_2_a, player_1_b, player_2_b, tournament_id, score, start_time")
+      .not("tournament_id", "is", null);
 
-    if (rankingError) {
-      console.warn("Error cargando tournament_rankings, usando fallback:", rankingError);
-
-      let matchQuery = supabase
-        .from("matches")
-        .select("winner, player_1_a, player_2_a, player_1_b, player_2_b, tournament_id, score")
-        .not("tournament_id", "is", null);
-
-      if (selectedTournament !== "all") {
-        matchQuery = matchQuery.eq("tournament_id", selectedTournament);
-      }
-
-      const { data: matches, error: matchError } = await matchQuery;
-
-      if (matchError) {
-        console.error("Error cargando ranking (fallback):", matchError);
-        toast.error("No se pudo cargar el ranking");
-        setLoading(false);
-        return;
-      }
-
-      (matches || []).forEach((match: any) => {
-        if (!match.player_1_a || !match.player_2_a || !match.player_1_b || !match.player_2_b) return;
-        if (!match.winner || match.winner === "pending") return;
-
-        const teamA = [match.player_1_a, match.player_2_a];
-        const teamB = [match.player_1_b, match.player_2_b];
-
-        const sets = match.score?.split(" ") || [];
-        let gamesA = 0;
-        let gamesB = 0;
-
-        sets.forEach((set: string) => {
-          const [a, b] = set.split("-").map(Number);
-          if (!isNaN(a) && !isNaN(b)) {
-            gamesA += a;
-            gamesB += b;
-          }
-        });
-
-        [...teamA, ...teamB].forEach((id: number) => {
-          if (!statsMap[id]) {
-            statsMap[id] = { wins: 0, losses: 0, played: 0, games_for: 0, games_against: 0, points: 0 };
-          }
-          statsMap[id].played += 1;
-        });
-
-        teamA.forEach((id: number) => {
-          statsMap[id].games_for += gamesA;
-          statsMap[id].games_against += gamesB;
-        });
-
-        teamB.forEach((id: number) => {
-          statsMap[id].games_for += gamesB;
-          statsMap[id].games_against += gamesA;
-        });
-
-        if (match.winner === "A") {
-          teamA.forEach((id: number) => {
-            statsMap[id].wins += 1;
-            statsMap[id].points += 3;
-          });
-          teamB.forEach((id: number) => {
-            statsMap[id].losses += 1;
-            statsMap[id].points += 1;
-          });
-        }
-
-        if (match.winner === "B") {
-          teamB.forEach((id: number) => {
-            statsMap[id].wins += 1;
-            statsMap[id].points += 3;
-          });
-          teamA.forEach((id: number) => {
-            statsMap[id].losses += 1;
-            statsMap[id].points += 1;
-          });
-        }
-      });
+    if (selectedTournament === "month") {
+      const now = new Date();
+      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      const nextMonthStart = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
+      );
+      matchQuery = matchQuery
+        .gte("start_time", monthStart.toISOString())
+        .lt("start_time", nextMonthStart.toISOString());
     } else {
-      for (const row of (rankingRows || []) as any[]) {
-        const playerId = Number(row.player_id);
-        if (!Number.isFinite(playerId)) continue;
-        if (!statsMap[playerId]) {
-          statsMap[playerId] = {
-            wins: 0,
-            losses: 0,
-            played: 0,
-            games_for: 0,
-            games_against: 0,
-            points: 0,
-          };
-        }
-        const wins = Number(row.matches_won) || 0;
-        const losses = Number(row.matches_lost) || 0;
-        statsMap[playerId].wins += wins;
-        statsMap[playerId].losses += losses;
-        statsMap[playerId].played += wins + losses;
-        statsMap[playerId].games_for += Number(row.games_for) || 0;
-        statsMap[playerId].games_against += Number(row.games_against) || 0;
-        statsMap[playerId].points += Number(row.points) || 0;
-      }
+      matchQuery = matchQuery.eq("tournament_id", selectedTournament);
     }
 
-    const ranking: RankedPlayer[] = (playerData || []).map((p: any) => {
+    const { data: matches, error: matchError } = await matchQuery;
+
+    if (matchError) {
+      console.error("Error cargando ranking:", matchError);
+      toast.error("No se pudo cargar el ranking");
+      setLoading(false);
+      return;
+    }
+
+    (matches || []).forEach((match: any) => {
+      if (!match.player_1_a || !match.player_2_a || !match.player_1_b || !match.player_2_b) return;
+      if (!match.winner || match.winner === "pending") return;
+
+      const teamA = [match.player_1_a, match.player_2_a];
+      const teamB = [match.player_1_b, match.player_2_b];
+
+      const sets = String(match.score || "").split(" ");
+      let gamesA = 0;
+      let gamesB = 0;
+
+      sets.forEach((set: string) => {
+        const [a, b] = set.split("-").map(Number);
+        if (!isNaN(a) && !isNaN(b)) {
+          gamesA += a;
+          gamesB += b;
+        }
+      });
+
+      [...teamA, ...teamB].forEach((id: number) => {
+        if (!statsMap[id]) {
+          statsMap[id] = { wins: 0, losses: 0, played: 0, games_for: 0, games_against: 0, points: 0 };
+        }
+        statsMap[id].played += 1;
+      });
+
+      teamA.forEach((id: number) => {
+        statsMap[id].games_for += gamesA;
+        statsMap[id].games_against += gamesB;
+      });
+
+      teamB.forEach((id: number) => {
+        statsMap[id].games_for += gamesB;
+        statsMap[id].games_against += gamesA;
+      });
+
+      if (match.winner === "A") {
+        teamA.forEach((id: number) => {
+          statsMap[id].wins += 1;
+          statsMap[id].points += 3;
+        });
+        teamB.forEach((id: number) => {
+          statsMap[id].losses += 1;
+          statsMap[id].points += 1;
+        });
+      }
+
+      if (match.winner === "B") {
+        teamB.forEach((id: number) => {
+          statsMap[id].wins += 1;
+          statsMap[id].points += 3;
+        });
+        teamA.forEach((id: number) => {
+          statsMap[id].losses += 1;
+          statsMap[id].points += 1;
+        });
+      }
+    });
+
+    let ranking: RankedPlayer[] = (playerData || [])
+      .filter((p: any) => Boolean(statsMap[p.id]))
+      .map((p: any) => {
       const stats = statsMap[p.id] || {
         wins: 0,
         losses: 0,
@@ -203,6 +185,10 @@ export default function RankingPage() {
       if (b.games_for !== a.games_for) return b.games_for - a.games_for;
       return a.name.localeCompare(b.name);
     });
+
+    if (selectedTournament === "month") {
+      ranking = ranking.slice(0, 10);
+    }
 
     setPlayers(ranking);
     setLoading(false);
@@ -259,12 +245,12 @@ export default function RankingPage() {
               value={selectedTournament}
               onChange={(e) =>
                 setSelectedTournament(
-                  e.target.value === "all" ? "all" : Number(e.target.value)
+                  e.target.value === "month" ? "month" : Number(e.target.value)
                 )
               }
               className="border rounded-md px-3 py-2 text-sm"
             >
-              <option value="all">Todos los torneos</option>
+              <option value="month">Top 10 del mes</option>
               {tournaments.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -273,7 +259,9 @@ export default function RankingPage() {
             </select>
           </div>
           <p className="text-sm text-gray-600 mt-1">
-            Puntos calculados automáticamente: 3 por victoria y 1 por derrota.
+            {selectedTournament === "month"
+              ? `Mostrando el Top 10 de ${currentMonthLabel}.`
+              : "Mostrando solo jugadores con partidos en el torneo seleccionado."}
           </p>
         </div>
 
