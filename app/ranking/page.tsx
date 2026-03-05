@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 import Card from "../components/Card";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { getClientCache, setClientCache } from "@/lib/clientCache";
 
 type RankedPlayer = {
   id: number;
@@ -128,11 +129,20 @@ export default function RankingPage() {
     if (scopeMode === "tournament") return `tournament:${selectedTournamentId}`;
     return "general";
   }, [scopeMode, selectedTournamentId]);
+  const rankingCacheKey = `qa:ranking:${selectedScope}`;
 
   const scopeDescription = getScopeDescription(scopeMode, selectedTournamentName);
 
   const loadRanking = useCallback(async () => {
-    setLoading(true);
+    type RankingCachePayload = { players: RankedPlayer[]; matchCount: number };
+    const cached = getClientCache<RankingCachePayload>(rankingCacheKey, 2 * 60 * 1000);
+    if (cached) {
+      setPlayers(cached.players || []);
+      setMatchCount(cached.matchCount || 0);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
       let availableTournaments = tournaments;
       if (!tournamentsLoaded) {
@@ -376,6 +386,10 @@ export default function RankingPage() {
       }
 
       setPlayers(ranking);
+      setClientCache(rankingCacheKey, {
+        players: ranking,
+        matchCount: matchesCount || 0,
+      });
     } catch (error) {
       console.error("Error inesperado cargando ranking:", error);
       toast.error("No se pudo cargar el ranking");
@@ -386,6 +400,7 @@ export default function RankingPage() {
     }
   }, [
     isTournamentView,
+    rankingCacheKey,
     selectedScope,
     selectedTournamentId,
     tournaments,

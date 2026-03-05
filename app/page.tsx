@@ -10,6 +10,7 @@ import MatchCard from "@/components/matches/MatchCard";
 import toast from "react-hot-toast";
 import { formatDateMadrid, formatTimeMadrid, formatDateTimeMadrid } from "@/lib/dates";
 import { useTranslation } from "./i18n";
+import { getClientCache, setClientCache } from "@/lib/clientCache";
 
 type PlayerMap = {
   [key: number]: string;
@@ -94,6 +95,23 @@ type TournamentRankingRow = {
   games_against: number;
   players: { name: string | null } | { name: string | null }[] | null;
 };
+
+type DashboardCachePayload = {
+  countPlayers: number;
+  countTournaments: number;
+  countPendingMatches: number;
+  upcomingMatches: UpcomingMatch[];
+  playerMap: PlayerMap;
+  tournamentMap: TournamentMap;
+  recentLogs: AuditLog[];
+  alerts: AlertItem[];
+  overdueMatchesCount: number;
+  chart7d: { key: string; label: string; pending: number; finished: number; total: number }[];
+  recentResults: FinishedMatch[];
+};
+
+const DASHBOARD_CACHE_KEY = "qa:dashboard:v1";
+const DASHBOARD_CACHE_TTL_MS = 90 * 1000;
 
 type FinishedMatch = {
   id: number;
@@ -286,9 +304,32 @@ export default function DashboardPage() {
     if (roleLoading) return;
 
     let active = true;
+    let hydratedFromCache = false;
+
+    const cachedDashboard = getClientCache<DashboardCachePayload>(
+      DASHBOARD_CACHE_KEY,
+      DASHBOARD_CACHE_TTL_MS
+    );
+    if (cachedDashboard) {
+      hydratedFromCache = true;
+      setCountPlayers(cachedDashboard.countPlayers || 0);
+      setCountTournaments(cachedDashboard.countTournaments || 0);
+      setCountPendingMatches(cachedDashboard.countPendingMatches || 0);
+      setUpcomingMatches(cachedDashboard.upcomingMatches || []);
+      setPlayerMap(cachedDashboard.playerMap || {});
+      setTournamentMap(cachedDashboard.tournamentMap || {});
+      setRecentLogs(cachedDashboard.recentLogs || []);
+      setAlerts(cachedDashboard.alerts || []);
+      setOverdueMatchesCount(cachedDashboard.overdueMatchesCount || 0);
+      setChart7d(cachedDashboard.chart7d || []);
+      setRecentResults(cachedDashboard.recentResults || []);
+      setLoadingDashboard(false);
+    }
 
     const loadData = async () => {
-      setLoadingDashboard(true);
+      if (!hydratedFromCache) {
+        setLoadingDashboard(true);
+      }
 
       try {
         const start7d = new Date();
@@ -368,14 +409,21 @@ export default function DashboardPage() {
         }
         setTournamentMap(tMap);
 
-        setCountPendingMatches(pendingCount || 0);
-        setCountPlayers(approvedPlayers.length);
-        setCountTournaments(tournaments.length);
+        const nextCountPendingMatches = pendingCount || 0;
+        const nextCountPlayers = approvedPlayers.length;
+        const nextCountTournaments = tournaments.length;
+        const nextUpcomingMatches = (pendingMatches || []).map((m: any) => normalizePlayersFromIds(m));
+        const nextRecentResults = (finishedMatches || []).map((m: any) => normalizePlayersFromIds(m));
+        const nextRecentLogs = logs || [];
+        const nextOverdueMatchesCount = overdueCount || 0;
 
-        setUpcomingMatches((pendingMatches || []).map((m: any) => normalizePlayersFromIds(m)));
-        setRecentResults((finishedMatches || []).map((m: any) => normalizePlayersFromIds(m)));
-        setRecentLogs(logs || []);
-        setOverdueMatchesCount(overdueCount || 0);
+        setCountPendingMatches(nextCountPendingMatches);
+        setCountPlayers(nextCountPlayers);
+        setCountTournaments(nextCountTournaments);
+        setUpcomingMatches(nextUpcomingMatches);
+        setRecentResults(nextRecentResults);
+        setRecentLogs(nextRecentLogs);
+        setOverdueMatchesCount(nextOverdueMatchesCount);
 
         const days: { key: string; label: string }[] = [];
         for (let i = 0; i < 7; i++) {
@@ -402,7 +450,8 @@ export default function DashboardPage() {
           byDay[key].total += 1;
         }
 
-        setChart7d(days.map((d) => byDay[d.key]));
+        const nextChart7d = days.map((d) => byDay[d.key]);
+        setChart7d(nextChart7d);
 
         calculateAlerts({
           overdueCount: overdueCount || 0,
@@ -490,6 +539,20 @@ export default function DashboardPage() {
           setUserLinkedPlayer(null);
           setUserNextMatch(null);
         }
+
+        setClientCache<DashboardCachePayload>(DASHBOARD_CACHE_KEY, {
+          countPlayers: nextCountPlayers,
+          countTournaments: nextCountTournaments,
+          countPendingMatches: nextCountPendingMatches,
+          upcomingMatches: nextUpcomingMatches,
+          playerMap: pMap,
+          tournamentMap: tMap,
+          recentLogs: nextRecentLogs,
+          alerts: alerts.slice(0, 4),
+          overdueMatchesCount: nextOverdueMatchesCount,
+          chart7d: nextChart7d,
+          recentResults: nextRecentResults,
+        });
       } catch (error) {
         console.error("[dashboard] loadData error:", error);
       } finally {

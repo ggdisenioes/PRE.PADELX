@@ -9,6 +9,7 @@ import { useRole } from "../hooks/useRole";
 import { supabase } from "../lib/supabase";
 import { useTranslation } from "../i18n";
 import { resolveNewsText } from "@/lib/newsPayload";
+import { getClientCache, setClientCache } from "@/lib/clientCache";
 
 type News = {
   id: number;
@@ -21,6 +22,9 @@ type News = {
   created_at: string;
 };
 
+const NEWS_CACHE_KEY = "qa:news:list:v1";
+const NEWS_CACHE_TTL_MS = 2 * 60 * 1000;
+
 export default function NewsPage() {
   const router = useRouter();
   const { t, locale } = useTranslation();
@@ -31,6 +35,12 @@ export default function NewsPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
+    const cachedNews = getClientCache<News[]>(NEWS_CACHE_KEY, NEWS_CACHE_TTL_MS);
+    if (cachedNews) {
+      setNews(cachedNews);
+      setLoading(false);
+    }
+
     const run = async () => {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
@@ -47,7 +57,9 @@ export default function NewsPage() {
         const result = await response.json();
 
         if (response.ok) {
-          setNews(result.news || []);
+          const freshNews = result.news || [];
+          setNews(freshNews);
+          setClientCache(NEWS_CACHE_KEY, freshNews);
           return;
         }
         toast.error(result.error || t("news.errorLoading"));
