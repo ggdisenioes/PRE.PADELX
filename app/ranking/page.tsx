@@ -436,10 +436,16 @@ export default function RankingPage() {
   }, [isTournamentView, selectedTournamentId, tournaments]);
 
   const podium = players.slice(0, 3);
-  const leader = players[0] || null;
+  const leaderByPoints = players[0] || null;
+  const leaderByGamesWon = players.length
+    ? players.reduce((best, current) => {
+        if (current.games_for > best.games_for) return current;
+        if (current.games_for < best.games_for) return best;
+        if (current.points > best.points) return current;
+        return best;
+      }, players[0])
+    : null;
   const totalPoints = players.reduce((acc, player) => acc + player.points, 0);
-  const leaderGap =
-    players.length > 1 && leader ? leader.points - players[1].points : null;
 
   const handleRowClick = (id: number) => {
     router.push(`/players/${id}`);
@@ -581,7 +587,7 @@ export default function RankingPage() {
           </div>
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <p className="text-xs uppercase tracking-[0.14em] text-gray-500 font-semibold">
               Jugadores rankeados
@@ -602,13 +608,26 @@ export default function RankingPage() {
           </div>
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <p className="text-xs uppercase tracking-[0.14em] text-gray-500 font-semibold">
-              Liderazgo
+              Líder en puntos
             </p>
             <p className="mt-2 text-lg font-extrabold text-slate-900 truncate">
-              {leader ? leader.name : "-"}
+              {leaderByPoints ? leaderByPoints.name : "-"}
             </p>
             <p className="mt-1 text-xs text-gray-500">
-              {leaderGap !== null ? `Ventaja: +${leaderGap} pts` : "Sin referencia"}
+              {leaderByPoints ? `${leaderByPoints.points} pts` : "Sin referencia"}
+            </p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.14em] text-gray-500 font-semibold">
+              Líder en juegos ganados
+            </p>
+            <p className="mt-2 text-lg font-extrabold text-slate-900 truncate">
+              {leaderByGamesWon ? leaderByGamesWon.name : "-"}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              {leaderByGamesWon
+                ? `${leaderByGamesWon.games_for} juegos`
+                : "Sin referencia"}
             </p>
           </div>
         </div>
