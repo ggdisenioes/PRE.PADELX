@@ -132,6 +132,8 @@ export default function RankingPage() {
   const rankingCacheKey = `qa:ranking:${selectedScope}`;
 
   const scopeDescription = getScopeDescription(scopeMode, selectedTournamentName);
+  const performanceTooltip =
+    "Rendimiento = estado por porcentaje de victorias. En juego (<3 PJ), Elite (>=70%), Firme (55-69%), En mejora (<55%).";
 
   const loadRanking = useCallback(async () => {
     type RankingCachePayload = { players: RankedPlayer[]; matchCount: number };
@@ -797,7 +799,14 @@ export default function RankingPage() {
                         <tr className="text-xs uppercase text-gray-500">
                           <th className="py-3 px-3 text-left font-semibold">Pos</th>
                           <th className="py-3 px-3 text-left font-semibold">Jugador</th>
-                          <th className="py-3 px-3 text-center font-semibold">Forma</th>
+                          <th className="py-3 px-3 text-center font-semibold">
+                            <span className="inline-flex items-center gap-1" title={performanceTooltip}>
+                              Rendimiento
+                              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700">
+                                i
+                              </span>
+                            </span>
+                          </th>
                           <th className="py-3 px-3 text-center font-semibold">PJ</th>
                           <th className="py-3 px-3 text-center font-semibold">PG</th>
                           <th className="py-3 px-3 text-center font-semibold">PP</th>
@@ -862,6 +871,10 @@ export default function RankingPage() {
                   </div>
 
                   <div className="md:hidden p-3 space-y-2">
+                    <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[11px] text-gray-600">
+                      <span className="font-semibold text-slate-700">Rendimiento:</span>{" "}
+                      {performanceTooltip.replace("Rendimiento = ", "")}
+                    </p>
                     {filteredPlayers.map((player) => {
                       const position = positionByPlayerId[player.id] || 0;
                       const badge = getFormBadge(player);
