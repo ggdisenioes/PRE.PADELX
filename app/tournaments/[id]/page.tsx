@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import MatchCard, { type Match } from "../../components/matches/MatchCard";
 import { useTranslation } from "../../i18n";
 import { useRole } from "../../hooks/useRole";
+import { getClientCache, setClientCache } from "../../lib/clientCache";
 
 type Tournament = {
   id: number;
@@ -26,6 +27,16 @@ type TournamentRound = {
   round_name: string;
   start_at: string;
 };
+
+type TournamentDetailCachePayload = {
+  tournament: Tournament | null;
+  matches: Match[];
+  tournamentRounds: TournamentRound[];
+  playersMap: PlayerMap;
+};
+
+const TOURNAMENT_DETAIL_CACHE_PREFIX = "qa:tournament:detail:v2";
+const TOURNAMENT_DETAIL_CACHE_TTL_MS = 60 * 1000;
 
 export default function TournamentDetail() {
   const params = useParams();
@@ -54,8 +65,21 @@ export default function TournamentDetail() {
       return;
     }
 
+    const cacheKey = `${TOURNAMENT_DETAIL_CACHE_PREFIX}:${idNum}`;
+    const cached = getClientCache<TournamentDetailCachePayload>(
+      cacheKey,
+      TOURNAMENT_DETAIL_CACHE_TTL_MS
+    );
+    if (cached) {
+      setTournament(cached.tournament || null);
+      setMatches(cached.matches || []);
+      setTournamentRounds(cached.tournamentRounds || []);
+      setPlayersMap(cached.playersMap || {});
+      setLoading(false);
+    }
+
     const load = async () => {
-      setLoading(true);
+      if (!cached) setLoading(true);
 
       try {
         const [
@@ -91,6 +115,10 @@ export default function TournamentDetail() {
         }
 
         const tournamentMatches = (mData || []) as Match[];
+        let nextTournament: Tournament | null = null;
+        let nextPlayersMap: PlayerMap = {};
+        let nextRounds: TournamentRound[] = [];
+
         if (mError) {
           console.error("Error cargando partidos:", mError);
           toast.error(t("matches.errorLoading"));
@@ -100,14 +128,16 @@ export default function TournamentDetail() {
         }
 
         if (tData) {
-          setTournament(tData as Tournament);
+          nextTournament = tData as Tournament;
+          setTournament(nextTournament);
         } else if (tournamentMatches.length > 0) {
-          setTournament({
+          nextTournament = {
             id: idNum,
             name: `${t("nav.tournaments")} #${idNum}`,
             category: null,
             start_date: null,
-          });
+          };
+          setTournament(nextTournament);
         } else {
           setTournament(null);
         }
@@ -119,6 +149,7 @@ export default function TournamentDetail() {
           (pData || []).forEach((p) => {
             map[p.id] = p.name;
           });
+          nextPlayersMap = map;
           setPlayersMap(map);
         }
 
@@ -126,8 +157,16 @@ export default function TournamentDetail() {
           console.error("Error cargando jornadas:", roundsError);
           setTournamentRounds([]);
         } else {
-          setTournamentRounds((roundsData || []) as TournamentRound[]);
+          nextRounds = (roundsData || []) as TournamentRound[];
+          setTournamentRounds(nextRounds);
         }
+
+        setClientCache<TournamentDetailCachePayload>(cacheKey, {
+          tournament: nextTournament,
+          matches: mError ? [] : tournamentMatches,
+          tournamentRounds: nextRounds,
+          playersMap: nextPlayersMap,
+        });
       } finally {
         setLoading(false);
       }

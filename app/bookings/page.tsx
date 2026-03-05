@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useRouter } from "next/navigation";
 import Card from "../components/Card";
 import toast from "react-hot-toast";
 import { useTranslation } from "../i18n";
+import { getClientCache, setClientCache } from "../lib/clientCache";
 
 type Court = {
   id: number;
@@ -21,6 +22,16 @@ type Booking = {
   status: string;
 };
 
+type BookingsCachePayload = {
+  courts: Court[];
+  bookings: Booking[];
+  selectedDate: string;
+  selectedCourt: string;
+};
+
+const BOOKINGS_CACHE_KEY = "qa:bookings:page:v1";
+const BOOKINGS_CACHE_TTL_MS = 60 * 1000;
+
 export default function BookingsPage() {
   const router = useRouter();
   const { t } = useTranslation();
@@ -32,7 +43,9 @@ export default function BookingsPage() {
   const [selectedCourt, setSelectedCourt] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const hydratedFromCacheRef = useRef(false);
+  const selectedCourtRef = useRef("");
   const [formData, setFormData] = useState({
     court_id: "",
     booking_date: selectedDate,
@@ -42,17 +55,42 @@ export default function BookingsPage() {
   });
 
   useEffect(() => {
-    checkAuth();
+    const cached = getClientCache<BookingsCachePayload>(
+      BOOKINGS_CACHE_KEY,
+      BOOKINGS_CACHE_TTL_MS
+    );
+
+    if (cached) {
+      hydratedFromCacheRef.current = true;
+      setCourts(cached.courts || []);
+      setBookings(cached.bookings || []);
+      if (cached.selectedDate) {
+        setSelectedDate(cached.selectedDate);
+      }
+      if (cached.selectedCourt) {
+        setSelectedCourt(cached.selectedCourt);
+        selectedCourtRef.current = cached.selectedCourt;
+        setFormData((prev) => ({
+          ...prev,
+          court_id: cached.selectedCourt,
+          booking_date: cached.selectedDate || prev.booking_date,
+        }));
+      }
+      setLoading(false);
+    }
+
+    void checkAuth();
   }, []);
 
   const checkAuth = async () => {
+    if (!hydratedFromCacheRef.current) setLoading(true);
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       router.push("/login");
+      setLoading(false);
       return;
     }
-
-    setCurrentUserId(user.id);
 
     // Get courts
     const { data: courtsData } = await supabase
@@ -62,11 +100,18 @@ export default function BookingsPage() {
 
     if (courtsData && courtsData.length > 0) {
       setCourts(courtsData);
-      setSelectedCourt(courtsData[0].id.toString());
-      setFormData({ ...formData, court_id: courtsData[0].id.toString() });
+      const defaultCourt =
+        selectedCourtRef.current || selectedCourt || courtsData[0].id.toString();
+      if (!selectedCourtRef.current && !selectedCourt) {
+        setSelectedCourt(defaultCourt);
+        selectedCourtRef.current = defaultCourt;
+      }
+      setFormData((prev) => ({
+        ...prev,
+        court_id: prev.court_id || defaultCourt,
+      }));
     }
-
-    fetchBookings();
+    setAuthReady(true);
   };
 
   const fetchBookings = async () => {
@@ -87,7 +132,14 @@ export default function BookingsPage() {
       const result = await response.json();
 
       if (response.ok) {
-        setBookings(result.bookings || []);
+        const nextBookings = result.bookings || [];
+        setBookings(nextBookings);
+        setClientCache<BookingsCachePayload>(BOOKINGS_CACHE_KEY, {
+          courts,
+          bookings: nextBookings,
+          selectedDate,
+          selectedCourt,
+        });
       }
     } catch (error) {
       console.error("Error fetching bookings:", error);
@@ -98,8 +150,13 @@ export default function BookingsPage() {
   };
 
   useEffect(() => {
-    fetchBookings();
-  }, [selectedDate, selectedCourt]);
+    selectedCourtRef.current = selectedCourt;
+  }, [selectedCourt]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    void fetchBookings();
+  }, [authReady, selectedDate, selectedCourt]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

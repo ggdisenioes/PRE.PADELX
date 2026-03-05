@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { supabase } from "../lib/supabase";
+import { getClientCache, setClientCache } from "../lib/clientCache";
 
 export type UserRole = "admin" | "manager" | "super_admin" | "user";
 
@@ -19,6 +20,14 @@ type TokenClaims = {
     user_active?: boolean;
   };
 };
+
+type RoleCachePayload = {
+  role: UserRole;
+  userId: string;
+};
+
+const ROLE_CACHE_KEY = "qa:auth:role:v1";
+const ROLE_CACHE_TTL_MS = 10 * 60 * 1000;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -66,8 +75,9 @@ function normalizeRole(value: unknown): UserRole | null {
 }
 
 export function useRole() {
-  const [role, setRole] = useState<UserRole>("user");
-  const [loading, setLoading] = useState(true);
+  const cachedRole = getClientCache<RoleCachePayload>(ROLE_CACHE_KEY, ROLE_CACHE_TTL_MS);
+  const [role, setRole] = useState<UserRole>(cachedRole?.role || "user");
+  const [loading, setLoading] = useState(!cachedRole);
 
   useEffect(() => {
     let active = true;
@@ -81,6 +91,10 @@ export function useRole() {
             setRole("user");
             setLoading(false);
           }
+          setClientCache<RoleCachePayload>(ROLE_CACHE_KEY, {
+            role: "user",
+            userId: "",
+          });
           return;
         }
 
@@ -114,7 +128,13 @@ export function useRole() {
 
         const normalizedTokenRole = normalizeRole(roleFromToken);
         if (normalizedTokenRole && normalizedTokenRole !== "user") {
-          if (active) setRole(normalizedTokenRole);
+          if (active) {
+            setRole(normalizedTokenRole);
+            setClientCache<RoleCachePayload>(ROLE_CACHE_KEY, {
+              role: normalizedTokenRole,
+              userId: session.user.id,
+            });
+          }
           // Si el token ya trae privilegios, no hace falta pegarle a la DB.
           return;
         }
@@ -130,7 +150,14 @@ export function useRole() {
 
         if (error || !data) {
           console.warn("[useRole] failed to fetch role from profiles", error);
-          if (active) setRole(normalizedTokenRole || "user");
+          const fallbackRole = normalizedTokenRole || "user";
+          if (active) {
+            setRole(fallbackRole);
+            setClientCache<RoleCachePayload>(ROLE_CACHE_KEY, {
+              role: fallbackRole,
+              userId,
+            });
+          }
           return;
         }
 
@@ -147,10 +174,23 @@ export function useRole() {
 
         const normalizedDbRole = normalizeRole(data.role);
         if (normalizedDbRole) {
-          if (active) setRole(normalizedDbRole);
+          if (active) {
+            setRole(normalizedDbRole);
+            setClientCache<RoleCachePayload>(ROLE_CACHE_KEY, {
+              role: normalizedDbRole,
+              userId,
+            });
+          }
         } else {
           console.warn("[useRole] invalid role value", data.role);
-          if (active) setRole(normalizedTokenRole || "user");
+          const fallbackRole = normalizedTokenRole || "user";
+          if (active) {
+            setRole(fallbackRole);
+            setClientCache<RoleCachePayload>(ROLE_CACHE_KEY, {
+              role: fallbackRole,
+              userId,
+            });
+          }
         }
       } catch (err) {
         console.error("[useRole] unexpected error:", err);
@@ -172,6 +212,12 @@ export function useRole() {
         event === "USER_UPDATED" ||
         event === "SIGNED_OUT"
       ) {
+        if (event === "SIGNED_OUT") {
+          setClientCache<RoleCachePayload>(ROLE_CACHE_KEY, {
+            role: "user",
+            userId: "",
+          });
+        }
         void loadRole();
       }
     });

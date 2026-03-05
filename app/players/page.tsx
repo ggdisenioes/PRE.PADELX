@@ -10,6 +10,7 @@ import Card from "../components/Card";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "../i18n";
+import { getClientCache, setClientCache } from "../lib/clientCache";
 
 type PlayerRow = {
   id: number;
@@ -77,9 +78,16 @@ export default function PlayersPage() {
   const [search, setSearch] = useState("");
 
   const { role, isAdmin, isManager, loading: roleLoading } = useRole();
+  const playersCacheKey = `qa:players:list:${role}`;
 
   const fetchPlayers = useCallback(async () => {
-    setLoading(true);
+    const cachedPlayers = getClientCache<PlayerRow[]>(playersCacheKey, 2 * 60 * 1000);
+    if (cachedPlayers) {
+      setPlayers(cachedPlayers);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
 
     let query = supabase.from("players").select("*").order("name", { ascending: true });
 
@@ -94,10 +102,12 @@ export default function PlayersPage() {
       toast.error(`${t("players.errorLoading")}: ${error.message}`, { duration: 5000 });
       setPlayers([]);
     } else {
-      setPlayers((data as PlayerRow[]) || []);
+      const nextPlayers = (data as PlayerRow[]) || [];
+      setPlayers(nextPlayers);
+      setClientCache(playersCacheKey, nextPlayers);
     }
     setLoading(false);
-  }, [role, t]);
+  }, [playersCacheKey, role, t]);
 
   useEffect(() => {
     if (roleLoading) return;
@@ -185,10 +195,17 @@ export default function PlayersPage() {
         metadata: { playerName, source, archived: true },
       });
 
+      const refreshedPlayers = previousPlayers.map((p) =>
+        p.id === playerId
+          ? { ...p, is_approved: false, deleted_at: nowIso, deleted_by: currentUserId }
+          : p
+      );
+      setClientCache(playersCacheKey, refreshedPlayers);
+
       toast.success(successMessage);
       return true;
     },
-    [players]
+    [players, playersCacheKey]
   );
 
   const handleApprove = async (playerId: number, playerName: string) => {
@@ -204,6 +221,12 @@ export default function PlayersPage() {
 
     setPlayers((prev) =>
       prev.map((p) =>
+        p.id === playerId ? { ...p, is_approved: true, deleted_at: null, deleted_by: null } : p
+      )
+    );
+    setClientCache(
+      playersCacheKey,
+      players.map((p) =>
         p.id === playerId ? { ...p, is_approved: true, deleted_at: null, deleted_by: null } : p
       )
     );
@@ -281,6 +304,13 @@ export default function PlayersPage() {
       entityId: playerId,
       metadata: { playerName },
     });
+
+    setClientCache(
+      playersCacheKey,
+      previousPlayers.map((p) =>
+        p.id === playerId ? { ...p, is_approved: true, deleted_at: null, deleted_by: null } : p
+      )
+    );
 
     toast.success(t("players.restored", { name: playerName }));
   };

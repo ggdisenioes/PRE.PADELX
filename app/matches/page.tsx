@@ -11,6 +11,7 @@ import { useRole } from "../hooks/useRole";
 import MatchCard from "../components/matches/MatchCard";
 import { formatDateMadrid, formatTimeMadrid } from "@/lib/dates";
 import { useTranslation } from "../i18n";
+import { getClientCache, setClientCache } from "../lib/clientCache";
 
 type PlayerRef = {
   id: number;
@@ -48,6 +49,15 @@ type Tournament = {
 
 type View = "pending" | "finished" | "all";
 
+type MatchesCachePayload = {
+  matches: Match[];
+  playersMapObj: Record<number, string>;
+  tournaments: Tournament[];
+};
+
+const MATCHES_CACHE_KEY = "qa:matches:list:v1";
+const MATCHES_CACHE_TTL_MS = 90 * 1000;
+
 export default function MatchesPage() {
   const { isAdmin, isManager, loading: roleLoading } = useRole();
   const searchParams = useSearchParams();
@@ -79,10 +89,23 @@ export default function MatchesPage() {
   useEffect(() => {
     let active = true;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let hydratedFromCache = false;
+
+    const cachedMatches = getClientCache<MatchesCachePayload>(
+      MATCHES_CACHE_KEY,
+      MATCHES_CACHE_TTL_MS
+    );
+    if (cachedMatches) {
+      hydratedFromCache = true;
+      setMatches(cachedMatches.matches || []);
+      setPlayersMapObj(cachedMatches.playersMapObj || {});
+      setTournaments(cachedMatches.tournaments || []);
+      setLoading(false);
+    }
 
     const loadData = async () => {
       if (!active) return;
-      setLoading(true);
+      if (!hydratedFromCache) setLoading(true);
 
       const [{ data: playersData, error: playersError }, { data: matchesData, error: matchError }, { data: tournamentsData }] =
         await Promise.all([
@@ -158,6 +181,11 @@ export default function MatchesPage() {
       });
 
       setMatches(normalizedMatches);
+      setClientCache(MATCHES_CACHE_KEY, {
+        matches: normalizedMatches,
+        playersMapObj,
+        tournaments: tournamentsData ?? [],
+      });
       setLoading(false);
     };
 
@@ -238,7 +266,15 @@ export default function MatchesPage() {
     }
 
     toast.success(t("matches.deleted"));
-    setMatches((prev) => prev.filter((m) => m.id !== matchId));
+    setMatches((prev) => {
+      const next = prev.filter((m) => m.id !== matchId);
+      setClientCache(MATCHES_CACHE_KEY, {
+        matches: next,
+        playersMapObj,
+        tournaments,
+      });
+      return next;
+    });
   };
 
   const handleNotify = async (match: Match, type: MatchNotificationType) => {

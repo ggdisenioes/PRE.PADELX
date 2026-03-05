@@ -4,13 +4,14 @@
 
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useRole } from "../hooks/useRole";
 import { useTenantPlan } from "../hooks/useTenantPlan";
 import { useTranslation } from "../i18n";
 import LanguageSelector from "./LanguageSelector";
 import toast from "react-hot-toast";
+import { getClientCache, setClientCache } from "../lib/clientCache";
 
 type SidebarProps = {
   onLinkClick?: () => void;
@@ -21,6 +22,9 @@ type UserInfo = {
   first_name?: string | null;
   last_name?: string | null;
 };
+
+const SIDEBAR_USER_CACHE_PREFIX = "qa:sidebar:user:v1";
+const SIDEBAR_USER_CACHE_TTL_MS = 10 * 60 * 1000;
 
 export default function Sidebar({ onLinkClick }: SidebarProps) {
   const router = useRouter();
@@ -39,17 +43,25 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
       } = await supabase.auth.getSession();
 
       if (session?.user) {
+        const cacheKey = `${SIDEBAR_USER_CACHE_PREFIX}:${session.user.id}`;
+        const cachedUser = getClientCache<UserInfo>(cacheKey, SIDEBAR_USER_CACHE_TTL_MS);
+        if (cachedUser) {
+          setUser(cachedUser);
+        }
+
         const { data: profile } = await supabase
           .from("profiles")
           .select("first_name,last_name")
           .eq("id", session.user.id)
           .single();
 
-        setUser({
+        const nextUser = {
           email: session.user.email ?? null,
           first_name: profile?.first_name ?? null,
           last_name: profile?.last_name ?? null,
-        });
+        };
+        setUser(nextUser);
+        setClientCache<UserInfo>(cacheKey, nextUser);
       } else {
         setUser(null);
       }
@@ -61,17 +73,25 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         if (session?.user) {
+          const cacheKey = `${SIDEBAR_USER_CACHE_PREFIX}:${session.user.id}`;
+          const cachedUser = getClientCache<UserInfo>(cacheKey, SIDEBAR_USER_CACHE_TTL_MS);
+          if (cachedUser) {
+            setUser(cachedUser);
+          }
+
           const { data: profile } = await supabase
             .from("profiles")
             .select("first_name,last_name")
             .eq("id", session.user.id)
             .single();
 
-          setUser({
+          const nextUser = {
             email: session.user.email ?? null,
             first_name: profile?.first_name ?? null,
             last_name: profile?.last_name ?? null,
-          });
+          };
+          setUser(nextUser);
+          setClientCache<UserInfo>(cacheKey, nextUser);
         } else {
           setUser(null);
         }
@@ -109,25 +129,31 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
   };
 
   // MENÚ GENERAL (visible para todos, algunos gated por plan)
-  const generalMenuItems = [
-    { id: "dashboard", label: t("nav.dashboard"), href: "/", emoji: "📊" },
-    { id: "tournaments", label: t("nav.tournaments"), href: "/tournaments", emoji: "🏆" },
-    { id: "players", label: t("nav.players"), href: "/players", emoji: "👥" },
-    { id: "matches", label: t("nav.matches"), href: "/matches", emoji: "🎾" },
-    { id: "ranking", label: t("nav.ranking"), href: "/ranking", emoji: "⭐", requiredFeature: "has_advanced_rankings" },
-    { id: "news", label: t("nav.news"), href: "/news", emoji: "📰" },
-    { id: "challenges", label: t("nav.challenges"), href: "/challenges", emoji: "⚔️" },
-    { id: "bookings", label: t("nav.bookings"), href: "/bookings", emoji: "📅" },
-    { id: "mi-cuenta", label: t("nav.myAccount"), href: "/mi-cuenta", emoji: "👤" },
-  ];
+  const generalMenuItems = useMemo(
+    () => [
+      { id: "dashboard", label: t("nav.dashboard"), href: "/", emoji: "📊" },
+      { id: "tournaments", label: t("nav.tournaments"), href: "/tournaments", emoji: "🏆" },
+      { id: "players", label: t("nav.players"), href: "/players", emoji: "👥" },
+      { id: "matches", label: t("nav.matches"), href: "/matches", emoji: "🎾" },
+      { id: "ranking", label: t("nav.ranking"), href: "/ranking", emoji: "⭐", requiredFeature: "has_advanced_rankings" },
+      { id: "news", label: t("nav.news"), href: "/news", emoji: "📰" },
+      { id: "challenges", label: t("nav.challenges"), href: "/challenges", emoji: "⚔️" },
+      { id: "bookings", label: t("nav.bookings"), href: "/bookings", emoji: "📅" },
+      { id: "mi-cuenta", label: t("nav.myAccount"), href: "/mi-cuenta", emoji: "👤" },
+    ],
+    [t]
+  );
 
   // MENÚ ADMINISTRACIÓN (solo Admin/Manager)
-  const adminMenuItems = [
-    { id: "management", label: t("nav.userManagement"), href: "/admin/management", emoji: "⚙️" },
-    { id: "courts", label: t("nav.courtAdmin"), href: "/courts", emoji: "🏟️" },
-    { id: "news-admin", label: t("nav.newsAdmin"), href: "/admin/news", emoji: "📝" },
-    { id: "analytics", label: t("nav.analytics"), href: "/admin/analytics", emoji: "📈", requiredFeature: "has_player_stats" },
-  ];
+  const adminMenuItems = useMemo(
+    () => [
+      { id: "management", label: t("nav.userManagement"), href: "/admin/management", emoji: "⚙️" },
+      { id: "courts", label: t("nav.courtAdmin"), href: "/courts", emoji: "🏟️" },
+      { id: "news-admin", label: t("nav.newsAdmin"), href: "/admin/news", emoji: "📝" },
+      { id: "analytics", label: t("nav.analytics"), href: "/admin/analytics", emoji: "📈", requiredFeature: "has_player_stats" },
+    ],
+    [t]
+  );
 
   const getInitials = (u: UserInfo | null): string => {
     if (!u) return "US";
@@ -182,6 +208,25 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
       </div>
     );
   };
+
+  useEffect(() => {
+    if (planLoading) return;
+
+    const hrefs = [
+      ...generalMenuItems
+        .filter((item) => !item.requiredFeature || hasFeature(item.requiredFeature))
+        .map((item) => item.href),
+      ...(user && (isAdmin || isManager)
+        ? adminMenuItems
+            .filter((item) => !item.requiredFeature || hasFeature(item.requiredFeature))
+            .map((item) => item.href)
+        : []),
+    ];
+
+    hrefs.forEach((href) => {
+      router.prefetch(href);
+    });
+  }, [adminMenuItems, generalMenuItems, hasFeature, isAdmin, isManager, planLoading, router, user]);
 
   return (
     <aside className="w-56 h-screen flex flex-col overflow-hidden text-white bg-gradient-to-b from-[#0b1220] via-[#0e1626] to-[#0a1020] border-r border-white/5">

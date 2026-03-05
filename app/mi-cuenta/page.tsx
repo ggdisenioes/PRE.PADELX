@@ -11,6 +11,7 @@ import {
 } from "@simplewebauthn/browser";
 import { useTranslation } from "@/i18n";
 import { useRole } from "../hooks/useRole";
+import { getClientCache, setClientCache } from "../lib/clientCache";
 
 type PlayerData = {
   id: number;
@@ -88,6 +89,25 @@ type StaffNotificationItem = {
   href: string;
   tone: "indigo" | "yellow" | "red" | "green";
 };
+
+type MyAccountCachePayload = {
+  player: PlayerData | null;
+  stats: { wins: number; losses: number; total: number };
+  history: HistoryItem[];
+  notLinked: boolean;
+  staffAccount: StaffAccountData | null;
+  staffTasks: StaffTaskSummary;
+  staffLogs: StaffLogRow[];
+  notifyEmail: boolean;
+  notifyWhatsapp: boolean;
+  phone: string;
+  email: string;
+  name: string;
+  avatarUrl: string;
+};
+
+const MY_ACCOUNT_CACHE_PREFIX = "qa:my-account:v1";
+const MY_ACCOUNT_CACHE_TTL_MS = 90 * 1000;
 
 function detectDevicePlatform(userAgent: string) {
   const ua = userAgent.toLowerCase();
@@ -309,22 +329,14 @@ export default function MiCuentaPage() {
     if (roleLoading) return;
 
     let active = true;
+    const defaultTasks: StaffTaskSummary = {
+      pendingUsers: 0,
+      pendingMatches: 0,
+      overdueMatches: 0,
+      upcomingThisWeek: 0,
+    };
 
     const load = async () => {
-      setLoading(true);
-      setNotLinked(false);
-      setPlayer(null);
-      setStats({ wins: 0, losses: 0, total: 0 });
-      setHistory([]);
-      setStaffAccount(null);
-      setStaffLogs([]);
-      setStaffTasks({
-        pendingUsers: 0,
-        pendingMatches: 0,
-        overdueMatches: 0,
-        upcomingThisWeek: 0,
-      });
-
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -334,6 +346,38 @@ export default function MiCuentaPage() {
         setLoading(false);
         setNotLinked(true);
         return;
+      }
+
+      const cacheKey = `${MY_ACCOUNT_CACHE_PREFIX}:${user.id}`;
+      const cached = getClientCache<MyAccountCachePayload>(
+        cacheKey,
+        MY_ACCOUNT_CACHE_TTL_MS
+      );
+
+      if (cached && active) {
+        setPlayer(cached.player || null);
+        setStats(cached.stats || { wins: 0, losses: 0, total: 0 });
+        setHistory(cached.history || []);
+        setNotLinked(cached.notLinked === true);
+        setStaffAccount(cached.staffAccount || null);
+        setStaffTasks(cached.staffTasks || defaultTasks);
+        setStaffLogs(cached.staffLogs || []);
+        setNotifyEmail(cached.notifyEmail ?? true);
+        setNotifyWhatsapp(cached.notifyWhatsapp ?? false);
+        setPhone(cached.phone || "");
+        setEmail(cached.email || "");
+        setName(cached.name || "");
+        setAvatarUrl(cached.avatarUrl || "");
+        setLoading(false);
+      } else {
+        setLoading(true);
+        setNotLinked(false);
+        setPlayer(null);
+        setStats({ wins: 0, losses: 0, total: 0 });
+        setHistory([]);
+        setStaffAccount(null);
+        setStaffLogs([]);
+        setStaffTasks(defaultTasks);
       }
 
       const { data: playerData, error: playerErr } = await supabase
@@ -409,21 +453,46 @@ export default function MiCuentaPage() {
         }
 
         if (!active) return;
-        setStats({ wins, losses, total: wins + losses });
+        const nextStats = { wins, losses, total: wins + losses };
+        setStats(nextStats);
         historyData.sort((a, b) => b.ts - a.ts);
-        setHistory(historyData.slice(0, 20));
+        const nextHistory = historyData.slice(0, 20);
+        setHistory(nextHistory);
+
+        let nextStaffAccount: StaffAccountData | null = null;
+        let nextStaffTasks: StaffTaskSummary = defaultTasks;
+        let nextStaffLogs: StaffLogRow[] = [];
 
         if (isStaffUser) {
           const staffSnapshot = await loadStaffSnapshot(user);
           if (active && staffSnapshot) {
-            setStaffAccount(staffSnapshot.account);
-            setStaffTasks(staffSnapshot.tasks);
-            setStaffLogs(staffSnapshot.logs);
+            nextStaffAccount = staffSnapshot.account;
+            nextStaffTasks = staffSnapshot.tasks;
+            nextStaffLogs = staffSnapshot.logs;
+            setStaffAccount(nextStaffAccount);
+            setStaffTasks(nextStaffTasks);
+            setStaffLogs(nextStaffLogs);
           }
         }
 
         await loadPasskeyDevices();
         if (!active) return;
+        setNotLinked(false);
+        setClientCache<MyAccountCachePayload>(cacheKey, {
+          player: playerData as PlayerData,
+          stats: nextStats,
+          history: nextHistory,
+          notLinked: false,
+          staffAccount: nextStaffAccount,
+          staffTasks: nextStaffTasks,
+          staffLogs: nextStaffLogs,
+          notifyEmail: playerData.notify_email ?? true,
+          notifyWhatsapp: playerData.notify_whatsapp ?? false,
+          phone: playerData.phone || "",
+          email: playerData.email || "",
+          name: playerData.name || "",
+          avatarUrl: playerData.avatar_url || "",
+        });
         setLoading(false);
         return;
       }
@@ -433,6 +502,21 @@ export default function MiCuentaPage() {
         if (!active) return;
         setLoading(false);
         setNotLinked(true);
+        setClientCache<MyAccountCachePayload>(cacheKey, {
+          player: null,
+          stats: { wins: 0, losses: 0, total: 0 },
+          history: [],
+          notLinked: true,
+          staffAccount: null,
+          staffTasks: defaultTasks,
+          staffLogs: [],
+          notifyEmail: true,
+          notifyWhatsapp: false,
+          phone: "",
+          email: user.email || "",
+          name: user.email || "",
+          avatarUrl: "",
+        });
         return;
       }
 
@@ -441,6 +525,21 @@ export default function MiCuentaPage() {
         if (!active) return;
         setLoading(false);
         setNotLinked(true);
+        setClientCache<MyAccountCachePayload>(cacheKey, {
+          player: null,
+          stats: { wins: 0, losses: 0, total: 0 },
+          history: [],
+          notLinked: true,
+          staffAccount: null,
+          staffTasks: defaultTasks,
+          staffLogs: [],
+          notifyEmail: true,
+          notifyWhatsapp: false,
+          phone: "",
+          email: user.email || "",
+          name: user.email || "",
+          avatarUrl: "",
+        });
         return;
       }
 
@@ -451,6 +550,21 @@ export default function MiCuentaPage() {
       await loadPasskeyDevices();
       if (!active) return;
       setNotLinked(true);
+      setClientCache<MyAccountCachePayload>(cacheKey, {
+        player: null,
+        stats: { wins: 0, losses: 0, total: 0 },
+        history: [],
+        notLinked: true,
+        staffAccount: staffSnapshot.account,
+        staffTasks: staffSnapshot.tasks,
+        staffLogs: staffSnapshot.logs,
+        notifyEmail: true,
+        notifyWhatsapp: false,
+        phone: "",
+        email: staffSnapshot.account.email || user.email || "",
+        name: staffSnapshot.account.fullName || user.email || "",
+        avatarUrl: "",
+      });
       setLoading(false);
     };
 

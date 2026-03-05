@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Card from "../components/Card";
 import { supabase } from "../lib/supabase";
 import { useRole } from "../hooks/useRole";
 import toast from "react-hot-toast";
 import { useTranslation } from "../i18n";
+import { getClientCache, setClientCache } from "../lib/clientCache";
 
 type Court = {
   id: number;
@@ -14,6 +15,9 @@ type Court = {
   is_covered: boolean;
   created_at: string;
 };
+
+const COURTS_CACHE_KEY = "qa:courts:list:v1";
+const COURTS_CACHE_TTL_MS = 2 * 60 * 1000;
 
 export default function CourtsPage() {
   const router = useRouter();
@@ -26,6 +30,7 @@ export default function CourtsPage() {
 
   const [loading, setLoading] = useState(true);
   const [courts, setCourts] = useState<Court[]>([]);
+  const hydratedFromCacheRef = useRef(false);
 
   // Redirect non-admin/non-manager users away from this admin page
   useEffect(() => {
@@ -51,7 +56,10 @@ export default function CourtsPage() {
   }, [role, t]);
 
   const fetchCourts = async () => {
-    setLoading(true);
+    if (!hydratedFromCacheRef.current) {
+      setLoading(true);
+    }
+
     const { data, error } = await supabase
       .from("courts")
       .select("id,name,is_covered,created_at")
@@ -65,12 +73,22 @@ export default function CourtsPage() {
       return;
     }
 
-    setCourts((data as Court[]) || []);
+    const nextCourts = (data as Court[]) || [];
+    setCourts(nextCourts);
+    setClientCache<Court[]>(COURTS_CACHE_KEY, nextCourts);
     setLoading(false);
   };
 
   useEffect(() => {
     if (roleLoading) return;
+
+    const cachedCourts = getClientCache<Court[]>(COURTS_CACHE_KEY, COURTS_CACHE_TTL_MS);
+    if (cachedCourts) {
+      hydratedFromCacheRef.current = true;
+      setCourts(cachedCourts);
+      setLoading(false);
+    }
+
     fetchCourts();
 
     const channel = supabase

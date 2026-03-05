@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { supabase } from "../lib/supabase";
 import { useTranslation } from "../i18n";
 import { useRole } from "../hooks/useRole";
+import { getClientCache, setClientCache } from "../lib/clientCache";
 
 type Tournament = {
   id: number;
@@ -20,6 +21,9 @@ type Tournament = {
   total_matches: number;
   prize: string | null;
 };
+
+const TOURNAMENTS_CACHE_KEY = "qa:tournaments:list:v1";
+const TOURNAMENTS_CACHE_TTL_MS = 2 * 60 * 1000;
 
 export default function TournamentsPage() {
   const { t, locale } = useTranslation();
@@ -45,6 +49,15 @@ export default function TournamentsPage() {
   };
 
   useEffect(() => {
+    const cachedTournaments = getClientCache<Tournament[]>(
+      TOURNAMENTS_CACHE_KEY,
+      TOURNAMENTS_CACHE_TTL_MS
+    );
+    if (cachedTournaments) {
+      setTournaments(cachedTournaments);
+      setLoading(false);
+    }
+
     const load = async () => {
       const { data, error } = await supabase
         .from("tournaments")
@@ -69,6 +82,7 @@ export default function TournamentsPage() {
           played_matches: statsMap[t.id]?.played_matches ?? 0,
         }));
         setTournaments(normalized);
+        setClientCache(TOURNAMENTS_CACHE_KEY, normalized);
       }
 
       setLoading(false);
@@ -87,7 +101,11 @@ export default function TournamentsPage() {
       return;
     }
 
-    setTournaments((prev) => prev.filter((t) => t.id !== id));
+    setTournaments((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      setClientCache(TOURNAMENTS_CACHE_KEY, next);
+      return next;
+    });
     toast.success(t("tournaments.deleted"));
   };
 

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useRouter } from "next/navigation";
 import Card from "../components/Card";
 import toast from "react-hot-toast";
 import { useTranslation } from "../i18n";
 import { useRole } from "../hooks/useRole";
+import { getClientCache, setClientCache } from "../lib/clientCache";
 
 type Challenge = {
   id: number;
@@ -36,6 +37,16 @@ type Court = {
   name: string;
 };
 
+type ChallengesCachePayload = {
+  challenges: Challenge[];
+  players: Player[];
+  courts: Court[];
+  myPlayerId: number | null;
+};
+
+const CHALLENGES_CACHE_KEY = "qa:challenges:page:v1";
+const CHALLENGES_CACHE_TTL_MS = 90 * 1000;
+
 export default function ChallengesPage() {
   const router = useRouter();
   const { t, locale } = useTranslation();
@@ -55,51 +66,85 @@ export default function ChallengesPage() {
   });
   const [scheduleForm, setScheduleForm] = useState<Record<number, { date: string; court: string; place: string }>>({});
   const [showSchedule, setShowSchedule] = useState<Record<number, boolean>>({});
+  const hydratedFromCacheRef = useRef(false);
   const dateLocale = locale === "en" ? "en-US" : "es-ES";
 
+  const syncChallengesCache = (
+    nextChallenges: Challenge[],
+    nextPlayers: Player[] = players,
+    nextCourts: Court[] = courts,
+    nextMyPlayerId: number | null = myPlayerId
+  ) => {
+    setClientCache<ChallengesCachePayload>(CHALLENGES_CACHE_KEY, {
+      challenges: nextChallenges,
+      players: nextPlayers,
+      courts: nextCourts,
+      myPlayerId: nextMyPlayerId,
+    });
+  };
+
   useEffect(() => {
-    checkAuth();
+    const cached = getClientCache<ChallengesCachePayload>(
+      CHALLENGES_CACHE_KEY,
+      CHALLENGES_CACHE_TTL_MS
+    );
+
+    if (cached) {
+      hydratedFromCacheRef.current = true;
+      setChallenges(cached.challenges || []);
+      setPlayers(cached.players || []);
+      setCourts(cached.courts || []);
+      setMyPlayerId(cached.myPlayerId ?? null);
+      setLoading(false);
+    }
+
+    void checkAuth();
   }, []);
 
   const checkAuth = async () => {
+    if (!hydratedFromCacheRef.current) setLoading(true);
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       router.push("/login");
+      setLoading(false);
       return;
     }
 
     // Get my linked player
-    const { data: myPlayer } = await supabase
-      .from("players")
-      .select("id")
-      .eq("user_id", user.id)
-      .single();
+    const [{ data: myPlayer }, { data: allPlayers }, { data: allCourts }] = await Promise.all([
+      supabase
+        .from("players")
+        .select("id")
+        .eq("user_id", user.id)
+        .single(),
+      supabase
+        .from("players")
+        .select("id, name")
+        .eq("is_approved", true)
+        .order("name"),
+      supabase
+        .from("courts")
+        .select("id, name")
+        .order("name"),
+    ]);
 
-    if (myPlayer) {
-      setMyPlayerId(myPlayer.id);
-    }
+    const nextMyPlayerId = myPlayer?.id ?? null;
+    const nextPlayers = allPlayers || [];
+    const nextCourts = allCourts || [];
 
-    // Get all approved players
-    const { data: allPlayers } = await supabase
-      .from("players")
-      .select("id, name")
-      .eq("is_approved", true)
-      .order("name");
+    setMyPlayerId(nextMyPlayerId);
+    setPlayers(nextPlayers);
+    setCourts(nextCourts);
 
-    setPlayers(allPlayers || []);
-
-    // Get courts
-    const { data: allCourts } = await supabase
-      .from("courts")
-      .select("id, name")
-      .order("name");
-
-    setCourts(allCourts || []);
-
-    fetchChallenges();
+    await fetchChallenges(nextPlayers, nextCourts, nextMyPlayerId);
   };
 
-  const fetchChallenges = async () => {
+  const fetchChallenges = async (
+    nextPlayers: Player[] = players,
+    nextCourts: Court[] = courts,
+    nextMyPlayerId: number | null = myPlayerId
+  ) => {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const headers: Record<string, string> = {
@@ -114,7 +159,9 @@ export default function ChallengesPage() {
       const result = await response.json();
 
       if (response.ok) {
-        setChallenges(result.challenges || []);
+        const nextChallenges = result.challenges || [];
+        setChallenges(nextChallenges);
+        syncChallengesCache(nextChallenges, nextPlayers, nextCourts, nextMyPlayerId);
       }
     } catch (error) {
       console.error("Error fetching challenges:", error);
@@ -158,13 +205,14 @@ export default function ChallengesPage() {
         toast.success(t("challenges.created"));
         setFormData({ challenger_id: "", challenger_partner_id: "", challenged_id: "", challenged_partner_id: "", message: "" });
         setShowForm(false);
-        fetchChallenges();
+        await fetchChallenges();
       } else {
         const result = await response.json();
         toast.error(result.error || t("challenges.errorCreating"));
       }
-    } catch (error: any) {
-      toast.error(error.message || t("challenges.errorCreating"));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : t("challenges.errorCreating");
+      toast.error(message || t("challenges.errorCreating"));
     }
   };
 
@@ -186,7 +234,7 @@ export default function ChallengesPage() {
 
       if (res.ok) {
         toast.success(response === "accept" ? t("challenges.accepted") : t("challenges.rejected"));
-        fetchChallenges();
+        await fetchChallenges();
       } else {
         const result = await res.json();
         toast.error(result.error || t("challenges.errorResponding"));
@@ -226,7 +274,7 @@ export default function ChallengesPage() {
       if (res.ok) {
         toast.success(t("challenges.proposalSent"));
         setShowSchedule((prev) => ({ ...prev, [challengeId]: false }));
-        fetchChallenges();
+        await fetchChallenges();
       } else {
         const result = await res.json();
         toast.error(result.error || t("challenges.errorSendingProposal"));
@@ -261,7 +309,7 @@ export default function ChallengesPage() {
 
       if (response.ok) {
         toast.success(t("challenges.deleted"));
-        fetchChallenges();
+        await fetchChallenges();
         return;
       }
 
