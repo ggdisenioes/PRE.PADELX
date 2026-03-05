@@ -1,7 +1,7 @@
 // ./app/ranking/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import Card from "../components/Card";
 import { useRouter } from "next/navigation";
@@ -19,7 +19,30 @@ type RankedPlayer = {
   points: number;
 };
 
-type RankingFilter = "month" | number;
+const MONTH_OPTION_COUNT = 12;
+
+function getMonthKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function getMonthOptions(count: number) {
+  const baseDate = new Date();
+  baseDate.setDate(1);
+  baseDate.setHours(0, 0, 0, 0);
+
+  return Array.from({ length: count }).map((_, index) => {
+    const d = new Date(baseDate);
+    d.setMonth(baseDate.getMonth() - index);
+    const key = getMonthKey(d);
+    const label = d.toLocaleDateString("es-ES", {
+      month: "long",
+      year: "numeric",
+    });
+    return { key, label };
+  });
+}
 
 export default function RankingPage() {
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
@@ -27,12 +50,14 @@ export default function RankingPage() {
   const router = useRouter();
 
   const [tournaments, setTournaments] = useState<{ id: number; name: string }[]>([]);
-  const [selectedTournament, setSelectedTournament] = useState<RankingFilter>("month");
+  const monthOptions = useMemo(() => getMonthOptions(MONTH_OPTION_COUNT), []);
+  const currentMonthKey = monthOptions[0]?.key || getMonthKey(new Date());
+  const [selectedScope, setSelectedScope] = useState<string>(`month:${currentMonthKey}`);
 
-  const currentMonthLabel = new Date().toLocaleDateString("es-ES", {
-    month: "long",
-    year: "numeric",
-  });
+  const isMonthlyView = selectedScope.startsWith("month:");
+  const selectedMonthKey = isMonthlyView ? selectedScope.slice("month:".length) : null;
+  const selectedMonthLabel =
+    monthOptions.find((month) => month.key === selectedMonthKey)?.label || "";
 
   // Cargar ranking desde Supabase usando solo partidos para garantizar
   // que aparezcan unicamente jugadores que tengan partidos en el filtro activo.
@@ -69,17 +94,26 @@ export default function RankingPage() {
       .select("winner, player_1_a, player_2_a, player_1_b, player_2_b, tournament_id, score, start_time")
       .not("tournament_id", "is", null);
 
-    if (selectedTournament === "month") {
-      const now = new Date();
-      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-      const nextMonthStart = new Date(
-        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
-      );
+    if (selectedScope.startsWith("month:")) {
+      const monthKey = selectedScope.slice("month:".length) || currentMonthKey;
+      const [yearRaw, monthRaw] = monthKey.split("-");
+      const year = Number(yearRaw);
+      const month = Number(monthRaw);
+
+      if (!Number.isFinite(year) || !Number.isFinite(month)) {
+        toast.error("Mes seleccionado inválido");
+        setLoading(false);
+        return;
+      }
+
+      const monthStart = new Date(year, month - 1, 1, 0, 0, 0, 0);
+      const nextMonthStart = new Date(year, month, 1, 0, 0, 0, 0);
       matchQuery = matchQuery
         .gte("start_time", monthStart.toISOString())
         .lt("start_time", nextMonthStart.toISOString());
     } else {
-      matchQuery = matchQuery.eq("tournament_id", selectedTournament);
+      const tournamentId = Number(selectedScope.slice("tournament:".length));
+      matchQuery = matchQuery.eq("tournament_id", tournamentId);
     }
 
     const { data: matches, error: matchError } = await matchQuery;
@@ -186,13 +220,13 @@ export default function RankingPage() {
       return a.name.localeCompare(b.name);
     });
 
-    if (selectedTournament === "month") {
+    if (selectedScope.startsWith("month:")) {
       ranking = ranking.slice(0, 10);
     }
 
     setPlayers(ranking);
     setLoading(false);
-  }, [selectedTournament]);
+  }, [currentMonthKey, selectedScope]);
 
   useEffect(() => {
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -242,25 +276,29 @@ export default function RankingPage() {
           </h1>
           <div className="mt-4 flex justify-center">
             <select
-              value={selectedTournament}
-              onChange={(e) =>
-                setSelectedTournament(
-                  e.target.value === "month" ? "month" : Number(e.target.value)
-                )
-              }
+              value={selectedScope}
+              onChange={(e) => setSelectedScope(e.target.value)}
               className="border rounded-md px-3 py-2 text-sm"
             >
-              <option value="month">Top 10 del mes</option>
+              <optgroup label="Top 10 mensual">
+                {monthOptions.map((month) => (
+                  <option key={month.key} value={`month:${month.key}`}>
+                    {`Top 10 - ${month.label}`}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Ranking por torneo">
               {tournaments.map((t) => (
-                <option key={t.id} value={t.id}>
+                <option key={t.id} value={`tournament:${t.id}`}>
                   {t.name}
                 </option>
               ))}
+              </optgroup>
             </select>
           </div>
           <p className="text-sm text-gray-600 mt-1">
-            {selectedTournament === "month"
-              ? `Mostrando el Top 10 de ${currentMonthLabel}.`
+            {isMonthlyView
+              ? `Mostrando el Top 10 de ${selectedMonthLabel}.`
               : "Mostrando solo jugadores con partidos en el torneo seleccionado."}
           </p>
         </div>
@@ -271,7 +309,9 @@ export default function RankingPage() {
           </p>
         ) : players.length === 0 ? (
           <p className="text-gray-400 text-center">
-            Todavía no hay jugadores con puntos. ¡Registrá algunos partidos!
+            {isMonthlyView
+              ? "No hay jugadores con puntos en ese mes. Elegí otro mes del selector."
+              : "No hay jugadores con puntos en ese torneo. Registrá algunos partidos."}
           </p>
         ) : (
           <>
