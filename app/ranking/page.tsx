@@ -19,43 +19,14 @@ type RankedPlayer = {
   points: number;
 };
 
-type ScopeMode = "general" | "month" | "tournament";
-
-const MONTH_OPTION_COUNT = 12;
-
-function getMonthKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${year}-${month}`;
-}
-
-function getMonthOptions(count: number) {
-  const baseDate = new Date();
-  baseDate.setDate(1);
-  baseDate.setHours(0, 0, 0, 0);
-
-  return Array.from({ length: count }).map((_, index) => {
-    const d = new Date(baseDate);
-    d.setMonth(baseDate.getMonth() - index);
-    const key = getMonthKey(d);
-    const label = d.toLocaleDateString("es-ES", {
-      month: "long",
-      year: "numeric",
-    });
-    return { key, label };
-  });
-}
+type ScopeMode = "general" | "tournament";
 
 function getScopeDescription(
   scopeMode: ScopeMode,
-  selectedMonthLabel: string,
   selectedTournamentName: string
 ) {
   if (scopeMode === "general") {
     return "Top 10 general histórico (sin filtro por fecha).";
-  }
-  if (scopeMode === "month") {
-    return `Top 10 mensual de ${selectedMonthLabel}.`;
   }
   if (selectedTournamentName) {
     return `Ranking del torneo ${selectedTournamentName}.`;
@@ -66,24 +37,24 @@ function getScopeDescription(
 function getPodiumStyle(position: number) {
   if (position === 1) {
     return {
-      card: "border-lime-300 bg-gradient-to-br from-lime-50 to-cyan-50",
-      position: "bg-lime-500 text-slate-900",
-      points: "text-cyan-700",
-      avatar: "border-lime-300",
+      card: "border-amber-300 bg-amber-50",
+      position: "bg-amber-500 text-white",
+      points: "text-amber-700",
+      avatar: "border-amber-300",
       emoji: "🥇",
     };
   }
   if (position === 2) {
     return {
-      card: "border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50",
-      position: "bg-blue-600 text-white",
-      points: "text-blue-700",
-      avatar: "border-blue-300",
+      card: "border-slate-300 bg-slate-50",
+      position: "bg-slate-500 text-white",
+      points: "text-slate-700",
+      avatar: "border-slate-300",
       emoji: "🥈",
     };
   }
   return {
-    card: "border-orange-300 bg-gradient-to-br from-orange-50 to-red-50",
+    card: "border-orange-300 bg-orange-50",
     position: "bg-orange-500 text-white",
     points: "text-orange-700",
     avatar: "border-orange-300",
@@ -100,25 +71,25 @@ function getFormBadge(player: RankedPlayer) {
   const winRate = getWinRate(player);
   if (player.played < 3) {
     return {
-      label: "Calentando",
-      className: "bg-slate-100 text-slate-700 border border-slate-200",
+      label: "En juego",
+      className: "bg-gray-100 text-gray-700 border border-gray-200",
     };
   }
   if (winRate >= 70) {
     return {
-      label: "On Fire",
-      className: "bg-lime-100 text-lime-800 border border-lime-300",
+      label: "Elite",
+      className: "bg-emerald-100 text-emerald-700 border border-emerald-200",
     };
   }
   if (winRate >= 55) {
     return {
-      label: "Competitivo",
-      className: "bg-cyan-100 text-cyan-800 border border-cyan-300",
+      label: "Firme",
+      className: "bg-blue-100 text-blue-700 border border-blue-200",
     };
   }
   return {
-    label: "Remontando",
-    className: "bg-orange-100 text-orange-800 border border-orange-300",
+    label: "En mejora",
+    className: "bg-amber-100 text-amber-700 border border-amber-200",
   };
 }
 
@@ -132,35 +103,21 @@ export default function RankingPage() {
   const [tournaments, setTournaments] = useState<{ id: number; name: string }[]>(
     []
   );
-  const monthOptions = useMemo(() => getMonthOptions(MONTH_OPTION_COUNT), []);
-  const currentMonthKey = monthOptions[0]?.key || getMonthKey(new Date());
-
   const [scopeMode, setScopeMode] = useState<ScopeMode>("general");
-  const [selectedMonthKey, setSelectedMonthKey] = useState(currentMonthKey);
   const [selectedTournamentId, setSelectedTournamentId] = useState("");
 
   const isGeneralView = scopeMode === "general";
-  const isMonthlyView = scopeMode === "month";
   const isTournamentView = scopeMode === "tournament";
-
-  const selectedMonthLabel =
-    monthOptions.find((month) => month.key === selectedMonthKey)?.label ||
-    "mes seleccionado";
 
   const selectedTournamentName =
     tournaments.find((t) => String(t.id) === selectedTournamentId)?.name || "";
 
   const selectedScope = useMemo(() => {
-    if (scopeMode === "month") return `month:${selectedMonthKey}`;
     if (scopeMode === "tournament") return `tournament:${selectedTournamentId}`;
     return "general";
-  }, [scopeMode, selectedMonthKey, selectedTournamentId]);
+  }, [scopeMode, selectedTournamentId]);
 
-  const scopeDescription = getScopeDescription(
-    scopeMode,
-    selectedMonthLabel,
-    selectedTournamentName
-  );
+  const scopeDescription = getScopeDescription(scopeMode, selectedTournamentName);
 
   const loadRanking = useCallback(async () => {
     setLoading(true);
@@ -218,23 +175,6 @@ export default function RankingPage() {
 
     if (selectedScope === "general") {
       // Top 10 general sin filtro por fecha.
-    } else if (selectedScope.startsWith("month:")) {
-      const monthKey = selectedScope.slice("month:".length) || currentMonthKey;
-      const [yearRaw, monthRaw] = monthKey.split("-");
-      const year = Number(yearRaw);
-      const month = Number(monthRaw);
-
-      if (!Number.isFinite(year) || !Number.isFinite(month)) {
-        toast.error("Mes seleccionado inválido");
-        setLoading(false);
-        return;
-      }
-
-      const monthStart = new Date(year, month - 1, 1, 0, 0, 0, 0);
-      const nextMonthStart = new Date(year, month, 1, 0, 0, 0, 0);
-      matchQuery = matchQuery
-        .gte("start_time", monthStart.toISOString())
-        .lt("start_time", nextMonthStart.toISOString());
     } else if (selectedScope.startsWith("tournament:")) {
       const tournamentId = Number(selectedScope.slice("tournament:".length));
       if (!Number.isFinite(tournamentId)) {
@@ -368,18 +308,13 @@ export default function RankingPage() {
       return a.name.localeCompare(b.name);
     });
 
-    if (selectedScope === "general" || selectedScope.startsWith("month:")) {
+    if (selectedScope === "general") {
       ranking = ranking.slice(0, 10);
     }
 
     setPlayers(ranking);
     setLoading(false);
-  }, [
-    currentMonthKey,
-    isTournamentView,
-    selectedScope,
-    selectedTournamentId,
-  ]);
+  }, [isTournamentView, selectedScope, selectedTournamentId]);
 
   useEffect(() => {
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -477,57 +412,43 @@ export default function RankingPage() {
   return (
     <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-20">
       <section className="max-w-6xl mx-auto space-y-5">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#071428] via-[#0d2f55] to-[#0f766e] px-6 py-7 md:px-8 md:py-8 shadow-lg">
-          <div className="pointer-events-none absolute -top-16 right-10 h-48 w-48 rounded-full bg-cyan-400/20 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-16 -left-12 h-44 w-44 rounded-full bg-lime-300/25 blur-3xl" />
-          <div className="pointer-events-none absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-lime-300/80 to-transparent" />
-          <p className="relative text-xs uppercase tracking-[0.22em] text-cyan-200 font-semibold">
-            Ranking Deportivo
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 px-6 py-7 md:px-8 md:py-8 shadow-sm">
+          <div className="pointer-events-none absolute -top-12 -right-8 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-16 -left-12 h-44 w-44 rounded-full bg-[#ccff00]/20 blur-2xl" />
+          <p className="relative text-xs uppercase tracking-[0.18em] text-slate-300 font-semibold">
+            Ranking Premium
           </p>
           <h1 className="relative mt-2 text-2xl md:text-3xl font-extrabold text-white tracking-wide">
             Ranking de Jugadores
           </h1>
-          <p className="relative mt-2 text-sm text-cyan-100/90">
-            Ritmo competitivo, rendimiento en pista y posición en tiempo real.
+          <p className="relative mt-2 text-sm text-slate-200">
+            Visión ejecutiva del rendimiento: posición, efectividad y consistencia.
           </p>
           <div className="relative mt-4 flex flex-wrap gap-2">
-            <span className="rounded-full bg-black/20 px-3 py-1 text-xs font-medium text-cyan-100 border border-cyan-300/35">
+            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white border border-white/20">
               {scopeDescription}
-            </span>
-            <span className="rounded-full bg-lime-300/20 px-3 py-1 text-xs font-semibold text-lime-200 border border-lime-300/30">
-              Modo Competencia
             </span>
           </div>
         </div>
 
-        <Card className="!p-0 overflow-hidden !bg-[#0c1b2d] !border-[#1e3a5f]">
-          <div className="px-5 py-4 border-b border-[#1e3a5f]">
-            <p className="text-xs uppercase tracking-[0.16em] text-cyan-200/80 font-semibold">
+        <Card className="!p-0 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <p className="text-xs uppercase tracking-[0.16em] text-gray-500 font-semibold">
               Vista activa
             </p>
-            <p className="mt-1 text-sm text-slate-100">{scopeDescription}</p>
+            <p className="mt-1 text-sm text-gray-700">{scopeDescription}</p>
           </div>
           <div className="px-5 py-4">
-            <div className="inline-flex w-full md:w-auto rounded-xl bg-[#0a2746] p-1 gap-1 border border-[#214d78]">
+            <div className="inline-flex w-full md:w-auto rounded-xl bg-slate-100 p-1 gap-1">
               <button
                 onClick={() => setScopeMode("general")}
                 className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-semibold transition ${
                   isGeneralView
-                    ? "bg-lime-300 text-slate-900 shadow-sm"
-                    : "text-cyan-100/80 hover:text-cyan-100"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-800"
                 }`}
               >
                 General
-              </button>
-              <button
-                onClick={() => setScopeMode("month")}
-                className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-semibold transition ${
-                  isMonthlyView
-                    ? "bg-lime-300 text-slate-900 shadow-sm"
-                    : "text-cyan-100/80 hover:text-cyan-100"
-                }`}
-              >
-                Mensual
               </button>
               <button
                 onClick={() => {
@@ -538,8 +459,8 @@ export default function RankingPage() {
                 }}
                 className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-semibold transition ${
                   isTournamentView
-                    ? "bg-lime-300 text-slate-900 shadow-sm"
-                    : "text-cyan-100/80 hover:text-cyan-100"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-800"
                 }`}
               >
                 Torneo
@@ -548,39 +469,20 @@ export default function RankingPage() {
 
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
               {isGeneralView && (
-                <div className="rounded-xl border border-cyan-300/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                   Mostrando el Top 10 histórico, ideal para analizar consistencia de largo plazo.
-                </div>
-              )}
-
-              {isMonthlyView && (
-                <div className="space-y-1">
-                  <label className="text-xs uppercase tracking-[0.12em] text-cyan-200/80 font-semibold">
-                    Seleccionar mes
-                  </label>
-                  <select
-                    value={selectedMonthKey}
-                    onChange={(e) => setSelectedMonthKey(e.target.value)}
-                    className="w-full border border-[#2b5b8f] rounded-lg px-3 py-2 text-sm bg-[#0a2746] text-slate-100 focus:outline-none focus:ring-2 focus:ring-lime-300"
-                  >
-                    {monthOptions.map((month) => (
-                      <option key={month.key} value={month.key}>
-                        {month.label}
-                      </option>
-                    ))}
-                  </select>
                 </div>
               )}
 
               {isTournamentView && (
                 <div className="space-y-1">
-                  <label className="text-xs uppercase tracking-[0.12em] text-cyan-200/80 font-semibold">
+                  <label className="text-xs uppercase tracking-[0.12em] text-gray-500 font-semibold">
                     Seleccionar torneo
                   </label>
                   <select
                     value={selectedTournamentId}
                     onChange={(e) => setSelectedTournamentId(e.target.value)}
-                    className="w-full border border-[#2b5b8f] rounded-lg px-3 py-2 text-sm bg-[#0a2746] text-slate-100 focus:outline-none focus:ring-2 focus:ring-lime-300"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300"
                   >
                     {tournaments.length === 0 ? (
                       <option value="">No hay torneos disponibles</option>
@@ -599,32 +501,32 @@ export default function RankingPage() {
         </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-          <div className="rounded-xl border border-cyan-300/30 bg-gradient-to-br from-[#0f2d4f] to-[#123f6b] p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.14em] text-cyan-200 font-semibold">
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.14em] text-gray-500 font-semibold">
               Jugadores rankeados
             </p>
-            <p className="mt-2 text-2xl font-extrabold text-white">{players.length}</p>
+            <p className="mt-2 text-2xl font-extrabold text-slate-900">{players.length}</p>
           </div>
-          <div className="rounded-xl border border-emerald-300/30 bg-gradient-to-br from-[#0f5132] to-[#0f766e] p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.14em] text-emerald-100 font-semibold">
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.14em] text-gray-500 font-semibold">
               Partidos computados
             </p>
-            <p className="mt-2 text-2xl font-extrabold text-white">{matchCount}</p>
+            <p className="mt-2 text-2xl font-extrabold text-slate-900">{matchCount}</p>
           </div>
-          <div className="rounded-xl border border-lime-300/30 bg-gradient-to-br from-[#355e1f] to-[#3f7d20] p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.14em] text-lime-100 font-semibold">
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.14em] text-gray-500 font-semibold">
               Puntos acumulados
             </p>
-            <p className="mt-2 text-2xl font-extrabold text-white">{totalPoints}</p>
+            <p className="mt-2 text-2xl font-extrabold text-slate-900">{totalPoints}</p>
           </div>
-          <div className="rounded-xl border border-orange-300/30 bg-gradient-to-br from-[#7c2d12] to-[#b45309] p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.14em] text-orange-100 font-semibold">
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.14em] text-gray-500 font-semibold">
               Liderazgo
             </p>
-            <p className="mt-2 text-lg font-extrabold text-white truncate">
+            <p className="mt-2 text-lg font-extrabold text-slate-900 truncate">
               {leader ? leader.name : "-"}
             </p>
-            <p className="mt-1 text-xs text-orange-100/90">
+            <p className="mt-1 text-xs text-gray-500">
               {leaderGap !== null ? `Ventaja: +${leaderGap} pts` : "Sin referencia"}
             </p>
           </div>
@@ -639,41 +541,39 @@ export default function RankingPage() {
             <p>
               {isGeneralView
                 ? "No hay jugadores con puntos todavía. Registrá algunos partidos."
-                : isMonthlyView
-                ? "No hay jugadores con puntos en ese mes. Elegí otro mes del selector."
                 : "No hay jugadores con puntos en ese torneo. Registrá algunos partidos."}
             </p>
           </Card>
         ) : (
           <>
-            <Card className="!p-0 overflow-hidden !bg-[#0c1b2d] !border-[#1e3a5f]">
-              <div className="px-5 py-4 border-b border-[#1e3a5f] flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-cyan-200/80 uppercase tracking-[0.18em]">
-                  Podio Elite
+            <Card className="!p-0 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.18em]">
+                  Podio Premium
                 </h2>
-                <span className="text-xs text-cyan-100/70">Top 3 jugadores</span>
+                <span className="text-xs text-gray-500">Top 3 jugadores</span>
               </div>
               <div className="p-4 md:p-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {leader && (
                   <button
                     onClick={() => handleRowClick(leader.id)}
-                    className="lg:col-span-2 rounded-2xl border border-lime-300/40 bg-gradient-to-br from-[#123a56] via-[#155c76] to-[#0f766e] p-5 text-left transition hover:shadow-md hover:scale-[1.01]"
+                    className="lg:col-span-2 rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 to-white p-5 text-left transition hover:shadow-md"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-4 min-w-0">
                         {renderAvatar(
                           leader,
-                          "w-16 h-16 border-2 border-lime-300",
+                          "w-16 h-16 border-2 border-amber-300",
                           "text-base"
                         )}
                         <div className="min-w-0">
-                          <p className="text-xs uppercase tracking-[0.12em] text-lime-200 font-semibold">
+                          <p className="text-xs uppercase tracking-[0.12em] text-amber-700 font-semibold">
                             1° lugar
                           </p>
-                          <p className="mt-1 text-xl font-extrabold text-white truncate">
+                          <p className="mt-1 text-xl font-extrabold text-slate-900 truncate">
                             {leader.name}
                           </p>
-                          <p className="mt-1 text-sm text-cyan-100/90">
+                          <p className="mt-1 text-sm text-slate-600">
                             Win rate: {getWinRate(leader)}%
                           </p>
                         </div>
@@ -681,27 +581,27 @@ export default function RankingPage() {
                       <span className="text-2xl">🥇</span>
                     </div>
                     <div className="mt-4 grid grid-cols-4 gap-3 text-xs">
-                      <div className="rounded-lg bg-white/10 border border-lime-300/20 px-3 py-2">
-                        <p className="text-cyan-100/80 uppercase tracking-wide">Puntos</p>
-                        <p className="mt-1 text-sm font-bold text-white">
+                      <div className="rounded-lg bg-white border border-amber-100 px-3 py-2">
+                        <p className="text-gray-500 uppercase tracking-wide">Puntos</p>
+                        <p className="mt-1 text-sm font-bold text-slate-900">
                           {leader.points}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-white/10 border border-lime-300/20 px-3 py-2">
-                        <p className="text-cyan-100/80 uppercase tracking-wide">PJ</p>
-                        <p className="mt-1 text-sm font-bold text-white">
+                      <div className="rounded-lg bg-white border border-amber-100 px-3 py-2">
+                        <p className="text-gray-500 uppercase tracking-wide">PJ</p>
+                        <p className="mt-1 text-sm font-bold text-slate-900">
                           {leader.played}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-white/10 border border-lime-300/20 px-3 py-2">
-                        <p className="text-cyan-100/80 uppercase tracking-wide">PG</p>
-                        <p className="mt-1 text-sm font-bold text-white">
+                      <div className="rounded-lg bg-white border border-amber-100 px-3 py-2">
+                        <p className="text-gray-500 uppercase tracking-wide">PG</p>
+                        <p className="mt-1 text-sm font-bold text-slate-900">
                           {leader.wins}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-white/10 border border-lime-300/20 px-3 py-2">
-                        <p className="text-cyan-100/80 uppercase tracking-wide">PP</p>
-                        <p className="mt-1 text-sm font-bold text-white">
+                      <div className="rounded-lg bg-white border border-amber-100 px-3 py-2">
+                        <p className="text-gray-500 uppercase tracking-wide">PP</p>
+                        <p className="mt-1 text-sm font-bold text-slate-900">
                           {leader.losses}
                         </p>
                       </div>
@@ -717,7 +617,7 @@ export default function RankingPage() {
                       <button
                         key={player.id}
                         onClick={() => handleRowClick(player.id)}
-                        className={`w-full rounded-xl border p-4 text-left transition hover:shadow-md hover:scale-[1.01] ${style.card}`}
+                        className={`w-full rounded-xl border p-4 text-left transition hover:shadow-md ${style.card}`}
                       >
                         <div className="flex items-center justify-between">
                           <span
@@ -747,7 +647,7 @@ export default function RankingPage() {
                     );
                   })}
                   {podium.length < 2 && (
-                    <div className="rounded-xl border border-dashed border-cyan-300/30 p-4 text-sm text-cyan-100/80">
+                    <div className="rounded-xl border border-dashed border-gray-200 p-4 text-sm text-gray-500">
                       Sin jugadores suficientes para completar el podio.
                     </div>
                   )}
@@ -755,9 +655,9 @@ export default function RankingPage() {
               </div>
             </Card>
 
-            <Card className="!p-0 overflow-hidden !bg-[#0c1b2d] !border-[#1e3a5f]">
-              <div className="px-5 py-4 border-b border-[#1e3a5f] flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <h2 className="text-sm font-semibold text-cyan-200/80 uppercase tracking-[0.18em]">
+            <Card className="!p-0 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.18em]">
                   Tabla Pro
                 </h2>
                 <input
@@ -765,20 +665,20 @@ export default function RankingPage() {
                   value={tableSearch}
                   onChange={(e) => setTableSearch(e.target.value)}
                   placeholder="Buscar jugador..."
-                  className="w-full md:w-64 border border-[#2b5b8f] rounded-lg px-3 py-2 text-sm bg-[#0a2746] text-slate-100 placeholder:text-cyan-100/50 focus:outline-none focus:ring-2 focus:ring-lime-300"
+                  className="w-full md:w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300"
                 />
               </div>
 
               {filteredPlayers.length === 0 ? (
-                <div className="px-5 py-8 text-center text-sm text-cyan-100/70">
+                <div className="px-5 py-8 text-center text-sm text-gray-500">
                   No hay jugadores para el criterio de búsqueda.
                 </div>
               ) : (
                 <>
                   <div className="hidden md:block overflow-x-auto max-h-[560px]">
                     <table className="w-full text-sm">
-                      <thead className="sticky top-0 bg-[#0e243b] z-10 shadow-[0_1px_0_0_rgba(30,58,95,1)]">
-                        <tr className="text-xs uppercase text-cyan-200/75">
+                      <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_0_0_rgba(229,231,235,1)]">
+                        <tr className="text-xs uppercase text-gray-500">
                           <th className="py-3 px-3 text-left font-semibold">Pos</th>
                           <th className="py-3 px-3 text-left font-semibold">Jugador</th>
                           <th className="py-3 px-3 text-center font-semibold">Forma</th>
@@ -797,18 +697,18 @@ export default function RankingPage() {
                           return (
                             <tr
                               key={player.id}
-                              className={`border-b border-[#1e3a5f] cursor-pointer transition hover:bg-[#12314d] ${
-                                position <= 3 ? "bg-[#102844]" : "bg-[#0c1b2d]"
+                              className={`border-b border-gray-100 cursor-pointer transition hover:bg-gray-50 ${
+                                position <= 3 ? "bg-slate-50/70" : "bg-white"
                               }`}
                               onClick={() => handleRowClick(player.id)}
                             >
-                              <td className="py-3 px-3 font-semibold text-lime-300">
+                              <td className="py-3 px-3 font-semibold text-slate-700">
                                 {position}º
                               </td>
                               <td className="py-3 px-3">
                                 <div className="flex items-center gap-2">
                                   {renderAvatar(player, "w-8 h-8", "text-xs")}
-                                  <span className="font-medium text-white">
+                                  <span className="font-medium text-slate-900">
                                     {player.name}
                                   </span>
                                 </div>
@@ -820,22 +720,22 @@ export default function RankingPage() {
                                   {badge.label}
                                 </span>
                               </td>
-                              <td className="py-3 px-3 text-center text-cyan-100/90">
+                              <td className="py-3 px-3 text-center text-slate-700">
                                 {player.played}
                               </td>
-                              <td className="py-3 px-3 text-center text-cyan-100/90">
+                              <td className="py-3 px-3 text-center text-slate-700">
                                 {player.wins}
                               </td>
-                              <td className="py-3 px-3 text-center text-cyan-100/90">
+                              <td className="py-3 px-3 text-center text-slate-700">
                                 {player.losses}
                               </td>
-                              <td className="py-3 px-3 text-center text-cyan-100/90 font-semibold">
+                              <td className="py-3 px-3 text-center text-slate-700 font-semibold">
                                 {getWinRate(player)}%
                               </td>
-                              <td className="py-3 px-3 text-center text-cyan-100/90">
+                              <td className="py-3 px-3 text-center text-slate-700">
                                 {player.games_for - player.games_against}
                               </td>
-                              <td className="py-3 px-3 text-center font-bold text-lime-300">
+                              <td className="py-3 px-3 text-center font-bold text-slate-900">
                                 {player.points}
                               </td>
                             </tr>
@@ -853,19 +753,19 @@ export default function RankingPage() {
                         <button
                           key={player.id}
                           onClick={() => handleRowClick(player.id)}
-                          className="w-full rounded-xl border border-[#214d78] bg-[#0f243b] p-3 text-left"
+                          className="w-full rounded-xl border border-gray-200 bg-white p-3 text-left"
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3 min-w-0">
-                              <span className="inline-flex items-center justify-center h-6 min-w-6 px-2 rounded-full bg-lime-300 text-slate-900 text-xs font-semibold">
+                              <span className="inline-flex items-center justify-center h-6 min-w-6 px-2 rounded-full bg-slate-900 text-white text-xs font-semibold">
                                 {position}
                               </span>
                               {renderAvatar(player, "w-9 h-9", "text-xs")}
-                              <p className="text-sm font-semibold text-white truncate">
+                              <p className="text-sm font-semibold text-slate-900 truncate">
                                 {player.name}
                               </p>
                             </div>
-                            <p className="text-sm font-bold text-lime-300">
+                            <p className="text-sm font-bold text-slate-900">
                               {player.points} pts
                             </p>
                           </div>
@@ -875,35 +775,35 @@ export default function RankingPage() {
                             >
                               {badge.label}
                             </span>
-                            <p className="text-[11px] text-cyan-100/75">
+                            <p className="text-[11px] text-gray-500">
                               Win rate:{" "}
-                              <span className="font-semibold text-white">
+                              <span className="font-semibold text-slate-900">
                                 {getWinRate(player)}%
                               </span>
                             </p>
                           </div>
-                          <div className="mt-2 grid grid-cols-4 gap-2 text-[11px] text-cyan-100/80">
+                          <div className="mt-2 grid grid-cols-4 gap-2 text-[11px] text-gray-600">
                             <p>
                               PJ:{" "}
-                              <span className="font-semibold text-white">
+                              <span className="font-semibold text-slate-900">
                                 {player.played}
                               </span>
                             </p>
                             <p>
                               PG:{" "}
-                              <span className="font-semibold text-white">
+                              <span className="font-semibold text-slate-900">
                                 {player.wins}
                               </span>
                             </p>
                             <p>
                               PP:{" "}
-                              <span className="font-semibold text-white">
+                              <span className="font-semibold text-slate-900">
                                 {player.losses}
                               </span>
                             </p>
                             <p>
                               +/-:{" "}
-                              <span className="font-semibold text-white">
+                              <span className="font-semibold text-slate-900">
                                 {player.games_for - player.games_against}
                               </span>
                             </p>
