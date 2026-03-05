@@ -17,6 +17,18 @@ type TournamentRound = {
   start_at: string;
 };
 
+function toDateTimeLocalValue(iso: string | null | undefined) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 export default function EditTournament() {
   const router = useRouter();
   const params = useParams();
@@ -28,6 +40,7 @@ export default function EditTournament() {
     name: "",
     category: "",
     start_date: "",
+    end_date: "",
     status: "abierto",
   });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -36,7 +49,11 @@ export default function EditTournament() {
   const [matches, setMatches] = useState<any[]>([]);
   const [rounds, setRounds] = useState<TournamentRound[]>([]);
   const [roundsBusy, setRoundsBusy] = useState(false);
+  const [newRoundName, setNewRoundName] = useState("");
   const [newRoundStartAt, setNewRoundStartAt] = useState("");
+  const [editingRoundId, setEditingRoundId] = useState<number | null>(null);
+  const [editingRoundName, setEditingRoundName] = useState("");
+  const [editingRoundStartAt, setEditingRoundStartAt] = useState("");
   const [tenantId, setTenantId] = useState<string>("");
   const [playersMap, setPlayersMap] = useState<Record<number, string>>({});
   const [openResultMatch, setOpenResultMatch] = useState<any | null>(null);
@@ -80,6 +97,7 @@ export default function EditTournament() {
             name: data.name || "",
             category: data.category || "",
             start_date: data.start_date ? data.start_date.split("T")[0] : "",
+            end_date: data.end_date ? data.end_date.split("T")[0] : "",
             status: data.status || "abierto",
           });
           setTenantId(data.tenant_id || "");
@@ -183,15 +201,46 @@ export default function EditTournament() {
       return;
     }
 
-    const { error } = await supabase
+    const normalizedStatus = String(formData.status || "").toLowerCase();
+    const mustHaveEndDate = normalizedStatus === "finalizado";
+    const normalizedEndDate = formData.end_date ? formData.end_date : null;
+
+    if (mustHaveEndDate && !normalizedEndDate) {
+      setLoading(false);
+      toast.error("Para finalizar el torneo debés indicar una fecha de finalización");
+      return;
+    }
+
+    const payloadWithEndDate = {
+      name: formData.name,
+      category: formData.category,
+      start_date: formData.start_date || null,
+      end_date: mustHaveEndDate ? normalizedEndDate : null,
+      status: formData.status,
+    };
+
+    let { error } = await supabase
       .from("tournaments")
-      .update({
+      .update(payloadWithEndDate)
+      .eq("id", idNumber);
+
+    if (
+      error &&
+      /end_date/i.test(error.message || "") &&
+      /(does not exist|column)/i.test(error.message || "")
+    ) {
+      const fallbackPayload = {
         name: formData.name,
         category: formData.category,
-        start_date: formData.start_date,
+        start_date: formData.start_date || null,
         status: formData.status,
-      })
-      .eq("id", idNumber);
+      };
+      const fallbackRes = await supabase
+        .from("tournaments")
+        .update(fallbackPayload)
+        .eq("id", idNumber);
+      error = fallbackRes.error;
+    }
 
     if (error) {
       console.error("Error UPDATE tournaments:", error);
@@ -238,7 +287,7 @@ export default function EditTournament() {
     }
 
     const nextRoundNumber = getNextRoundNumber();
-    const nextRoundName = `Fecha ${nextRoundNumber}`;
+    const nextRoundName = newRoundName.trim() || `Fecha ${nextRoundNumber}`;
 
     setRoundsBusy(true);
 
@@ -289,7 +338,99 @@ export default function EditTournament() {
     setRounds((prev) =>
       [...prev, data as TournamentRound].sort((a, b) => a.round_number - b.round_number)
     );
+    setNewRoundName("");
     toast.success("Jornada creada");
+  };
+
+  const startEditRound = (round: TournamentRound) => {
+    setEditingRoundId(round.id);
+    setEditingRoundName(round.round_name);
+    setEditingRoundStartAt(toDateTimeLocalValue(round.start_at));
+  };
+
+  const cancelEditRound = () => {
+    setEditingRoundId(null);
+    setEditingRoundName("");
+    setEditingRoundStartAt("");
+  };
+
+  const handleSaveRoundEdit = async (round: TournamentRound) => {
+    const trimmedName = editingRoundName.trim();
+    if (!trimmedName) {
+      toast.error("El nombre de la jornada es obligatorio");
+      return;
+    }
+
+    const parsed = new Date(editingRoundStartAt);
+    if (!editingRoundStartAt || Number.isNaN(parsed.getTime())) {
+      toast.error("Seleccioná una fecha y hora válida para la jornada");
+      return;
+    }
+
+    setRoundsBusy(true);
+
+    const isRenaming = trimmedName !== round.round_name;
+    if (isRenaming) {
+      const { error: renameMatchesError } = await supabase
+        .from("matches")
+        .update({ round_name: trimmedName })
+        .eq("tournament_id", idNumber)
+        .eq("round_name", round.round_name);
+
+      if (renameMatchesError) {
+        console.error("Error renombrando partidos de la jornada:", renameMatchesError);
+        setRoundsBusy(false);
+        toast.error("No se pudo actualizar el nombre en los partidos de la jornada");
+        return;
+      }
+    }
+
+    const { error: updateRoundError } = await supabase
+      .from("tournament_rounds")
+      .update({
+        round_name: trimmedName,
+        start_at: parsed.toISOString(),
+      })
+      .eq("id", round.id);
+
+    if (updateRoundError) {
+      console.error("Error actualizando jornada:", updateRoundError);
+      if (isRenaming) {
+        await supabase
+          .from("matches")
+          .update({ round_name: round.round_name })
+          .eq("tournament_id", idNumber)
+          .eq("round_name", trimmedName);
+      }
+      setRoundsBusy(false);
+      toast.error("No se pudo editar la jornada");
+      return;
+    }
+
+    setRounds((prev) =>
+      prev.map((item) =>
+        item.id === round.id
+          ? {
+              ...item,
+              round_name: trimmedName,
+              start_at: parsed.toISOString(),
+            }
+          : item
+      )
+    );
+    if (isRenaming) {
+      setMatches((prev) =>
+        prev.map((match) =>
+          match.round_name === round.round_name
+            ? { ...match, round_name: trimmedName }
+            : match
+        )
+      );
+    }
+
+    setRoundsBusy(false);
+    cancelEditRound();
+    toast.success("Jornada actualizada");
   };
 
   const handleDeleteRound = async (round: TournamentRound) => {
@@ -331,6 +472,7 @@ export default function EditTournament() {
     }
 
     setRounds((prev) => prev.filter((item) => item.id !== round.id));
+    if (editingRoundId === round.id) cancelEditRound();
     toast.success("Jornada eliminada");
   };
 
@@ -439,6 +581,25 @@ export default function EditTournament() {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Fecha de finalización
+              </label>
+              <input
+                type="date"
+                className="w-full p-2 border border-gray-300 rounded outline-none"
+                value={formData.end_date}
+                onChange={(e) =>
+                  setFormData({ ...formData, end_date: e.target.value })
+                }
+              />
+              {formData.status === "finalizado" && !formData.end_date && (
+                <p className="mt-1 text-xs text-red-600">
+                  Para finalizar el torneo, cargá la fecha de finalización.
+                </p>
+              )}
+            </div>
+
             {/* Botones */}
             <div className="flex justify-end gap-3 mt-4">
               <button
@@ -472,24 +633,75 @@ export default function EditTournament() {
                   key={round.id}
                   className="border border-gray-200 rounded-lg p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
                 >
-                  <div>
-                    <p className="font-semibold text-gray-800">{round.round_name}</p>
-                    <p className="text-sm text-gray-500">
-                      {new Date(round.start_at).toLocaleString("es-ES", {
-                        dateStyle: "short",
-                        timeStyle: "short",
-                        timeZone: "Europe/Madrid",
-                      })}
-                    </p>
+                  {editingRoundId === round.id ? (
+                    <div className="w-full space-y-2">
+                      <input
+                        type="text"
+                        value={editingRoundName}
+                        onChange={(e) => setEditingRoundName(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded outline-none"
+                        placeholder="Nombre de la jornada"
+                      />
+                      <input
+                        type="datetime-local"
+                        value={editingRoundStartAt}
+                        onChange={(e) => setEditingRoundStartAt(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded outline-none"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="font-semibold text-gray-800">{round.round_name}</p>
+                      <p className="text-sm text-gray-500">
+                        {new Date(round.start_at).toLocaleString("es-ES", {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                          timeZone: "Europe/Madrid",
+                        })}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    {editingRoundId === round.id ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleSaveRoundEdit(round)}
+                          disabled={roundsBusy}
+                          className="px-3 py-1 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEditRound}
+                          disabled={roundsBusy}
+                          className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 text-sm hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Cancelar
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startEditRound(round)}
+                        disabled={roundsBusy}
+                        className="px-3 py-1 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Editar jornada
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteRound(round)}
+                      disabled={roundsBusy}
+                      className="px-3 py-1 rounded-md bg-red-100 text-red-700 text-sm hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Eliminar jornada
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteRound(round)}
-                    disabled={roundsBusy}
-                    className="px-3 py-1 rounded-md bg-red-100 text-red-700 text-sm hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Eliminar jornada
-                  </button>
                 </div>
               ))
             )}
@@ -497,6 +709,13 @@ export default function EditTournament() {
 
           <div className="border border-dashed border-gray-300 rounded-lg p-4 space-y-3">
             <p className="font-semibold text-gray-800">Agregar jornada</p>
+            <input
+              type="text"
+              value={newRoundName}
+              onChange={(e) => setNewRoundName(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded outline-none"
+              placeholder={`Nombre (opcional, por defecto "Fecha ${getNextRoundNumber()}")`}
+            />
             <input
               type="datetime-local"
               value={newRoundStartAt}
