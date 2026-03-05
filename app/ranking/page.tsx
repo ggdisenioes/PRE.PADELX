@@ -52,8 +52,9 @@ export default function RankingPage() {
   const [tournaments, setTournaments] = useState<{ id: number; name: string }[]>([]);
   const monthOptions = useMemo(() => getMonthOptions(MONTH_OPTION_COUNT), []);
   const currentMonthKey = monthOptions[0]?.key || getMonthKey(new Date());
-  const [selectedScope, setSelectedScope] = useState<string>(`month:${currentMonthKey}`);
+  const [selectedScope, setSelectedScope] = useState<string>("general");
 
+  const isGeneralView = selectedScope === "general";
   const isMonthlyView = selectedScope.startsWith("month:");
   const selectedMonthKey = isMonthlyView ? selectedScope.slice("month:".length) : null;
   const selectedMonthLabel =
@@ -94,7 +95,9 @@ export default function RankingPage() {
       .select("winner, player_1_a, player_2_a, player_1_b, player_2_b, tournament_id, score, start_time")
       .not("tournament_id", "is", null);
 
-    if (selectedScope.startsWith("month:")) {
+    if (selectedScope === "general") {
+      // Top 10 general sin filtro por fecha
+    } else if (selectedScope.startsWith("month:")) {
       const monthKey = selectedScope.slice("month:".length) || currentMonthKey;
       const [yearRaw, monthRaw] = monthKey.split("-");
       const year = Number(yearRaw);
@@ -111,9 +114,13 @@ export default function RankingPage() {
       matchQuery = matchQuery
         .gte("start_time", monthStart.toISOString())
         .lt("start_time", nextMonthStart.toISOString());
-    } else {
+    } else if (selectedScope.startsWith("tournament:")) {
       const tournamentId = Number(selectedScope.slice("tournament:".length));
       matchQuery = matchQuery.eq("tournament_id", tournamentId);
+    } else {
+      toast.error("Filtro de ranking inválido");
+      setLoading(false);
+      return;
     }
 
     const { data: matches, error: matchError } = await matchQuery;
@@ -220,7 +227,7 @@ export default function RankingPage() {
       return a.name.localeCompare(b.name);
     });
 
-    if (selectedScope.startsWith("month:")) {
+    if (selectedScope === "general" || selectedScope.startsWith("month:")) {
       ranking = ranking.slice(0, 10);
     }
 
@@ -280,6 +287,7 @@ export default function RankingPage() {
               onChange={(e) => setSelectedScope(e.target.value)}
               className="border rounded-md px-3 py-2 text-sm"
             >
+              <option value="general">Top 10 general (histórico)</option>
               <optgroup label="Top 10 mensual">
                 {monthOptions.map((month) => (
                   <option key={month.key} value={`month:${month.key}`}>
@@ -297,7 +305,9 @@ export default function RankingPage() {
             </select>
           </div>
           <p className="text-sm text-gray-600 mt-1">
-            {isMonthlyView
+            {isGeneralView
+              ? "Mostrando el Top 10 general histórico (sin filtro por fecha)."
+              : isMonthlyView
               ? `Mostrando el Top 10 de ${selectedMonthLabel}.`
               : "Mostrando solo jugadores con partidos en el torneo seleccionado."}
           </p>
@@ -309,7 +319,9 @@ export default function RankingPage() {
           </p>
         ) : players.length === 0 ? (
           <p className="text-gray-400 text-center">
-            {isMonthlyView
+            {isGeneralView
+              ? "No hay jugadores con puntos todavía. Registrá algunos partidos."
+              : isMonthlyView
               ? "No hay jugadores con puntos en ese mes. Elegí otro mes del selector."
               : "No hay jugadores con puntos en ese torneo. Registrá algunos partidos."}
           </p>
