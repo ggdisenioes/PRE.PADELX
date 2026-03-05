@@ -21,6 +21,17 @@ type RankedPlayer = {
 
 type ScopeMode = "general" | "tournament";
 
+function emptyRankingStats() {
+  return {
+    wins: 0,
+    losses: 0,
+    played: 0,
+    games_for: 0,
+    games_against: 0,
+    points: 0,
+  };
+}
+
 function getScopeDescription(
   scopeMode: ScopeMode,
   selectedTournamentName: string
