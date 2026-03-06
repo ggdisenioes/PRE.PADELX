@@ -6,11 +6,20 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "../i18n";
 
 const REMEMBERED_EMAIL_KEY = "padelx.rememberedEmail";
+const STRICT_TENANT_SLUGS = new Set(["twinco"]);
 
 function getBaseDomain(hostname: string) {
   const parts = hostname.split(".");
   if (parts.length < 2) return hostname;
   return parts.slice(-2).join(".");
+}
+
+function getPreferredSubdomain(tenantSlug: string) {
+  const slug = String(tenantSlug || "").trim().toLowerCase();
+  if (!slug) return "";
+  // Entorno demo usa el host new.padelx.es
+  if (slug === "demo") return "new";
+  return slug;
 }
 
 function getLoginMessage(errorCode: string | null, t: (key: string) => string) {
@@ -55,7 +64,9 @@ export default function LoginPage() {
     if (typeof window === "undefined") return null;
 
     const base = getBaseDomain(window.location.hostname);
-    return `https://${tenantSlug}.${base}`;
+    const preferredSubdomain = getPreferredSubdomain(tenantSlug);
+    if (!preferredSubdomain) return null;
+    return `https://${preferredSubdomain}.${base}`;
   }, [tenantSlug]);
 
   useEffect(() => {
@@ -92,7 +103,7 @@ export default function LoginPage() {
   const validateProfileAndRedirect = async (userId: string, fallbackError: string) => {
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("active, role")
+      .select("active, role, tenant_id")
       .eq("id", userId)
       .single();
 
@@ -104,6 +115,49 @@ export default function LoginPage() {
           : fallbackError
       );
       return;
+    }
+
+    if (profile.role !== "super_admin") {
+      if (!profile.tenant_id) {
+        await supabase.auth.signOut();
+        setErrorMsg(t("errors.tenantNoAsignado"));
+        return;
+      }
+
+      const { data: tenantData, error: tenantError } = await supabase
+        .from("tenants")
+        .select("slug")
+        .eq("id", profile.tenant_id)
+        .maybeSingle();
+
+      const tenantSlugFromProfile = String(tenantData?.slug || "")
+        .trim()
+        .toLowerCase();
+
+      if (tenantError || !tenantSlugFromProfile) {
+        await supabase.auth.signOut();
+        setErrorMsg(t("errors.tenantInvalido"));
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        const currentHost = window.location.hostname.trim().toLowerCase();
+        const currentSubdomain = currentHost.split(".")[0] || "";
+        const preferredSubdomain = getPreferredSubdomain(tenantSlugFromProfile);
+        const shouldForceTenantHost =
+          STRICT_TENANT_SLUGS.has(tenantSlugFromProfile) &&
+          preferredSubdomain &&
+          currentSubdomain !== preferredSubdomain;
+
+        if (shouldForceTenantHost) {
+          const baseDomain = getBaseDomain(currentHost);
+          await supabase.auth.signOut();
+          window.location.replace(
+            `https://${preferredSubdomain}.${baseDomain}/login?error=tenant_incorrecto&tenant=${encodeURIComponent(tenantSlugFromProfile)}`
+          );
+          return;
+        }
+      }
     }
 
     router.push(profile?.role === "super_admin" ? "/super-admin" : "/");
