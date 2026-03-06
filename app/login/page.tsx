@@ -7,6 +7,7 @@ import { useTranslation } from "../i18n";
 
 const REMEMBERED_EMAIL_KEY = "padelx.rememberedEmail";
 const STRICT_TENANT_SLUGS = new Set(["twinco"]);
+const LOGIN_REQUEST_TIMEOUT_MS = 15000;
 
 function getBaseDomain(hostname: string) {
   const parts = hostname.split(".");
@@ -41,6 +42,21 @@ function getLoginMessage(errorCode: string | null, t: (key: string) => string) {
     default:
       return null;
   }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout")), ms);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
 }
 
 export default function LoginPage() {
@@ -101,11 +117,14 @@ export default function LoginPage() {
   }, []);
 
   const validateProfileAndRedirect = async (userId: string, fallbackError: string) => {
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("active, role, tenant_id")
-      .eq("id", userId)
-      .single();
+    const { data: profile, error: profileError } = await withTimeout(
+      supabase
+        .from("profiles")
+        .select("active, role, tenant_id")
+        .eq("id", userId)
+        .single(),
+      LOGIN_REQUEST_TIMEOUT_MS
+    );
 
     if (profileError || !profile || profile.active === false) {
       await supabase.auth.signOut();
@@ -124,11 +143,14 @@ export default function LoginPage() {
         return;
       }
 
-      const { data: tenantData, error: tenantError } = await supabase
-        .from("tenants")
-        .select("slug")
-        .eq("id", profile.tenant_id)
-        .maybeSingle();
+      const { data: tenantData, error: tenantError } = await withTimeout(
+        supabase
+          .from("tenants")
+          .select("slug")
+          .eq("id", profile.tenant_id)
+          .maybeSingle(),
+        LOGIN_REQUEST_TIMEOUT_MS
+      );
 
       const tenantSlugFromProfile = String(tenantData?.slug || "")
         .trim()
@@ -169,34 +191,53 @@ export default function LoginPage() {
     setLoading(true);
     setErrorMsg(null);
     setInfoMsg(null);
-
     const normalizedEmail = email.trim().toLowerCase();
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password,
-    });
-
-    if (error || !data.session || !data.user) {
-      setErrorMsg(
-        error?.message === "Invalid login credentials"
-          ? t("auth.invalidCredentials")
-          : error?.message ?? t("auth.loginError")
+    try {
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        }),
+        LOGIN_REQUEST_TIMEOUT_MS
       );
-      setLoading(false);
-      return;
-    }
 
-    if (typeof window !== "undefined") {
-      if (rememberUser) {
-        window.localStorage.setItem(REMEMBERED_EMAIL_KEY, normalizedEmail);
-      } else {
-        window.localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+      if (error || !data.session || !data.user) {
+        setErrorMsg(
+          error?.message === "Invalid login credentials"
+            ? t("auth.invalidCredentials")
+            : error?.message ?? t("auth.loginError")
+        );
+        return;
       }
-    }
 
-    await validateProfileAndRedirect(data.user.id, t("auth.userDisabled"));
-    setLoading(false);
+      if (typeof window !== "undefined") {
+        if (rememberUser) {
+          window.localStorage.setItem(REMEMBERED_EMAIL_KEY, normalizedEmail);
+        } else {
+          window.localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+        }
+      }
+
+      await withTimeout(
+        validateProfileAndRedirect(data.user.id, t("auth.userDisabled")),
+        LOGIN_REQUEST_TIMEOUT_MS
+      );
+    } catch (error: any) {
+      console.error("[login] timeout/error:", error);
+      if (String(error?.message || "").includes("timeout")) {
+        try {
+          await supabase.auth.signOut({ scope: "local" });
+        } catch {}
+        setErrorMsg(
+          "La autenticación tardó demasiado. Se limpió la sesión local, intentá nuevamente."
+        );
+      } else {
+        setErrorMsg(t("auth.loginError"));
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
