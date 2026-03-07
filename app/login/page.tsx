@@ -348,7 +348,7 @@ export default function LoginPage() {
             Registrarme
           </button>
           <p className="text-xs text-gray-500 text-center">
-            Si no ves tu club en el registro, contactá al administrador.
+            Si no ves tu club en el registro, contacta al administrador.
           </p>
         </form>
 

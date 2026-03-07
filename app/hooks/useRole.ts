@@ -115,7 +115,7 @@ export function useRole() {
 
         if (activeFromToken === false) {
           console.warn("[useRole] inactive user (JWT claim), signing out", session.user.id);
-          toast.error("Tu cuenta fue desactivada. Contactá al administrador.");
+          toast.error("Tu cuenta fue desactivada. Contacta al administrador.");
           await supabase.auth.signOut();
           try {
             sessionStorage.setItem("auth_disabled", "1");
@@ -163,7 +163,7 @@ export function useRole() {
 
         if (data.active === false) {
           console.warn("[useRole] inactive user, signing out", userId);
-          toast.error("Tu cuenta fue desactivada. Contactá al administrador.");
+          toast.error("Tu cuenta fue desactivada. Contacta al administrador.");
           await supabase.auth.signOut();
           try { sessionStorage.setItem("auth_disabled", "1"); } catch {}
           if (typeof window !== "undefined") {

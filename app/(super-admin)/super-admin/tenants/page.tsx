@@ -60,7 +60,7 @@ export default function TenantsPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <input
             type="text"
-            placeholder="Buscar por nombre o email..."
+            placeholder="Buscar por nombre o correo electrónico..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);

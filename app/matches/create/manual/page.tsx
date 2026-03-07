@@ -262,12 +262,12 @@ export default function CreateMatchManualPage() {
     }
 
     if (rounds.length > 0 && !form.round_id) {
-      toast.error("Seleccioná una jornada para el partido");
+      toast.error("Selecciona una jornada para el partido");
       return;
     }
 
     if (!form.court_id) {
-      toast.error("Seleccioná una pista disponible");
+      toast.error("Selecciona una pista disponible");
       return;
     }
 

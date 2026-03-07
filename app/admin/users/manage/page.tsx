@@ -185,7 +185,7 @@ export default function AdminUsersManagePage() {
     const password = createForm.password;
 
     if (!email || !password) {
-      toast.error("Completá email y contraseña");
+      toast.error("Introduce el correo electrónico y la contraseña");
       return;
     }
     const passwordError = getFirstPasswordError(password);

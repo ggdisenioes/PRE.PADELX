@@ -74,7 +74,7 @@ export default function DashboardPage() {
       await supabase.auth.signOut();
       setErrorMsg(
         profile && profile.active === false
-          ? "Tu solicitud de acceso está en revisión. Contactá al administrador del club."
+          ? "Tu solicitud de acceso está en revisión. Contacta al administrador del club."
           : "Usuario deshabilitado, contacte su administrador."
       );
       setLoading(false);

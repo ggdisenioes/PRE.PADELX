@@ -92,12 +92,12 @@ export default function RegisterPage() {
     e.preventDefault();
 
     if (!tenantId) {
-      toast.error("Seleccioná un club.");
+      toast.error("Selecciona un club.");
       return;
     }
 
     if (!email.trim()) {
-      toast.error("Accede un email.");
+      toast.error("Introduce un correo electrónico.");
       return;
     }
 
@@ -172,7 +172,7 @@ export default function RegisterPage() {
         <div className="space-y-1 mb-6">
           <h1 className="text-2xl font-bold">Crear cuenta</h1>
           <p className="text-sm text-gray-600">
-            Registrate para solicitar acceso a un club. Un administrador debe aprobar tu solicitud.
+            Regístrate para solicitar acceso a un club. Un administrador debe aprobar tu solicitud.
           </p>
         </div>
 
@@ -195,7 +195,7 @@ export default function RegisterPage() {
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-500">
-              Si no ves tu club, contactá al administrador.
+              Si no ves tu club, contacta al administrador.
             </p>
           </div>
 

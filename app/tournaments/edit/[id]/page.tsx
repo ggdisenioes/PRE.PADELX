@@ -276,7 +276,7 @@ export default function EditTournament() {
 
   const handleAddRound = async () => {
     if (!newRoundStartAt) {
-      toast.error("Seleccioná fecha y hora de inicio de la jornada");
+      toast.error("Selecciona fecha y hora de inicio de la jornada");
       return;
     }
 
@@ -363,7 +363,7 @@ export default function EditTournament() {
 
     const parsed = new Date(editingRoundStartAt);
     if (!editingRoundStartAt || Number.isNaN(parsed.getTime())) {
-      toast.error("Seleccioná una fecha y hora válida para la jornada");
+      toast.error("Selecciona una fecha y hora válida para la jornada");
       return;
     }
 

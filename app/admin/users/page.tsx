@@ -221,7 +221,7 @@ export default function AdminUsersPage() {
 
     const name = inviteForm.name.trim();
     if (!name) {
-      toast.error("Completá el nombre.");
+      toast.error("Completa el nombre.");
       return;
     }
 
@@ -573,7 +573,7 @@ export default function AdminUsersPage() {
         <div>
           <h1 className="text-2xl font-bold">Gestión de usuarios</h1>
           <p className="text-sm text-gray-600">
-            Administrá usuarios del club (aprobar/rechazar, habilitar/deshabilitar, rol, vincular jugador).
+            Administra usuarios del club (aprobar/rechazar, habilitar/deshabilitar, rol, vincular jugador).
           </p>
         </div>
         <button
@@ -637,7 +637,7 @@ export default function AdminUsersPage() {
             <>
               <h2 className="text-lg sm:text-xl font-bold mb-2">Invitar nuevo usuario</h2>
               <p className="text-sm text-gray-600 mb-4">
-                Enviá una invitación por email para que el usuario cree su contraseña y acceda.
+                Envía una invitación por email para que el usuario cree su contraseña y acceda.
               </p>
               <form onSubmit={handleSendInvitation} className="space-y-4">
                 <div>

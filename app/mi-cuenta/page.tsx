@@ -1105,7 +1105,7 @@ export default function MiCuentaPage() {
             Tu cuenta aún no está vinculada a un perfil de jugador.
           </p>
           <p className="text-sm text-gray-500">
-            Contactá al administrador de tu club para que vincule tu usuario con tu perfil de jugador.
+            Contacta al administrador de tu club para que vincule tu usuario con tu perfil de jugador.
           </p>
         </div>
       </main>
@@ -1266,7 +1266,7 @@ export default function MiCuentaPage() {
 
             {notifyWhatsapp && !phone && (
               <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
-                Accede un número de teléfono para recibir notificaciones por WhatsApp.
+                Introduce un número de teléfono para recibir notificaciones por WhatsApp.
               </p>
             )}
           </div>

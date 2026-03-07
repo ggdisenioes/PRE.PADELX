@@ -1350,7 +1350,7 @@ export default function DashboardPage() {
 
                   {!userLinkedPlayer ? (
                     <p className="rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
-                      Vinculá tu usuario a un jugador para ver estadísticas.
+                      Vincula tu usuario a un jugador para ver estadísticas.
                     </p>
                   ) : !userRankingSummary ? (
                     <p className="rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">

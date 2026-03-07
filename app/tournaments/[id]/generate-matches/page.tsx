@@ -234,7 +234,7 @@ export default function GenerateMatchesPage() {
   const generateMatches = async () => {
     // Reglas 2vs2
     if (selectedPlayers.length < 4) {
-      toast.error("Seleccioná al menos 4 jugadores (2 parejas)");
+      toast.error("Selecciona al menos 4 jugadores (2 parejas)");
       return;
     }
     if (selectedPlayers.length % 2 !== 0) {
@@ -243,12 +243,12 @@ export default function GenerateMatchesPage() {
     }
 
     if (rounds.length > 0 && !selectedRound) {
-      toast.error("Seleccioná la jornada donde querés generar los partidos");
+      toast.error("Selecciona la jornada donde querés generar los partidos");
       return;
     }
 
     if (!startDate && !selectedRound?.start_at) {
-      toast.error("Seleccioná la fecha de inicio del torneo");
+      toast.error("Selecciona la fecha de inicio del torneo");
       return;
     }
 
@@ -704,7 +704,7 @@ export default function GenerateMatchesPage() {
           <div>
             <p className="font-medium mb-2">Vista previa de parejas</p>
             {selectedPlayers.length < 4 ? (
-              <p className="text-gray-500 text-sm">Seleccioná al menos 4 jugadores para armar parejas.</p>
+              <p className="text-gray-500 text-sm">Selecciona al menos 4 jugadores para armar parejas.</p>
             ) : selectedPlayers.length % 2 !== 0 ? (
               <p className="text-gray-500 text-sm">Falta 1 jugador para poder armar parejas.</p>
             ) : (

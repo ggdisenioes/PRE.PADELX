@@ -96,7 +96,7 @@ export default function CreatePlayer() {
 
         {!planLoading && !canCreatePlayer && (
           <div className="max-w-xl mx-auto mb-4 p-4 bg-yellow-50 border border-yellow-300 rounded-lg text-yellow-800 text-sm">
-            <strong>Limite alcanzado:</strong> Tu plan {plan?.name} permite hasta {plan?.max_players} jugadores y ya tienes {usage.playerCount}. Contacta al administrador para actualizar tu plan.
+            <strong>Límite alcanzado:</strong> Tu plan {plan?.name} permite hasta {plan?.max_players} jugadores y ya tienes {usage.playerCount}. Contacta al administrador para actualizar tu plan.
           </div>
         )}
 

@@ -139,7 +139,7 @@ export default function AcceptInvitationPage() {
           </h1>
           <p className="text-gray-600 text-sm mb-6">
             {isExpired
-              ? "Esta invitación expiró (válida por 72 horas). Contactá al administrador de PadelX para que te envíe una nueva."
+              ? "Esta invitación expiró (válida por 72 horas). Contacta al administrador de PadelX para que te envíe una nueva."
               : "Esta invitación no existe o ya fue utilizada."}
           </p>
           <a
@@ -181,7 +181,7 @@ export default function AcceptInvitationPage() {
             {preview.tenant_name}
           </span>
           <p className="text-gray-500 text-sm mt-4">
-            Configurá tu contraseña para acceder al panel de administración.
+            Configura tu contraseña para acceder al panel de administración.
           </p>
           <p className="text-sm font-semibold text-gray-900 mt-1">
             {preview.email}

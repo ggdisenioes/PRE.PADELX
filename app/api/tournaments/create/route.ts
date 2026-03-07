@@ -91,14 +91,14 @@ export async function POST(request: NextRequest) {
 
     if (!name) {
       return NextResponse.json(
-        { error: "Accede un nombre para el torneo." },
+        { error: "Introduce un nombre para el torneo." },
         { status: 400 }
       );
     }
 
     if (!category) {
       return NextResponse.json(
-        { error: "Accede una categoría válida." },
+        { error: "Introduce una categoría válida." },
         { status: 400 }
       );
     }

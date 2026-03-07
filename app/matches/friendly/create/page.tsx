@@ -167,13 +167,13 @@ export default function CreateFriendlyMatchPage() {
     }
 
     if (!form.start_time) {
-      toast.error("Seleccioná día y horario");
+      toast.error("Selecciona día y horario");
       return;
     }
 
     // Si hay pistas cargadas, recomendamos elegir una pista, pero permitimos fallback texto.
     if (courts.length > 0 && !form.court_id && !form.court_text) {
-      toast.error("Seleccioná una pista o completá la pista manualmente");
+      toast.error("Selecciona una pista o completa la pista manualmente");
       return;
     }
 
@@ -320,7 +320,7 @@ export default function CreateFriendlyMatchPage() {
         </section>
 
         <section>
-          <h2 className="font-semibold mb-2">Seleccioná jugadores (mínimo 4, número par)</h2>
+          <h2 className="font-semibold mb-2">Selecciona jugadores (mínimo 4, número par)</h2>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {players.map((p) => (

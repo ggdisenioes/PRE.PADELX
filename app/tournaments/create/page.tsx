@@ -72,7 +72,7 @@ export default function CreateTournament() {
     }
 
     if (!name.trim()) {
-      toast.error("Accede un nombre para el torneo");
+      toast.error("Introduce un nombre para el torneo");
       return;
     }
 
@@ -88,7 +88,7 @@ export default function CreateTournament() {
       : category;
 
     if (!finalCategory) {
-      toast.error("Accede una categoría válida");
+      toast.error("Introduce una categoría válida");
       setLoading(false);
       return;
     }
@@ -107,7 +107,7 @@ export default function CreateTournament() {
     for (let index = 0; index < normalizedRoundCount; index += 1) {
       const localDateTime = String(roundStarts[index] || "").trim();
       if (!localDateTime) {
-        toast.error(`Completá la fecha de inicio de la jornada ${index + 1}`);
+        toast.error(`Completa la fecha de inicio de la jornada ${index + 1}`);
         setLoading(false);
         return;
       }
@@ -190,7 +190,7 @@ export default function CreateTournament() {
 
       {!planLoading && !canCreateTournament && (
         <div className="max-w-3xl mb-4 p-4 bg-yellow-50 border border-yellow-300 rounded-lg text-yellow-800 text-sm">
-          <strong>Limite alcanzado:</strong> Tu plan {plan?.name} permite hasta {plan?.max_concurrent_tournaments} torneo(s) activo(s) y ya tienes {usage.activeTournamentCount}. Finaliza un torneo o contacta al administrador para actualizar tu plan.
+          <strong>Límite alcanzado:</strong> Tu plan {plan?.name} permite hasta {plan?.max_concurrent_tournaments} torneo(s) activo(s) y ya tienes {usage.activeTournamentCount}. Finaliza un torneo o contacta al administrador para actualizar tu plan.
         </div>
       )}
 
