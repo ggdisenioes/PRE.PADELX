@@ -209,7 +209,7 @@ export default function CreateMatchManualPage() {
     return (
       <main className="p-8">
         <p className="text-red-600 font-semibold">
-          ❌ No tenés permisos para crear partidos.
+          ❌ No tienes permisos para crear partidos.
         </p>
       </main>
     );

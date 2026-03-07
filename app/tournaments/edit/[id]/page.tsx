@@ -63,7 +63,7 @@ export default function EditTournament() {
   useEffect(() => {
     if (roleLoading) return;
     if (!isAdmin && !isManager) {
-      toast.error("No tenés permisos para editar torneos");
+      toast.error("No tienes permisos para editar torneos");
       router.replace("/tournaments");
     }
   }, [isAdmin, isManager, roleLoading, router]);
@@ -595,7 +595,7 @@ export default function EditTournament() {
               />
               {formData.status === "finalizado" && !formData.end_date && (
                 <p className="mt-1 text-xs text-red-600">
-                  Para finalizar el torneo, cargá la fecha de finalización.
+                  Para finalizar el torneo, introduce la fecha de finalización.
                 </p>
               )}
             </div>

@@ -203,7 +203,7 @@ export default function PlayersApprovalLogsPage() {
   if (!isAdmin) {
     return (
       <main className="px-4 sm:px-6 py-8 max-w-6xl mx-auto">
-        <p className="text-red-600 font-semibold">No tenés permisos para ver esta sección.</p>
+        <p className="text-red-600 font-semibold">No tienes permisos para ver esta sección.</p>
       </main>
     );
   }

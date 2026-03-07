@@ -141,7 +141,7 @@ export default function AdminUsersManagePage() {
     }
 
     if (currentUserId && u.id === currentUserId) {
-      toast.error("No podés eliminar tu propio usuario");
+      toast.error("No puedes eliminar tu propio usuario");
       return;
     }
 
@@ -270,7 +270,7 @@ export default function AdminUsersManagePage() {
   if (roleLoading) return <div className="p-6">Cargando...</div>;
 
   if (role !== "admin") {
-    return <div className="p-6 text-red-600 font-semibold">No tenés permisos para ver esta sección.</div>;
+    return <div className="p-6 text-red-600 font-semibold">No tienes permisos para ver esta sección.</div>;
   }
 
   return (

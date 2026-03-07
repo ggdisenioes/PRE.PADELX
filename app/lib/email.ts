@@ -336,7 +336,7 @@ export async function sendPasswordResetEmail(opts: {
     <p>Recibimos una solicitud para cambiar la contraseña de tu cuenta en <strong>${safeClub}</strong>.</p>
     <p>Para continuar, hacé clic en el siguiente botón:</p>
     <a class="btn" href="${safeUrl}">Restablecer contraseña</a>
-    <p style="margin-top:14px;">Si no solicitaste este cambio, podés ignorar este correo.</p>
+    <p style="margin-top:14px;">Si no solicitaste este cambio, puedes ignorar este correo.</p>
     <p class="muted">Por seguridad, este enlace vence automáticamente.</p>`
   );
 
@@ -369,7 +369,7 @@ export async function sendUserInvitationEmail(opts: {
     ${intro}
     <p>Para activar tu cuenta, definí tu contraseña desde este botón:</p>
     <a class="btn" href="${safeUrl}">Crear contraseña y acceder</a>
-    <p style="margin-top:14px;">Si no esperabas este correo, podés ignorarlo.</p>
+    <p style="margin-top:14px;">Si no esperabas este correo, puedes ignorarlo.</p>
     <p class="muted">Este enlace es personal y seguro.</p>`
   );
 
@@ -404,7 +404,7 @@ export async function sendAdminPendingRegistrationEmail(opts: {
   const subject = `Nuevo registro pendiente de aprobación · ${safeClub}`;
   const cta = manageUrl
     ? `<a class="btn" href="${safeManageUrl}">Revisar y aprobar/rechazar</a>`
-    : `<p class="muted">Ingresá al panel de gestión de usuarios para aprobar o rechazar la solicitud.</p>`;
+    : `<p class="muted">Accede al panel de gestión de usuarios para aprobar o rechazar la solicitud.</p>`;
 
   const body = baseLayout(
     subject,
@@ -415,7 +415,7 @@ export async function sendAdminPendingRegistrationEmail(opts: {
       <tr><td>Email</td><td>${safeRegistrantEmail}</td></tr>
       <tr><td>Estado</td><td>Pendiente de aprobación</td></tr>
     </table>
-    <p>Podés aprobar o rechazar esta solicitud desde la sección de gestión de usuarios.</p>
+    <p>Puedes aprobar o rechazar esta solicitud desde la sección de gestión de usuarios.</p>
     ${cta}`
   );
 
@@ -427,7 +427,7 @@ export async function sendAdminPendingRegistrationEmail(opts: {
 
 function renderMatchCta(url: string | null, label: string) {
   if (!url) {
-    return `<p class="muted">Este correo es informativo. Ingresá desde el enlace habitual de tu club para ver el detalle.</p>`;
+    return `<p class="muted">Este correo es informativo. Accede desde el enlace habitual de tu club para ver el detalle.</p>`;
   }
   return `<a class="btn" href="${esc(url)}">${esc(label)}</a>`;
 }
@@ -609,7 +609,7 @@ export async function sendMatchNotification(opts: {
       return baseLayout(
         subject,
         `<h2>¡Nuevo Partido!</h2>
-        <p>Hola <strong>${safeName}</strong>, tenés un nuevo partido programado.</p>
+        <p>Hola <strong>${safeName}</strong>, tienes un nuevo partido programado.</p>
         <table class="info-table">
           <tr><td>Equipo A</td><td>${safeTeamA}</td></tr>
           <tr><td>Equipo B</td><td>${safeTeamB}</td></tr>
@@ -768,7 +768,7 @@ export async function sendMatchProposalNotification(opts: {
         <tr><td>Fecha</td><td>${safeDate}</td></tr>
         ${court ? `<tr><td>Pista</td><td>${safeCourt}</td></tr>` : ""}
       </table>
-      <p>Por favor, revisá la propuesta y creá el partido desde el panel de administración.</p>
+      <p>Por favor, revisa la propuesta y crea el partido desde el panel de administración.</p>
       <a class="btn" href="${DEFAULT_APP_URL}/matches/friendly/create">Crear Partido Amistoso</a>`
     );
 

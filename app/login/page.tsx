@@ -260,7 +260,7 @@ export default function LoginPage() {
           <div className="bg-amber-50 border-l-4 border-amber-500 text-amber-900 p-3 mb-4 text-sm rounded-r">
             <p className="font-semibold">Acceso por subdominio incorrecto</p>
             <p className="mt-1">
-              Este usuario pertenece a otro club. Para evitar errores, ingresá desde el subdominio correcto.
+              Este usuario pertenece a otro club. Para evitar errores, accede desde el subdominio correcto.
             </p>
 
             {tenantRedirectUrl && (

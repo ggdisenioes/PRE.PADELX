@@ -1354,7 +1354,7 @@ export default function DashboardPage() {
                     </p>
                   ) : !userRankingSummary ? (
                     <p className="rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
-                      Todavía no tenés estadísticas suficientes en el ranking.
+                      Todavía no tienes estadísticas suficientes en el ranking.
                     </p>
                   ) : (
                     <div className="grid grid-cols-2 gap-2">

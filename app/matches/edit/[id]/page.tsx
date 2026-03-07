@@ -48,7 +48,7 @@ export default function EditMatch() {
     }
 
     if (!matchIdNum || Number.isNaN(matchIdNum)) {
-      toast.error('ID de partido inválido. Revisá la ruta /matches/edit/[id].');
+      toast.error('ID de partido inválido. Revisa la ruta /matches/edit/[id].');
       router.push('/matches');
       setLoading(false);
       return;
@@ -360,7 +360,7 @@ export default function EditMatch() {
                               )}
 
                               <p className="text-xs text-gray-500">
-                                Tip: si el partido se creó con texto (sin pista del club), podés dejarlo así o elegir una pista del listado.
+                                Tip: si el partido se creó con texto (sin pista del club), puedes dejarlo así o elegir una pista del listado.
                               </p>
                             </div>
                         </div>

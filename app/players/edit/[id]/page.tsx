@@ -467,7 +467,7 @@ export default function EditPlayerPage() {
                   </label>
                 </div>
                 {formData.notify_whatsapp && !formData.phone && (
-                  <p className="text-xs text-amber-600 mt-1">Ingresá un número de WhatsApp para recibir notificaciones.</p>
+                  <p className="text-xs text-amber-600 mt-1">Accede un número de WhatsApp para recibir notificaciones.</p>
                 )}
               </div>
 

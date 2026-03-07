@@ -74,7 +74,7 @@ export async function POST(req: Request) {
     }
 
     if (requesterId === user_id) {
-      return NextResponse.json({ error: "No podés eliminar tu propio usuario" }, { status: 400 });
+      return NextResponse.json({ error: "No puedes eliminar tu propio usuario" }, { status: 400 });
     }
 
     if (targetProfile.tenant_id !== requesterProfile.tenant_id) {

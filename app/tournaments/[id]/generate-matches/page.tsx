@@ -117,7 +117,7 @@ export default function GenerateMatchesPage() {
     return (
       <main className="max-w-xl mx-auto p-6">
         <p className="text-red-600 font-semibold">
-          No tenés permisos para generar partidos.
+          No tienes permisos para generar partidos.
         </p>
       </main>
     );
@@ -273,7 +273,7 @@ export default function GenerateMatchesPage() {
 
     const teams = teamsPreview;
     if (teams.length < 2) {
-      toast.error("No se pudieron armar parejas. Revisá la selección de jugadores.");
+      toast.error("No se pudieron armar parejas. Revisa la selección de jugadores.");
       return;
     }
 

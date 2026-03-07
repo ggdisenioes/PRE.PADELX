@@ -809,7 +809,7 @@ export default function MiCuentaPage() {
       </div>
 
       <p className="text-xs text-gray-500">
-        Recomendación: revisá este panel al inicio del día para priorizar aprobaciones y carga de resultados.
+        Recomendación: revisa este panel al inicio del día para priorizar aprobaciones y carga de resultados.
       </p>
     </section>
   );
@@ -928,7 +928,7 @@ export default function MiCuentaPage() {
           >
             <p className="text-sm font-semibold">
               {pendingTotal > 0
-                ? `Tenés ${pendingTotal} tarea${pendingTotal === 1 ? "" : "s"} pendiente${
+                ? `Tienes ${pendingTotal} tarea${pendingTotal === 1 ? "" : "s"} pendiente${
                     pendingTotal === 1 ? "" : "s"
                   } por revisar.`
                 : "No hay tareas críticas pendientes en este momento."}
@@ -1266,7 +1266,7 @@ export default function MiCuentaPage() {
 
             {notifyWhatsapp && !phone && (
               <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
-                Ingresá un número de teléfono para recibir notificaciones por WhatsApp.
+                Accede un número de teléfono para recibir notificaciones por WhatsApp.
               </p>
             )}
           </div>

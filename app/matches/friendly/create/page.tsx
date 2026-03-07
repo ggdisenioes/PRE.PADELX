@@ -157,7 +157,7 @@ export default function CreateFriendlyMatchPage() {
 
   const handleCreate = async () => {
     if (!canAccess) {
-      toast.error("No tenés permisos para crear amistosos.");
+      toast.error("No tienes permisos para crear amistosos.");
       return;
     }
 
@@ -241,7 +241,7 @@ export default function CreateFriendlyMatchPage() {
   }
 
   if (!canAccess) {
-    return <p className="text-red-600 font-semibold">No tenés permisos para crear partidos amistosos.</p>;
+    return <p className="text-red-600 font-semibold">No tienes permisos para crear partidos amistosos.</p>;
   }
 
   return (
@@ -304,7 +304,7 @@ export default function CreateFriendlyMatchPage() {
             <input
               type="text"
               name="court_text"
-              placeholder="Pista manual (opcional si elegís pista)"
+              placeholder="Pista manual (opcional si eliges pista)"
               value={form.court_text}
               onChange={handleFormChange}
               className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"

@@ -143,7 +143,7 @@ export async function POST(req: Request) {
     // No permitir borrarse a sí mismo
     if (user.id === user_id) {
       return NextResponse.json(
-        { error: "No podés eliminar tu propio usuario" },
+        { error: "No puedes eliminar tu propio usuario" },
         { status: 400 }
       );
     }

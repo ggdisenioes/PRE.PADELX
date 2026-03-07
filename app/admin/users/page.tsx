@@ -134,7 +134,7 @@ export default function AdminUsersPage() {
       setCanAccess(false);
       setCanAdminActions(false);
       toast.error(
-        "No se pudo determinar tu club (tenant). Verificá que exista tu fila en public.profiles y que tenga tenant_id asignado."
+        "No se pudo determinar tu club (tenant). Verifica que exista tu fila en public.profiles y que tenga tenant_id asignado."
       );
       return;
     }
@@ -562,7 +562,7 @@ export default function AdminUsersPage() {
   if (!canAccess) {
     return (
       <p className="p-6 text-red-600 font-semibold">
-        No tenés permisos para gestionar usuarios.
+        No tienes permisos para gestionar usuarios.
       </p>
     );
   }
@@ -1029,7 +1029,7 @@ export default function AdminUsersPage() {
                                 disabled={isMe || isTargetAdmin}
                                 title={
                                   isMe
-                                    ? "No podés deshabilitarte a vos mismo"
+                                    ? "No puedes deshabilitarte a ti mismo"
                                     : isTargetAdmin
                                     ? "No se deshabilita el admin principal desde aquí"
                                     : ""
@@ -1046,7 +1046,7 @@ export default function AdminUsersPage() {
                                 disabled={isMe || isTargetAdmin}
                                 title={
                                   isMe
-                                    ? "No podés eliminarte a vos mismo"
+                                    ? "No puedes eliminarte a ti mismo"
                                     : isTargetAdmin
                                     ? "No se elimina el admin principal desde aquí"
                                     : "Eliminar = deshabilitar (reversible)"

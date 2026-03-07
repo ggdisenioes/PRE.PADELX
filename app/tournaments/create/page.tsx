@@ -60,19 +60,19 @@ export default function CreateTournament() {
   useEffect(() => {
     if (roleLoading) return;
     if (!isAdmin && !isManager) {
-      toast.error("No tenés permisos para crear torneos");
+      toast.error("No tienes permisos para crear torneos");
       router.replace("/tournaments");
     }
   }, [isAdmin, isManager, roleLoading, router]);
 
   const handleCreate = async () => {
     if (!isAdmin && !isManager) {
-      toast.error("No tenés permisos para crear torneos");
+      toast.error("No tienes permisos para crear torneos");
       return;
     }
 
     if (!name.trim()) {
-      toast.error("Ingresá un nombre para el torneo");
+      toast.error("Accede un nombre para el torneo");
       return;
     }
 
@@ -88,7 +88,7 @@ export default function CreateTournament() {
       : category;
 
     if (!finalCategory) {
-      toast.error("Ingresá una categoría válida");
+      toast.error("Accede una categoría válida");
       setLoading(false);
       return;
     }

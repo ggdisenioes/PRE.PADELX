@@ -658,8 +658,8 @@ export default function RankingPage() {
           <Card className="text-center text-gray-500">
             <p>
               {isGeneralView
-                ? "No hay jugadores con puntos todavía. Registrá algunos partidos."
-                : "No hay jugadores con puntos en ese torneo. Registrá algunos partidos."}
+                ? "No hay jugadores con puntos todavía. Registra algunos partidos."
+                : "No hay jugadores con puntos en ese torneo. Registra algunos partidos."}
             </p>
           </Card>
         ) : (

@@ -174,7 +174,7 @@ export default function AdminLogsPage() {
       <div className="p-8">
         <h1 className="text-xl font-bold">Acceso denegado</h1>
         <p className="text-gray-600">
-          No tenés permisos para ver esta sección.
+          No tienes permisos para ver esta sección.
         </p>
         <Link href="/" className="text-indigo-600 underline mt-4 inline-block">
           Volver al dashboard

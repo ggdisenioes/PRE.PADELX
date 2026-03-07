@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     if (!ALLOWED_ROLES.has(String(profile.role || "").toLowerCase())) {
       return NextResponse.json(
-        { error: "No tenés permisos para crear torneos." },
+        { error: "No tienes permisos para crear torneos." },
         { status: 403 }
       );
     }
@@ -91,14 +91,14 @@ export async function POST(request: NextRequest) {
 
     if (!name) {
       return NextResponse.json(
-        { error: "Ingresá un nombre para el torneo." },
+        { error: "Accede un nombre para el torneo." },
         { status: 400 }
       );
     }
 
     if (!category) {
       return NextResponse.json(
-        { error: "Ingresá una categoría válida." },
+        { error: "Accede una categoría válida." },
         { status: 400 }
       );
     }

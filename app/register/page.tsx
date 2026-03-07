@@ -97,7 +97,7 @@ export default function RegisterPage() {
     }
 
     if (!email.trim()) {
-      toast.error("Ingresá un email.");
+      toast.error("Accede un email.");
       return;
     }
 
