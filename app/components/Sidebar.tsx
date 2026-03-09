@@ -36,18 +36,6 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
-  const [tenantSlugFromHost, setTenantSlugFromHost] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const host = window.location.hostname.trim().toLowerCase();
-    const parts = host.split(".");
-    if (parts.length < 3) {
-      setTenantSlugFromHost(null);
-      return;
-    }
-    setTenantSlugFromHost(parts[0] || null);
-  }, []);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -146,10 +134,9 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
     { id: "tournaments", label: t("nav.tournaments"), href: "/tournaments", emoji: "🏆" },
     { id: "players", label: t("nav.players"), href: "/players", emoji: "👥" },
     { id: "matches", label: t("nav.matches"), href: "/matches", emoji: "🎾" },
-    { id: "ranking", label: t("nav.ranking"), href: "/ranking", emoji: "⭐", requiredFeature: "has_advanced_rankings" },
+    { id: "ranking", label: t("nav.ranking"), href: "/ranking", emoji: "⭐" },
     { id: "news", label: t("nav.news"), href: "/news", emoji: "📰" },
     { id: "challenges", label: t("nav.challenges"), href: "/challenges", emoji: "⚔️" },
-    { id: "bookings", label: t("nav.bookings"), href: "/bookings", emoji: "📅" },
     { id: "mi-cuenta", label: t("nav.myAccount"), href: "/mi-cuenta", emoji: "👤" },
   ];
 
@@ -215,23 +202,13 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
     );
   };
 
-  const isTwincoTenant = tenantSlugFromHost === "twinco";
-
   return (
     <aside className="w-56 h-screen flex flex-col overflow-hidden text-white bg-gradient-to-b from-[#0b1220] via-[#0e1626] to-[#0a1020] border-r border-white/5">
       {/* HEADER / LOGO */}
       <div className="px-5 py-6 border-b border-white/10 text-center">
-        {isTwincoTenant ? (
-          <img
-            src="/logo.svg"
-            alt="TWINCO"
-            className="h-8 w-auto mx-auto object-contain"
-          />
-        ) : (
-          <h1 className="text-[26px] font-extrabold italic tracking-tight">
-            TWINCO
-          </h1>
-        )}
+        <h1 className="text-[26px] font-extrabold italic tracking-tight">
+          PADELX QA
+        </h1>
         <p className="mt-1 text-[10px] font-bold tracking-[0.3em] text-[#ccff00] uppercase">
           Pádel Manager
         </p>
@@ -243,10 +220,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
         <div>
           <p className="px-6 py-2 text-xs font-semibold text-gray-400 uppercase tracking-widest">General</p>
           {generalMenuItems
-            .filter(item => {
-              if (isTwincoTenant && item.id === "bookings") return false;
-              return !item.requiredFeature || hasFeature(item.requiredFeature);
-            })
+            .filter(item => !item.requiredFeature || hasFeature(item.requiredFeature))
             .map(renderMenuItem)}
         </div>
 
