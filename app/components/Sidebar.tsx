@@ -304,12 +304,12 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
         <p className="mt-2 text-center text-[9px] text-gray-500">
           {t("common.developedBy")}{" "}
           <a
-            href="https://ggdisenio.es"
+            href="https://padelx.es"
             target="_blank"
             rel="noreferrer"
             className="font-bold hover:text-[#ccff00]"
           >
-            GGDisenio.es
+            padelx.es
           </a>
         </p>
       </div>

@@ -356,11 +356,11 @@ export default function LoginPage() {
           <p className="text-xs text-gray-400">
             Desarrollado por{" "}
             <a
-              href="https://ggdisenio.es"
+              href="https://padelx.es"
               target="_blank"
               className="text-gray-600 hover:text-[#00b4ff] font-bold transition"
             >
-              GGDisenio.es
+              padelx.es
             </a>
           </p>
         </div>
