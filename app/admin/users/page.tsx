@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { supabase } from "../../lib/supabase";
+import { waitForSession } from "@/lib/auth-session";
 
 type ApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -75,6 +76,7 @@ export default function AdminUsersPage() {
   const [pendingInvitations, setPendingInvitations] = useState<PendingInvitationRow[]>([]);
   const [loadingInvitations, setLoadingInvitations] = useState(false);
   const [invitationActionKey, setInvitationActionKey] = useState<string | null>(null);
+  const [roleActionUserId, setRoleActionUserId] = useState<string | null>(null);
 
   const [inviteForm, setInviteForm] = useState({
     name: "",
@@ -87,6 +89,13 @@ export default function AdminUsersPage() {
     if (statusTab === "all") return rows;
     return rows.filter((r) => statusFromRow(r) === statusTab);
   }, [rows, statusTab]);
+
+  const activeAdminCount = useMemo(() => {
+    return rows.filter((r) => {
+      const role = (r.role ?? "").toString().toLowerCase();
+      return role === "admin" && r.active !== false && !r.deleted_at;
+    }).length;
+  }, [rows]);
 
   const userPlayerMap = useMemo(() => {
     const map: Record<string, number> = {};
@@ -107,20 +116,21 @@ export default function AdminUsersPage() {
   const load = async () => {
     setLoading(true);
 
-    const {
-      data: { user },
-      error: userErr,
-    } = await supabase.auth.getUser();
+    const session = await waitForSession(supabase, { retries: 7, delayMs: 180 });
+    const user = session?.user || null;
 
-    if (userErr || !user) {
+    if (!user) {
       setLoading(false);
       setCanAccess(false);
       setCanAdminActions(false);
-      toast.error("No se pudo leer tu sesión.");
+      toast.error("No se pudo leer tu sesión. Reinténtalo en unos segundos.");
       return;
     }
 
     setMeId(user.id);
+
+    const token = session?.access_token;
+    const tokenRole = decodeJwtRole(token);
 
     const { data: me, error: meErr } = await supabase
       .from("profiles")
@@ -134,12 +144,13 @@ export default function AdminUsersPage() {
       setCanAccess(false);
       setCanAdminActions(false);
       toast.error(
-        "No se pudo determinar tu club (tenant). Verifica que exista tu fila en public.profiles y que tenga tenant_id asignado."
+        "No se pudo determinar tu club (tenant). Verificá que exista tu fila en public.profiles y que tenga tenant_id asignado."
       );
       return;
     }
 
-    const role = (me.role ?? "").toString().toLowerCase();
+    const dbRole = (me.role ?? "").toString().toLowerCase();
+    const role = pickHigherRole(tokenRole, dbRole);
     const allowed = role === "admin" || role === "manager";
     const isAdmin = role === "admin";
 
@@ -205,7 +216,14 @@ export default function AdminUsersPage() {
       toast.error("No se pudieron cargar los logs.");
     }
 
-    setRows((usersRes.data as ProfileRow[]) || []);
+    const rows = ((usersRes.data as ProfileRow[]) || []).map((row) => {
+      if (session?.user?.id && row.id === session.user.id) {
+        return { ...row, role: pickHigherRole(tokenRole, row.role) };
+      }
+      return row;
+    });
+
+    setRows(rows);
     setPlayers((playersRes.data as PlayerOption[]) || []);
     setLogs((logsRes.data as AuditLog[]) || []);
     setLoading(false);
@@ -221,7 +239,7 @@ export default function AdminUsersPage() {
 
     const name = inviteForm.name.trim();
     if (!name) {
-      toast.error("Completa el nombre.");
+      toast.error("Completá el nombre.");
       return;
     }
 
@@ -264,7 +282,7 @@ export default function AdminUsersPage() {
       void load();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        toast.error("La invitación tardó demasiado. Reintentá.");
+        toast.error("La invitación tardó demasiado. Reinténtalo.");
       } else {
         toast.error(error instanceof Error ? error.message : "Error enviando invitación.");
       }
@@ -307,7 +325,7 @@ export default function AdminUsersPage() {
       );
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        toast.error("La carga de invitaciones tardó demasiado. Reintentá.");
+        toast.error("La carga de invitaciones tardó demasiado. Reinténtalo.");
       } else {
         toast.error(error instanceof Error ? error.message : "Error cargando invitaciones.");
       }
@@ -359,7 +377,7 @@ export default function AdminUsersPage() {
       await loadPendingInvitations();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        toast.error("El reenvío tardó demasiado. Reintentá.");
+        toast.error("El reenvío tardó demasiado. Reinténtalo.");
       } else {
         toast.error(error instanceof Error ? error.message : "Error reenviando invitación.");
       }
@@ -414,7 +432,7 @@ export default function AdminUsersPage() {
       void load();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        toast.error("La cancelación tardó demasiado. Reintentá.");
+        toast.error("La cancelación tardó demasiado. Reinténtalo.");
       } else {
         toast.error(error instanceof Error ? error.message : "Error cancelando invitación.");
       }
@@ -483,15 +501,42 @@ export default function AdminUsersPage() {
     void load();
   };
 
-  const changeRole = async (userId: string, newRole: "user" | "manager") => {
-    const { error } = await supabase.from("profiles").update({ role: newRole }).eq("id", userId);
-    if (error) {
-      console.error(error);
-      toast.error("No se pudo actualizar el rol.");
+  const changeRole = async (userId: string, newRole: "user" | "manager" | "admin") => {
+    if (!canAdminActions) {
+      toast.error("Solo admins pueden cambiar roles.");
       return;
     }
-    toast.success("Rol actualizado.");
-    void load();
+
+    setRoleActionUserId(userId);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Sesión inválida.");
+
+      const response = await fetch("/api/admin/users/role", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ user_id: userId, role: newRole }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "No se pudo actualizar el rol.");
+      }
+
+      toast.success(payload.unchanged ? "El rol ya estaba aplicado." : "Rol actualizado.");
+      void load();
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar el rol.");
+    } finally {
+      setRoleActionUserId(null);
+    }
   };
 
   const linkPlayer = async (userId: string, playerId: number | null) => {
@@ -527,6 +572,45 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     void load();
+  }, []);
+
+function decodeJwtRole(token?: string | null): string | null {
+  if (!token) return null;
+  try {
+    const payload = token.split(".")[1];
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    const data = JSON.parse(json);
+    const role =
+      data?.role ||
+      data?.user_role ||
+      data?.app_metadata?.role ||
+      data?.app_metadata?.user_role;
+    return typeof role === "string" ? role.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+function pickHigherRole(tokenRole: string | null, dbRole: string | null): string {
+  const normDb = (dbRole || "").toLowerCase();
+  const normTk = (tokenRole || "").toLowerCase();
+  if (normTk === "admin") return "admin";
+  if (normTk === "manager" && normDb !== "admin") return "manager";
+  return normDb || normTk || "user";
+}
+
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        void load();
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -573,7 +657,7 @@ export default function AdminUsersPage() {
         <div>
           <h1 className="text-2xl font-bold">Gestión de usuarios</h1>
           <p className="text-sm text-gray-600">
-            Administra usuarios del club (aprobar/rechazar, habilitar/deshabilitar, rol, vincular jugador).
+            Administrá usuarios del club (aprobar/rechazar, habilitar/deshabilitar, rol, vincular jugador).
           </p>
         </div>
         <button
@@ -879,7 +963,18 @@ export default function AdminUsersPage() {
                 {filtered.map((u) => {
                   const status = statusFromRow(u);
                   const isMe = meId === u.id;
-                  const isTargetAdmin = (u.role ?? "").toString().toLowerCase() === "admin";
+                  const normalizedRole = (u.role ?? "user").toString().toLowerCase();
+                  const roleValue: "admin" | "manager" | "user" =
+                    normalizedRole === "admin" ||
+                    normalizedRole === "manager" ||
+                    normalizedRole === "user"
+                      ? normalizedRole
+                      : "user";
+                  const isProtectedRole = normalizedRole === "super_admin";
+                  const isTargetAdmin = roleValue === "admin";
+                  const isLastActiveAdmin =
+                    isTargetAdmin && u.active !== false && !u.deleted_at && activeAdminCount <= 1;
+                  const isChangingRole = roleActionUserId === u.id;
                   const linkedPlayerId = userPlayerMap[u.id] ?? null;
                   const availablePlayers = players.filter(
                     (p) => p.user_id === null || p.user_id === u.id
@@ -919,20 +1014,31 @@ export default function AdminUsersPage() {
 
                       <div className="md:col-span-1">
                         <p className="md:hidden text-[11px] font-bold uppercase text-gray-500 mb-1">Rol</p>
-                        {isTargetAdmin ? (
-                          <span className="text-sm text-gray-700">admin</span>
-                        ) : (
+                        {canAdminActions && !isProtectedRole ? (
                           <select
-                            value={(u.role ?? "user").toString().toLowerCase()}
+                            value={roleValue}
                             onChange={(e) => {
                               const v = e.target.value;
-                              if (v === "manager" || v === "user") void changeRole(u.id, v);
+                              if (v === "admin" || v === "manager" || v === "user") {
+                                void changeRole(u.id, v);
+                              }
                             }}
-                            className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
+                            disabled={isChangingRole || isLastActiveAdmin}
+                            title={
+                              isLastActiveAdmin
+                                ? "No se puede quitar el rol al último admin activo del tenant."
+                                : ""
+                            }
+                            className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm disabled:bg-gray-100 disabled:text-gray-500"
                           >
                             <option value="user">user</option>
                             <option value="manager">manager</option>
+                            <option value="admin">admin</option>
                           </select>
+                        ) : (
+                          <span className="text-sm text-gray-700">
+                            {isProtectedRole ? "super_admin" : roleValue}
+                          </span>
                         )}
                       </div>
 

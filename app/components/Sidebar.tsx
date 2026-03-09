@@ -4,14 +4,13 @@
 
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useRole } from "../hooks/useRole";
 import { useTenantPlan } from "../hooks/useTenantPlan";
 import { useTranslation } from "../i18n";
 import LanguageSelector from "./LanguageSelector";
 import toast from "react-hot-toast";
-import { getClientCache, setClientCache } from "../lib/clientCache";
 
 type SidebarProps = {
   onLinkClick?: () => void;
@@ -23,8 +22,6 @@ type UserInfo = {
   last_name?: string | null;
 };
 
-const SIDEBAR_USER_CACHE_PREFIX = "qa:sidebar:user:v1";
-const SIDEBAR_USER_CACHE_TTL_MS = 10 * 60 * 1000;
 const SESSION_STARTED_AT_KEY = "padelx.sessionStartedAt";
 const SESSION_LAST_ACTIVITY_AT_KEY = "padelx.sessionLastActivityAt";
 const SESSION_USER_ID_KEY = "padelx.sessionUserId";
@@ -39,6 +36,18 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+  const [tenantSlugFromHost, setTenantSlugFromHost] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const host = window.location.hostname.trim().toLowerCase();
+    const parts = host.split(".");
+    if (parts.length < 3) {
+      setTenantSlugFromHost(null);
+      return;
+    }
+    setTenantSlugFromHost(parts[0] || null);
+  }, []);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -47,25 +56,17 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
       } = await supabase.auth.getSession();
 
       if (session?.user) {
-        const cacheKey = `${SIDEBAR_USER_CACHE_PREFIX}:${session.user.id}`;
-        const cachedUser = getClientCache<UserInfo>(cacheKey, SIDEBAR_USER_CACHE_TTL_MS);
-        if (cachedUser) {
-          setUser(cachedUser);
-        }
-
         const { data: profile } = await supabase
           .from("profiles")
           .select("first_name,last_name")
           .eq("id", session.user.id)
           .single();
 
-        const nextUser = {
+        setUser({
           email: session.user.email ?? null,
           first_name: profile?.first_name ?? null,
           last_name: profile?.last_name ?? null,
-        };
-        setUser(nextUser);
-        setClientCache<UserInfo>(cacheKey, nextUser);
+        });
       } else {
         setUser(null);
       }
@@ -77,25 +78,17 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         if (session?.user) {
-          const cacheKey = `${SIDEBAR_USER_CACHE_PREFIX}:${session.user.id}`;
-          const cachedUser = getClientCache<UserInfo>(cacheKey, SIDEBAR_USER_CACHE_TTL_MS);
-          if (cachedUser) {
-            setUser(cachedUser);
-          }
-
           const { data: profile } = await supabase
             .from("profiles")
             .select("first_name,last_name")
             .eq("id", session.user.id)
             .single();
 
-          const nextUser = {
+          setUser({
             email: session.user.email ?? null,
             first_name: profile?.first_name ?? null,
             last_name: profile?.last_name ?? null,
-          };
-          setUser(nextUser);
-          setClientCache<UserInfo>(cacheKey, nextUser);
+          });
         } else {
           setUser(null);
         }
@@ -125,6 +118,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
           window.localStorage.removeItem(SESSION_STARTED_AT_KEY);
           window.localStorage.removeItem(SESSION_LAST_ACTIVITY_AT_KEY);
           window.localStorage.removeItem(ROLE_CACHE_KEY);
+          // No se borra REMEMBERED_EMAIL_KEY para respetar "recordar usuario"
           window.sessionStorage.removeItem("unauthorized_redirect");
         } catch {}
       }
@@ -147,31 +141,25 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
   };
 
   // MENÚ GENERAL (visible para todos, algunos gated por plan)
-  const generalMenuItems = useMemo(
-    () => [
-      { id: "dashboard", label: t("nav.dashboard"), href: "/", emoji: "📊" },
-      { id: "tournaments", label: t("nav.tournaments"), href: "/tournaments", emoji: "🏆" },
-      { id: "players", label: t("nav.players"), href: "/players", emoji: "👥" },
-      { id: "matches", label: t("nav.matches"), href: "/matches", emoji: "🎾" },
-      { id: "ranking", label: t("nav.ranking"), href: "/ranking", emoji: "⭐", requiredFeature: "has_advanced_rankings" },
-      { id: "news", label: t("nav.news"), href: "/news", emoji: "📰" },
-      { id: "challenges", label: t("nav.challenges"), href: "/challenges", emoji: "⚔️" },
-      { id: "bookings", label: t("nav.bookings"), href: "/bookings", emoji: "📅" },
-      { id: "mi-cuenta", label: t("nav.myAccount"), href: "/mi-cuenta", emoji: "👤" },
-    ],
-    [t]
-  );
+  const generalMenuItems = [
+    { id: "dashboard", label: t("nav.dashboard"), href: "/", emoji: "📊" },
+    { id: "tournaments", label: t("nav.tournaments"), href: "/tournaments", emoji: "🏆" },
+    { id: "players", label: t("nav.players"), href: "/players", emoji: "👥" },
+    { id: "matches", label: t("nav.matches"), href: "/matches", emoji: "🎾" },
+    { id: "ranking", label: t("nav.ranking"), href: "/ranking", emoji: "⭐", requiredFeature: "has_advanced_rankings" },
+    { id: "news", label: t("nav.news"), href: "/news", emoji: "📰" },
+    { id: "challenges", label: t("nav.challenges"), href: "/challenges", emoji: "⚔️" },
+    { id: "bookings", label: t("nav.bookings"), href: "/bookings", emoji: "📅" },
+    { id: "mi-cuenta", label: t("nav.myAccount"), href: "/mi-cuenta", emoji: "👤" },
+  ];
 
   // MENÚ ADMINISTRACIÓN (solo Admin/Manager)
-  const adminMenuItems = useMemo(
-    () => [
-      { id: "management", label: t("nav.userManagement"), href: "/admin/management", emoji: "⚙️" },
-      { id: "courts", label: t("nav.courtAdmin"), href: "/courts", emoji: "🏟️" },
-      { id: "news-admin", label: t("nav.newsAdmin"), href: "/admin/news", emoji: "📝" },
-      { id: "analytics", label: t("nav.analytics"), href: "/admin/analytics", emoji: "📈", requiredFeature: "has_player_stats" },
-    ],
-    [t]
-  );
+  const adminMenuItems = [
+    { id: "management", label: t("nav.userManagement"), href: "/admin/users", emoji: "⚙️" },
+    { id: "courts", label: t("nav.courtAdmin"), href: "/courts", emoji: "🏟️" },
+    { id: "news-admin", label: t("nav.newsAdmin"), href: "/admin/news", emoji: "📝" },
+    { id: "analytics", label: t("nav.analytics"), href: "/admin/analytics", emoji: "📈", requiredFeature: "has_player_stats" },
+  ];
 
   const getInitials = (u: UserInfo | null): string => {
     if (!u) return "US";
@@ -227,32 +215,23 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
     );
   };
 
-  useEffect(() => {
-    if (planLoading) return;
-
-    const hrefs = [
-      ...generalMenuItems
-        .filter((item) => !item.requiredFeature || hasFeature(item.requiredFeature))
-        .map((item) => item.href),
-      ...(user && (isAdmin || isManager)
-        ? adminMenuItems
-            .filter((item) => !item.requiredFeature || hasFeature(item.requiredFeature))
-            .map((item) => item.href)
-        : []),
-    ];
-
-    hrefs.forEach((href) => {
-      router.prefetch(href);
-    });
-  }, [adminMenuItems, generalMenuItems, hasFeature, isAdmin, isManager, planLoading, router, user]);
+  const isTwincoTenant = tenantSlugFromHost === "twinco";
 
   return (
     <aside className="w-56 h-screen flex flex-col overflow-hidden text-white bg-gradient-to-b from-[#0b1220] via-[#0e1626] to-[#0a1020] border-r border-white/5">
       {/* HEADER / LOGO */}
       <div className="px-5 py-6 border-b border-white/10 text-center">
-        <h1 className="text-[26px] font-extrabold italic tracking-tight">
-          PADELX QA
-        </h1>
+        {isTwincoTenant ? (
+          <img
+            src="/logo.svg"
+            alt="TWINCO"
+            className="h-8 w-auto mx-auto object-contain"
+          />
+        ) : (
+          <h1 className="text-[26px] font-extrabold italic tracking-tight">
+            TWINCO
+          </h1>
+        )}
         <p className="mt-1 text-[10px] font-bold tracking-[0.3em] text-[#ccff00] uppercase">
           Pádel Manager
         </p>
@@ -264,7 +243,10 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
         <div>
           <p className="px-6 py-2 text-xs font-semibold text-gray-400 uppercase tracking-widest">General</p>
           {generalMenuItems
-            .filter(item => !item.requiredFeature || hasFeature(item.requiredFeature))
+            .filter(item => {
+              if (isTwincoTenant && item.id === "bookings") return false;
+              return !item.requiredFeature || hasFeature(item.requiredFeature);
+            })
             .map(renderMenuItem)}
         </div>
 
