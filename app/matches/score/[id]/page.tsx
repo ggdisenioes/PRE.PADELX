@@ -26,8 +26,15 @@ export default function ScoreEntryPage() {
     });
     const [winnerTeam, setWinnerTeam] = useState<'A' | 'B' | null>(null);
 
-    // Determines if the match is 'FINALIZED'
-    const isFinished = useMemo(() => matchData?.winner !== 'pending', [matchData]);
+    const normalizedWinner = useMemo(() => {
+        const rawWinner = matchData?.winner;
+        if (typeof rawWinner !== 'string') return null;
+        const winner = rawWinner.trim().toUpperCase();
+        return winner === 'A' || winner === 'B' ? (winner as 'A' | 'B') : null;
+    }, [matchData?.winner]);
+
+    // Considera finalizado solo si hay ganador real A/B.
+    const isFinished = useMemo(() => normalizedWinner !== null, [normalizedWinner]);
 
     // Helper function to get player names (using fetched JOIN data)
     const getTeamDisplay = (teamLetter: 'A' | 'B') => {
@@ -77,7 +84,8 @@ export default function ScoreEntryPage() {
                         set3A: parts[2]?.split('-')[0] || '', set3B: parts[2]?.split('-')[1] || '',
                     });
                 }
-                setWinnerTeam(data.winner === 'A' || data.winner === 'B' ? data.winner : null);
+                const winner = typeof data.winner === 'string' ? data.winner.trim().toUpperCase() : '';
+                setWinnerTeam(winner === 'A' || winner === 'B' ? winner : null);
             }
             setLoading(false);
         };
