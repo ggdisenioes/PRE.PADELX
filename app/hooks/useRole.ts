@@ -33,6 +33,12 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+type WhoAmIRoleResponse = {
+  authenticated?: boolean;
+  active?: boolean;
+  role?: string;
+};
+
 async function getSessionWithRetry(retries = 12, delayMs = 180) {
   for (let attempt = 1; attempt <= retries; attempt += 1) {
     const {
@@ -44,6 +50,26 @@ async function getSessionWithRetry(retries = 12, delayMs = 180) {
     }
   }
   return null;
+}
+
+async function fetchRoleFromWhoAmI(): Promise<UserRole | null> {
+  try {
+    const response = await fetch("/api/auth/whoami-role", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "include",
+    });
+
+    if (!response.ok) return null;
+
+    const payload = (await response.json()) as WhoAmIRoleResponse;
+    if (!payload?.authenticated || payload?.active === false) return null;
+
+    const normalized = normalizeRole(payload?.role);
+    return normalized ?? "user";
+  } catch {
+    return null;
+  }
 }
 
 function decodeJwtPayload<T = unknown>(token: string): T | null {
@@ -87,6 +113,15 @@ export function useRole() {
         const session = await getSessionWithRetry(12, 180);
 
         if (!session?.user?.id) {
+          const serverRole = await fetchRoleFromWhoAmI();
+          if (serverRole) {
+            if (active) {
+              setRole(serverRole);
+              setLoading(false);
+            }
+            return;
+          }
+
           if (active) {
             setRole("user");
             setLoading(false);
@@ -150,6 +185,18 @@ export function useRole() {
 
         if (error || !data) {
           console.warn("[useRole] failed to fetch role from profiles", error);
+          const serverRole = await fetchRoleFromWhoAmI();
+          if (serverRole) {
+            if (active) {
+              setRole(serverRole);
+              setClientCache<RoleCachePayload>(ROLE_CACHE_KEY, {
+                role: serverRole,
+                userId,
+              });
+            }
+            return;
+          }
+
           const fallbackRole = normalizedTokenRole || "user";
           if (active) {
             setRole(fallbackRole);
